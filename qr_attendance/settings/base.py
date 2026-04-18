@@ -11,7 +11,8 @@ from decouple import config, Csv
 BASE_DIR = Path(__file__).resolve().parent.parent.parent
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = config('SECRET_KEY', default='django-insecure-change-me-in-production')
+SECRET_KEY = config(
+    'SECRET_KEY', default='django-insecure-change-me-in-production')
 
 # Application definition
 INSTALLED_APPS = [
@@ -21,11 +22,11 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
-    
+
     # Third-party apps
     'rest_framework',
     'django_htmx',
-    
+
     # Local apps
     'core',
     'attendance',
@@ -81,7 +82,7 @@ AUTH_PASSWORD_VALIDATORS = [
 ]
 
 # Internationalization
-LANGUAGE_CODE = 'en-us'
+LANGUAGE_CODE = 'ar'  # Arabic
 TIME_ZONE = config('TIME_ZONE', default='Africa/Cairo')
 USE_I18N = True
 USE_TZ = True

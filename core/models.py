@@ -16,16 +16,16 @@ from django.db import models
 class User(AbstractUser):
     """
     Custom User model with role-based access control.
-    
+
     Roles:
         - admin: Full system access (manage students, teachers, view all records)
         - teacher: View own students, upload photos
     """
-    
+
     class Role(models.TextChoices):
         ADMIN = 'admin', 'Admin'
         TEACHER = 'teacher', 'Teacher'
-    
+
     role = models.CharField(
         max_length=10,
         choices=Role.choices,
@@ -38,20 +38,20 @@ class User(AbstractUser):
         null=True,
         help_text="Contact phone number"
     )
-    
+
     class Meta:
         db_table = 'users'
         verbose_name = 'User'
         verbose_name_plural = 'Users'
-    
+
     def __str__(self) -> str:
         return f"{self.get_full_name() or self.username} ({self.role})"
-    
+
     @property
     def is_admin(self) -> bool:
         """Check if user has admin role."""
         return self.role == self.Role.ADMIN
-    
+
     @property
     def is_teacher(self) -> bool:
         """Check if user has teacher role."""
@@ -61,11 +61,11 @@ class User(AbstractUser):
 class Student(models.Model):
     """
     Student model representing a student in the system.
-    
+
     Students are identified by a UUID which is encoded in their QR code.
     They can be linked to multiple teachers (different subjects).
     """
-    
+
     id = models.UUIDField(
         primary_key=True,
         default=uuid.uuid4,
@@ -89,13 +89,13 @@ class Student(models.Model):
     )
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
-    
+
     class Meta:
         db_table = 'students'
         ordering = ['full_name']
         verbose_name = 'Student'
         verbose_name_plural = 'Students'
-    
+
     def __str__(self) -> str:
         return f"{self.full_name} ({self.national_id})"
 
@@ -103,11 +103,11 @@ class Student(models.Model):
 class Teacher(models.Model):
     """
     Teacher profile model linked to a User account.
-    
+
     Teachers are also identified by a UUID for QR code scanning.
     They have a user account for portal access.
     """
-    
+
     id = models.UUIDField(
         primary_key=True,
         default=uuid.uuid4,
@@ -132,13 +132,13 @@ class Teacher(models.Model):
     )
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
-    
+
     class Meta:
         db_table = 'teachers'
         ordering = ['full_name']
         verbose_name = 'Teacher'
         verbose_name_plural = 'Teachers'
-    
+
     def __str__(self) -> str:
         return f"{self.full_name}"
 
@@ -146,11 +146,11 @@ class Teacher(models.Model):
 class StudentTeacherLink(models.Model):
     """
     Many-to-many relationship between students and teachers.
-    
+
     A student can be linked to multiple teachers (different subjects).
     A teacher can have multiple students assigned to them.
     """
-    
+
     student = models.ForeignKey(
         Student,
         on_delete=models.CASCADE,
@@ -168,14 +168,13 @@ class StudentTeacherLink(models.Model):
         help_text="Whether this is the student's primary teacher"
     )
     created_at = models.DateTimeField(auto_now_add=True)
-    
+
     class Meta:
         db_table = 'student_teacher_links'
         unique_together = ['student', 'teacher']
         verbose_name = 'Student-Teacher Link'
         verbose_name_plural = 'Student-Teacher Links'
-    
+
     def __str__(self) -> str:
         primary = " (Primary)" if self.is_primary else ""
         return f"{self.student.full_name} → {self.teacher.full_name}{primary}"
-

@@ -12,7 +12,8 @@ from decouple import config, Csv
 DEBUG = False
 
 # Allowed hosts - set to your local server IP
-ALLOWED_HOSTS = config('ALLOWED_HOSTS', cast=Csv(), default='localhost,127.0.0.1')
+ALLOWED_HOSTS = config('ALLOWED_HOSTS', cast=Csv(),
+                       default='localhost,127.0.0.1')
 
 # Database - PostgreSQL for production
 DATABASES = {
