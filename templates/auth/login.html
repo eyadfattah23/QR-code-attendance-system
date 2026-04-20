@@ -1,0 +1,372 @@
+{% extends 'base.html' %}
+
+{% block title %}تسجيل الدخول - نظام الحضور{% endblock %}
+
+{% block extra_css %}
+<style>
+    /* Login Page Responsive Styles */
+    .login-wrapper {
+        min-height: 100vh;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 1rem;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    }
+
+    .login-card-container {
+        width: 100%;
+        max-width: 420px;
+        animation: fadeInUp 0.6s ease-out;
+    }
+
+    @keyframes fadeInUp {
+        from {
+            opacity: 0;
+            transform: translateY(20px);
+        }
+
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    }
+
+    .login-card {
+        background: #fff;
+        border-radius: 1rem;
+        box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
+        overflow: hidden;
+    }
+
+    .login-header {
+        background: linear-gradient(135deg, #0d6efd 0%, #0a58ca 100%);
+        color: white;
+        padding: 2rem;
+        text-align: center;
+    }
+
+    .login-header .icon-wrapper {
+        width: 80px;
+        height: 80px;
+        background: rgba(255, 255, 255, 0.2);
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        margin: 0 auto 1rem;
+    }
+
+    .login-header .icon-wrapper i {
+        font-size: 2.5rem;
+    }
+
+    .login-body {
+        padding: 2rem;
+    }
+
+    .form-floating>label {
+        right: 0;
+        left: auto;
+        padding-right: 1rem;
+    }
+
+    .form-floating>.form-control {
+        padding-right: 1rem;
+    }
+
+    .input-group-text {
+        background-color: #f8f9fa;
+        border-left: none;
+    }
+
+    .form-control:focus {
+        border-color: #0d6efd;
+        box-shadow: 0 0 0 0.25rem rgba(13, 110, 253, 0.15);
+    }
+
+    .btn-login {
+        padding: 0.875rem 1.5rem;
+        font-size: 1.1rem;
+        font-weight: 500;
+        border-radius: 0.5rem;
+        transition: all 0.3s ease;
+    }
+
+    .btn-login:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 5px 20px rgba(13, 110, 253, 0.4);
+    }
+
+    .btn-login:active {
+        transform: translateY(0);
+    }
+
+    .login-footer {
+        text-align: center;
+        padding: 1rem 2rem 1.5rem;
+        background: #f8f9fa;
+        border-top: 1px solid #e9ecef;
+    }
+
+    /* Password Toggle Button */
+    .password-toggle {
+        cursor: pointer;
+        border: 1px solid #dee2e6;
+        border-right: none;
+        background: #f8f9fa;
+    }
+
+    .password-toggle:hover {
+        background: #e9ecef;
+    }
+
+    /* Mobile Responsive (Small devices) */
+    @media (max-width: 575.98px) {
+        .login-wrapper {
+            padding: 0.5rem;
+            align-items: flex-start;
+            padding-top: 2rem;
+        }
+
+        .login-card-container {
+            max-width: 100%;
+        }
+
+        .login-header {
+            padding: 1.5rem 1rem;
+        }
+
+        .login-header .icon-wrapper {
+            width: 60px;
+            height: 60px;
+        }
+
+        .login-header .icon-wrapper i {
+            font-size: 2rem;
+        }
+
+        .login-header h2 {
+            font-size: 1.5rem;
+        }
+
+        .login-body {
+            padding: 1.5rem 1rem;
+        }
+
+        .btn-login {
+            padding: 0.75rem 1rem;
+            font-size: 1rem;
+        }
+    }
+
+    /* Tablet Responsive (Medium devices) */
+    @media (min-width: 576px) and (max-width: 767.98px) {
+        .login-card-container {
+            max-width: 380px;
+        }
+    }
+
+    /* Landscape Phone */
+    @media (max-height: 500px) and (orientation: landscape) {
+        .login-wrapper {
+            padding: 1rem;
+            align-items: flex-start;
+        }
+
+        .login-header {
+            padding: 1rem;
+        }
+
+        .login-header .icon-wrapper {
+            width: 50px;
+            height: 50px;
+            margin-bottom: 0.5rem;
+        }
+
+        .login-header .icon-wrapper i {
+            font-size: 1.5rem;
+        }
+
+        .login-body {
+            padding: 1rem;
+        }
+    }
+
+    /* Alert styling */
+    .alert {
+        border-radius: 0.5rem;
+        border: none;
+    }
+
+    .alert-danger {
+        background-color: #f8d7da;
+        color: #842029;
+    }
+
+    /* Loading state */
+    .btn-login.loading {
+        pointer-events: none;
+        opacity: 0.7;
+    }
+
+    .btn-login .spinner-border {
+        width: 1.2rem;
+        height: 1.2rem;
+        margin-left: 0.5rem;
+    }
+</style>
+{% endblock %}
+
+{% block body %}
+<div class="login-wrapper">
+    <div class="login-card-container">
+        <div class="login-card">
+            <!-- Header -->
+            <div class="login-header">
+                <div class="icon-wrapper">
+                    <i class="bi bi-qr-code-scan"></i>
+                </div>
+                <h2 class="mb-1">نظام الحضور</h2>
+                <p class="mb-0 opacity-75">تسجيل الدخول للمتابعة</p>
+            </div>
+
+            <!-- Body -->
+            <div class="login-body">
+                {% if messages %}
+                {% for message in messages %}
+                <div class="alert alert-{{ message.tags }} alert-dismissible fade show mb-3" role="alert">
+                    <i class="bi bi-info-circle me-2"></i>
+                    {{ message }}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="إغلاق"></button>
+                </div>
+                {% endfor %}
+                {% endif %}
+
+                {% if form.non_field_errors %}
+                <div class="alert alert-danger mb-3">
+                    <i class="bi bi-exclamation-triangle-fill me-2"></i>
+                    {% for error in form.non_field_errors %}
+                    {{ error }}
+                    {% endfor %}
+                </div>
+                {% endif %}
+
+                <form method="post" id="login-form" novalidate>
+                    {% csrf_token %}
+                    {% if next %}<input type="hidden" name="next" value="{{ next }}">{% endif %}
+
+                    <!-- Phone Number Field -->
+                    <div class="mb-3">
+                        <label for="id_phone" class="form-label fw-medium">
+                            <i class="bi bi-telephone me-1"></i>
+                            رقم الهاتف
+                        </label>
+                        <input type="tel" name="phone" id="id_phone" value="{{ form.phone.value|default:'' }}"
+                            class="form-control form-control-lg {% if form.phone.errors %}is-invalid{% endif %}"
+                            placeholder="أدخل رقم الهاتف (01234567890)" autocomplete="tel" inputmode="numeric"
+                            pattern="0\d{10}" maxlength="11" dir="ltr" autofocus required>
+                        <small class="form-text text-muted">
+                            <i class="bi bi-info-circle me-1"></i>
+                            11 رقم يبدأ بصفر
+                        </small>
+                        {% if form.phone.errors %}
+                        <div class="invalid-feedback">
+                            {{ form.phone.errors.0 }}
+                        </div>
+                        {% endif %}
+                    </div>
+
+                    <!-- Password Field -->
+                    <div class="mb-4">
+                        <label for="id_password" class="form-label fw-medium">
+                            <i class="bi bi-lock me-1"></i>
+                            كلمة المرور
+                        </label>
+                        <div class="input-group">
+                            <input type="password" name="password" id="id_password"
+                                class="form-control form-control-lg {% if form.password.errors %}is-invalid{% endif %}"
+                                placeholder="أدخل كلمة المرور" autocomplete="current-password" required>
+                            <button class="password-toggle input-group-text" type="button" id="toggle-password"
+                                aria-label="إظهار/إخفاء كلمة المرور">
+                                <i class="bi bi-eye" id="password-icon"></i>
+                            </button>
+                            {% if form.password.errors %}
+                            <div class="invalid-feedback">
+                                {{ form.password.errors.0 }}
+                            </div>
+                            {% endif %}
+                        </div>
+                    </div>
+
+                    <!-- Submit Button -->
+                    <button type="submit" class="btn btn-primary btn-login w-100" id="login-btn">
+                        <span class="btn-text">
+                            <i class="bi bi-box-arrow-in-left me-2"></i>
+                            تسجيل الدخول
+                        </span>
+                        <span class="btn-loading d-none">
+                            <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
+                            جاري تسجيل الدخول...
+                        </span>
+                    </button>
+                </form>
+            </div>
+
+            <!-- Footer -->
+            <div class="login-footer">
+                <small class="text-muted">
+                    <i class="bi bi-shield-check me-1"></i>
+                    نظام الحضور بالباركود - {{ "now"|date:"Y" }}
+                </small>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    document.addEventListener('DOMContentLoaded', function () {
+        // Password visibility toggle
+        const togglePassword = document.getElementById('toggle-password');
+        const passwordInput = document.getElementById('id_password');
+        const passwordIcon = document.getElementById('password-icon');
+
+        if (togglePassword && passwordInput && passwordIcon) {
+            togglePassword.addEventListener('click', function () {
+                const type = passwordInput.getAttribute('type') === 'password' ? 'text' : 'password';
+                passwordInput.setAttribute('type', type);
+                passwordIcon.classList.toggle('bi-eye');
+                passwordIcon.classList.toggle('bi-eye-slash');
+            });
+        }
+
+        // Form submission loading state
+        const loginForm = document.getElementById('login-form');
+        const loginBtn = document.getElementById('login-btn');
+
+        if (loginForm && loginBtn) {
+            loginForm.addEventListener('submit', function (e) {
+                // Basic client-side validation
+                const phone = document.getElementById('id_phone').value.trim();
+                const password = document.getElementById('id_password').value;
+
+                if (!phone || !password) {
+                    return;
+                }
+
+                // Validate phone format (11 digits starting with 0)
+                if (!/^0\d{10}$/.test(phone)) {
+                    return;
+                }
+
+                // Show loading state
+                loginBtn.classList.add('loading');
+                loginBtn.querySelector('.btn-text').classList.add('d-none');
+                loginBtn.querySelector('.btn-loading').classList.remove('d-none');
+            });
+        }
+    });
+</script>
+{% endblock %}

@@ -8,14 +8,61 @@ This module contains the base models used across the application:
 - StudentTeacherLink: Many-to-many relationship between students and teachers
 """
 
+import re
 import uuid
-from django.contrib.auth.models import AbstractUser
+from django.contrib.auth.models import AbstractUser, BaseUserManager
+from django.core.exceptions import ValidationError
+from django.core.validators import RegexValidator
 from django.db import models
+
+
+# Phone number validator: 11 digits starting with 0
+phone_validator = RegexValidator(
+    regex=r'^0\d{10}$',
+    message='رقم الهاتف يجب أن يكون 11 رقم ويبدأ بصفر (مثال: 01234567890)'
+)
+
+
+def validate_phone_number(value: str) -> None:
+    """Validate phone number format: 11 digits starting with 0."""
+    if not re.match(r'^0\d{10}$', value):
+        raise ValidationError(
+            'رقم الهاتف يجب أن يكون 11 رقم ويبدأ بصفر (مثال: 01234567890)',
+            code='invalid_phone'
+        )
+
+
+class UserManager(BaseUserManager):
+    """Custom user manager that uses phone number for authentication."""
+
+    def create_user(self, phone, password=None, **extra_fields):
+        """Create and return a regular user with phone and password."""
+        if not phone:
+            raise ValueError('رقم الهاتف مطلوب')
+        user = self.model(phone=phone, **extra_fields)
+        user.set_password(password)
+        user.save(using=self._db)
+        return user
+
+    def create_superuser(self, phone, password=None, **extra_fields):
+        """Create and return a superuser with phone and password."""
+        extra_fields.setdefault('is_staff', True)
+        extra_fields.setdefault('is_superuser', True)
+        extra_fields.setdefault('role', 'admin')
+
+        if extra_fields.get('is_staff') is not True:
+            raise ValueError('Superuser must have is_staff=True.')
+        if extra_fields.get('is_superuser') is not True:
+            raise ValueError('Superuser must have is_superuser=True.')
+
+        return self.create_user(phone, password, **extra_fields)
 
 
 class User(AbstractUser):
     """
     Custom User model with role-based access control.
+
+    Authentication is done via phone number instead of username.
 
     Roles:
         - admin: Full system access (manage students, teachers, view all records)
@@ -33,11 +80,27 @@ class User(AbstractUser):
         help_text="User role determining access level"
     )
     phone = models.CharField(
-        max_length=20,
+        max_length=11,
+        unique=True,
+        validators=[phone_validator],
+        help_text="رقم الهاتف: 11 رقم يبدأ بصفر (مثال: 01234567890)"
+    )
+
+    # Make username not required (we use phone for login)
+    username = models.CharField(
+        max_length=150,
+        unique=True,
         blank=True,
         null=True,
-        help_text="Contact phone number"
+        help_text="Optional username (phone is used for login)"
     )
+
+    # Use phone as the username field for authentication
+    USERNAME_FIELD = 'phone'
+    REQUIRED_FIELDS = ['email']  # Required when creating superuser
+
+    # Custom manager for phone-based authentication
+    objects = UserManager()
 
     class Meta:
         db_table = 'users'
@@ -45,7 +108,7 @@ class User(AbstractUser):
         verbose_name_plural = 'Users'
 
     def __str__(self) -> str:
-        return f"{self.get_full_name() or self.username} ({self.role})"
+        return f"{self.get_full_name() or self.phone} ({self.role})"
 
     @property
     def is_admin(self) -> bool:

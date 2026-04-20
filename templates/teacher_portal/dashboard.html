@@ -1,0 +1,147 @@
+{% extends 'base.html' %}
+
+{% block title %}لوحة تحكم المعلم - نظام الحضور{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- Page Header -->
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h1 class="h3 mb-0">
+            <i class="bi bi-house-door me-2"></i>
+            لوحة التحكم
+        </h1>
+        <span class="badge bg-primary fs-6">
+            <i class="bi bi-people me-1"></i>
+            {{ total_students }} طالب
+        </span>
+    </div>
+
+    <!-- Scan Input Section -->
+    <div class="card border-0 shadow-sm mb-4">
+        <div class="card-header bg-primary text-white">
+            <h5 class="mb-0">
+                <i class="bi bi-qr-code-scan me-2"></i>
+                تسجيل الحضور
+            </h5>
+        </div>
+        <div class="card-body">
+            <form id="attendance-form" method="post" action="#">
+                {% csrf_token %}
+                <div class="row align-items-end">
+                    <div class="col-md-9">
+                        <label for="scan-input" class="form-label">
+                            امسح بطاقات الطلاب (يمكنك مسح عدة بطاقات)
+                        </label>
+                        <textarea id="scan-input" name="scanned_codes" class="form-control form-control-lg" rows="3"
+                            placeholder="امسح البطاقات هنا... اضغط Enter للتسجيل" autofocus></textarea>
+                        <small class="text-muted">
+                            امسح بطاقة واحدة أو أكثر، ثم اضغط Enter أو زر التسجيل
+                        </small>
+                    </div>
+                    <div class="col-md-3">
+                        <button type="submit" class="btn btn-success btn-lg w-100">
+                            <i class="bi bi-check-circle me-2"></i>
+                            تسجيل الحضور
+                        </button>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Students Table -->
+    <div class="card border-0 shadow-sm">
+        <div class="card-header bg-transparent d-flex justify-content-between align-items-center">
+            <h5 class="mb-0">
+                <i class="bi bi-list-ul me-2"></i>
+                قائمة الطلاب - {{ "اليوم"|date:"l، j F Y" }}
+            </h5>
+            <div class="btn-group">
+                <button class="btn btn-outline-secondary btn-sm">
+                    <i class="bi bi-funnel me-1"></i>
+                    تصفية
+                </button>
+                <button class="btn btn-outline-secondary btn-sm">
+                    <i class="bi bi-download me-1"></i>
+                    تصدير
+                </button>
+            </div>
+        </div>
+        <div class="card-body p-0">
+            {% if students %}
+            <div class="table-responsive">
+                <table class="table table-hover align-middle mb-0">
+                    <thead class="table-light">
+                        <tr>
+                            <th scope="col">#</th>
+                            <th scope="col">اسم الطالب</th>
+                            <th scope="col">الصف</th>
+                            <th scope="col">حالة الحضور</th>
+                            <th scope="col">وقت الحضور</th>
+                            <th scope="col">الصورة</th>
+                            <th scope="col">إجراءات</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for student in students %}
+                        <tr>
+                            <td>{{ forloop.counter }}</td>
+                            <td>
+                                <div class="d-flex align-items-center">
+                                    <div class="avatar bg-primary bg-opacity-10 rounded-circle p-2 ms-2">
+                                        <i class="bi bi-person text-primary"></i>
+                                    </div>
+                                    {{ student.name }}
+                                </div>
+                            </td>
+                            <td>{{ student.grade|default:"-" }}</td>
+                            <td>
+                                <span class="badge bg-secondary">
+                                    <i class="bi bi-clock me-1"></i>
+                                    لم يسجل
+                                </span>
+                            </td>
+                            <td>-</td>
+                            <td>
+                                <span class="badge bg-light text-dark">
+                                    <i class="bi bi-image me-1"></i>
+                                    لا توجد
+                                </span>
+                            </td>
+                            <td>
+                                <div class="btn-group btn-group-sm">
+                                    <button class="btn btn-outline-primary" title="رفع صورة">
+                                        <i class="bi bi-camera"></i>
+                                    </button>
+                                    <button class="btn btn-outline-info" title="عرض السجل">
+                                        <i class="bi bi-clock-history"></i>
+                                    </button>
+                                </div>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% else %}
+            <div class="text-center py-5">
+                <i class="bi bi-inbox display-1 text-muted"></i>
+                <p class="text-muted mt-3">لا يوجد طلاب مسجلين لديك حالياً</p>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+{% block extra_js %}
+<script>
+    // Auto-submit on Enter key for batch scanning
+    document.getElementById('scan-input').addEventListener('keydown', function (e) {
+        if (e.key === 'Enter' && !e.shiftKey) {
+            e.preventDefault();
+            document.getElementById('attendance-form').submit();
+        }
+    });
+</script>
+{% endblock %}
+{% endblock %}
