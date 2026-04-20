@@ -109,7 +109,7 @@
                         <a class="nav-link dropdown-toggle text-end" href="#" id="userDropdown" role="button"
                             data-bs-toggle="dropdown" aria-expanded="false">
                             <i class="bi bi-person-circle me-1"></i>
-                            {{ user.get_full_name|default:user.username }}
+                            {{ user.get_full_name|default:user.phone }}
                         </a>
 
                         <ul class="dropdown-menu dropdown-menu-end shadow">
