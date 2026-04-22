@@ -12,7 +12,7 @@
         </h1>
         <span class="badge bg-primary fs-6">
             <i class="bi bi-people me-1"></i>
-            {{ total_students }} طالب
+            {{ attended_count }} / {{ total_students }} حضور اليوم
         </span>
     </div>
 
@@ -54,7 +54,7 @@
         <div class="card-header bg-transparent d-flex justify-content-between align-items-center">
             <h5 class="mb-0">
                 <i class="bi bi-list-ul me-2"></i>
-                قائمة الطلاب - {{ "اليوم"|date:"l، j F Y" }}
+                قائمة الطلاب - {% now "l، j F Y" %}
             </h5>
             <div class="btn-group">
                 <button class="btn btn-outline-secondary btn-sm">
@@ -79,11 +79,13 @@
                             <th scope="col">حالة الحضور</th>
                             <th scope="col">وقت الحضور</th>
                             <th scope="col">الصورة</th>
+                            <th scope="col">التقييم</th>
+                            <th scope="col">التحويل</th>
                             <th scope="col">إجراءات</th>
                         </tr>
                     </thead>
                     <tbody>
-                        {% for student in students %}
+                        {% for row in student_rows %}
                         <tr>
                             <td>{{ forloop.counter }}</td>
                             <td>
@@ -91,22 +93,62 @@
                                     <div class="avatar bg-primary bg-opacity-10 rounded-circle p-2 ms-2">
                                         <i class="bi bi-person text-primary"></i>
                                     </div>
-                                    {{ student.name }}
+                                    {{ row.student.full_name }}
                                 </div>
                             </td>
-                            <td>{{ student.grade|default:"-" }}</td>
+                            <td>{{ row.student.grade|default:"-" }}</td>
                             <td>
+                                {% if row.is_attended %}
+                                <span class="badge bg-success">
+                                    <i class="bi bi-check-circle me-1"></i>
+                                    حضر
+                                </span>
+                                {% else %}
                                 <span class="badge bg-secondary">
                                     <i class="bi bi-clock me-1"></i>
                                     لم يسجل
                                 </span>
+                                {% endif %}
                             </td>
-                            <td>-</td>
                             <td>
+                                {% if row.attendance %}
+                                {{ row.attendance.check_in_time|time:"H:i" }}
+                                {% else %}
+                                -
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if row.attendance and row.attendance.daily_photo %}
+                                <span class="badge bg-success-subtle text-success-emphasis">
+                                    <i class="bi bi-image me-1"></i>
+                                    مرفوعة
+                                </span>
+                                {% else %}
                                 <span class="badge bg-light text-dark">
                                     <i class="bi bi-image me-1"></i>
                                     لا توجد
                                 </span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if row.attendance %}
+                                <span class="badge bg-info-subtle text-info-emphasis">
+                                    {{ row.attendance.rating }}/10
+                                </span>
+                                {% else %}
+                                -
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if row.attendance and row.attendance.is_substitute_assignment %}
+                                <span class="badge bg-warning text-dark"
+                                    title="{{ row.attendance.substitute_note|default:'تحويل ليوم واحد' }}">
+                                    <i class="bi bi-arrow-left-right me-1"></i>
+                                    بديل
+                                </span>
+                                {% else %}
+                                <span class="text-muted">-</span>
+                                {% endif %}
                             </td>
                             <td>
                                 <div class="btn-group btn-group-sm">

@@ -75,25 +75,28 @@ Build a Django web application on an Ubuntu server. A separate scanning PC with 
 - is_primary: boolean (for display purposes)
 - created_at
 
-**AttendanceRecord**
+**StudentAttendanceRecord**
 - id: UUID
-- person_type: enum (student, teacher)
-- student: FK → Student (nullable)
-- teacher: FK → Teacher (nullable)
+- student: FK → Student
 - date: date
 - check_in_time: datetime
 - recorded_by: FK → User (admin who was logged in)
-- assigned_teacher: FK → Teacher (can differ from default on substitute days)
+- original_teacher: FK → Teacher (student's default teacher)
+- assigned_teacher: FK → Teacher (may differ on substitute days)
 - substitute_note: string (optional, e.g., "Original teacher absent")
+- daily_photo: ImageField (optional, stored directly on attendance record)
+- rating: integer (1-10, default=6)
 - created_at
-
-**DailyPhoto**
-- student: FK → Student
-- teacher: FK → Teacher (who uploaded)
-- date: date
-- photo: ImageField
-- uploaded_at: datetime
 - UNIQUE(student, date)
+
+**TeacherAttendanceRecord**
+- id: UUID
+- teacher: FK → Teacher
+- date: date
+- check_in_time: datetime
+- recorded_by: FK → User (admin who was logged in)
+- created_at
+- UNIQUE(teacher, date)
 
 ---
 
@@ -118,7 +121,7 @@ Build a Django web application on an Ubuntu server. A separate scanning PC with 
    - Clear button for next batch
 7. **Batch processing endpoint** — POST endpoint that:
    - Receives list of scanned IDs (newline-separated)
-   - For each ID: identify student/teacher, create AttendanceRecord if not exists today
+    - For each ID: identify student/teacher, create StudentAttendanceRecord or TeacherAttendanceRecord if not exists today
    - Return detailed results per ID (success, already scanned, not found)
 8. **Results display** — Show after batch submit:
    - ✓ "Ahmed Mohamed - Checked in at 8:15 AM"
@@ -170,7 +173,7 @@ Build a Django web application on an Ubuntu server. A separate scanning PC with 
 ### Phase 5: Testing & Documentation (Days 24-28)
 
 24. **Unit tests** — Test models, services, and utility functions
-    - Student/Teacher/AttendanceRecord model tests
+    - Student/Teacher/StudentAttendanceRecord/TeacherAttendanceRecord model tests
     - QR generation tests
     - Batch scan processing logic tests
     - Excel export tests
@@ -234,7 +237,7 @@ qr_attendance/
 │       └── import_students.py
 │
 ├── attendance/                 # Attendance logic
-│   ├── models.py               # AttendanceRecord, DailyPhoto
+│   ├── models.py               # StudentAttendanceRecord, TeacherAttendanceRecord
 │   ├── views.py                # Scan endpoint, record views
 │   ├── services.py             # Business logic
 │   └── tests/

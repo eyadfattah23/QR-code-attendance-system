@@ -95,11 +95,19 @@
                 <ul class="navbar-nav me-auto">
                     {% if user.is_admin %}
                     <li class="nav-item">
-                        <a class="nav-link" href="{% url 'admin_portal:dashboard' %}">لوحة التحكم</a>
+                        <a class="nav-link {% if '/portal/admin/' in request.path %}active{% endif %}"
+                            href="{% url 'admin_portal:dashboard' %}">
+                            <i class="bi bi-speedometer2 me-1"></i>
+                            لوحة المدير
+                        </a>
                     </li>
                     {% elif user.is_teacher %}
                     <li class="nav-item">
-                        <a class="nav-link" href="{% url 'teacher_portal:dashboard' %}">لوحة التحكم</a>
+                        <a class="nav-link {% if '/portal/teacher/' in request.path %}active{% endif %}"
+                            href="{% url 'teacher_portal:dashboard' %}">
+                            <i class="bi bi-house-door me-1"></i>
+                            لوحة المعلم
+                        </a>
                     </li>
                     {% endif %}
                 </ul>
