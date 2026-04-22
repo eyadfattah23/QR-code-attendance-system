@@ -9,6 +9,7 @@ from django.conf.urls.static import static
 urlpatterns = [
     path('admin/', admin.site.urls),
     path('', include('core.urls')),
+    path('scan/', include('attendance.urls')),
     path('portal/admin/', include('admin_portal.urls')),
     path('portal/teacher/', include('teacher_portal.urls')),
 ]

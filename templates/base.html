@@ -101,6 +101,13 @@
                             لوحة المدير
                         </a>
                     </li>
+                    <li class="nav-item">
+                        <a class="nav-link {% if '/scan/' in request.path %}active{% endif %}"
+                            href="{% url 'attendance:station' %}">
+                            <i class="bi bi-qr-code-scan me-1"></i>
+                            محطة المسح
+                        </a>
+                    </li>
                     {% elif user.is_teacher %}
                     <li class="nav-item">
                         <a class="nav-link {% if '/portal/teacher/' in request.path %}active{% endif %}"

@@ -121,8 +121,9 @@ Build a Django web application on an Ubuntu server. A separate scanning PC with 
    - Clear button for next batch
 7. **Batch processing endpoint** — POST endpoint that:
    - Receives list of scanned IDs (newline-separated)
-    - For each ID: identify student/teacher, create StudentAttendanceRecord or TeacherAttendanceRecord if not exists today
+   - For each ID: identify student/teacher, create StudentAttendanceRecord or TeacherAttendanceRecord if not exists today
    - Return detailed results per ID (success, already scanned, not found)
+   - **Permission**: Both admins and teachers can scan and record attendance
 8. **Results display** — Show after batch submit:
    - ✓ "Ahmed Mohamed - Checked in at 8:15 AM"
    - ⚠ "Sara Ali - Already checked in at 7:45 AM"  
@@ -130,7 +131,7 @@ Build a Django web application on an Ubuntu server. A separate scanning PC with 
 9. **Sound feedback** — Success sound for batch complete, error beep if any failures
 10. **Scan history panel** — Show today's total check-ins, last few successful scans
 
-*Deliverable: Functional batch check-in station*
+*Deliverable: Functional batch check-in station accessible to admins and teachers*
 
 ### Phase 3: Admin Portal (Days 11-17)
 

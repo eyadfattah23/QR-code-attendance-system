@@ -25,7 +25,7 @@
             </h5>
         </div>
         <div class="card-body">
-            <form id="attendance-form" method="post" action="#">
+            <form id="attendance-form" method="post" action="{% url 'teacher_portal:scan' %}">
                 {% csrf_token %}
                 <div class="row align-items-end">
                     <div class="col-md-9">

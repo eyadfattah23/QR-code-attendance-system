@@ -1,0 +1,292 @@
+{% extends 'base.html' %}
+
+{% block title %}محطة المسح - نظام الحضور{% endblock %}
+
+{% block extra_css %}
+<style>
+    .scan-page {
+        min-height: calc(100vh - 56px);
+        background: linear-gradient(120deg, #f5f7fa 0%, #e8eef5 100%);
+        padding: 1.25rem;
+    }
+
+    .scan-layout {
+        display: grid;
+        grid-template-columns: 1.1fr 0.9fr;
+        gap: 1rem;
+        min-height: calc(100vh - 120px);
+    }
+
+    .scan-card {
+        border: none;
+        border-radius: 1rem;
+        box-shadow: 0 12px 30px rgba(26, 39, 68, 0.08);
+        overflow: hidden;
+        background: #ffffff;
+    }
+
+    .scan-card-header {
+        background: linear-gradient(135deg, #0d6efd 0%, #0b57cf 100%);
+        color: #fff;
+        padding: 1rem 1.25rem;
+    }
+
+    .scan-card-body {
+        padding: 1.25rem;
+    }
+
+    .scan-textarea {
+        min-height: 360px;
+        font-family: Consolas, Monaco, 'Courier New', monospace;
+        font-size: 1rem;
+        line-height: 1.4;
+        direction: ltr;
+    }
+
+    .result-list {
+        max-height: 470px;
+        overflow-y: auto;
+    }
+
+    .result-item {
+        border-radius: 0.75rem;
+        border: 1px solid transparent;
+        padding: 0.75rem 0.9rem;
+        margin-bottom: 0.6rem;
+    }
+
+    .result-item.success {
+        background: #edf9f0;
+        border-color: #9fdfb1;
+    }
+
+    .result-item.warning {
+        background: #fff8e7;
+        border-color: #ffe1a1;
+    }
+
+    .result-item.danger {
+        background: #fef0f1;
+        border-color: #f8b9bf;
+    }
+
+    .stat-pill {
+        border-radius: 999px;
+        padding: 0.35rem 0.7rem;
+        font-size: 0.875rem;
+        font-weight: 600;
+        display: inline-flex;
+        align-items: center;
+        gap: 0.35rem;
+    }
+
+    .stat-pill.total {
+        background: #e9ecef;
+        color: #495057;
+    }
+
+    .stat-pill.success {
+        background: #d1f0da;
+        color: #1d6f37;
+    }
+
+    .stat-pill.warning {
+        background: #ffe9ba;
+        color: #8a6513;
+    }
+
+    .stat-pill.danger {
+        background: #f9d7db;
+        color: #8b1e2d;
+    }
+
+    @media (max-width: 991.98px) {
+        .scan-layout {
+            grid-template-columns: 1fr;
+            min-height: auto;
+        }
+
+        .scan-textarea {
+            min-height: 260px;
+        }
+
+        .result-list {
+            max-height: 340px;
+        }
+    }
+
+    @media (max-width: 575.98px) {
+        .scan-page {
+            padding: 0.75rem;
+        }
+
+        .scan-card-body {
+            padding: 1rem;
+        }
+
+        .scan-card-header {
+            padding: 0.8rem 1rem;
+        }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="scan-page">
+    <div class="scan-layout">
+        <section class="scan-card">
+            <header class="scan-card-header d-flex align-items-center justify-content-between">
+                <h5 class="mb-0">
+                    <i class="bi bi-upc-scan me-2"></i>
+                    إدخال أكواد المسح
+                </h5>
+                <span class="small opacity-75">اضغط Enter للإرسال</span>
+            </header>
+            <div class="scan-card-body">
+                <form id="scan-form" method="post">
+                    {% csrf_token %}
+                    <label for="id_scanned_codes" class="form-label fw-semibold">الأكواد (كل كود في سطر)</label>
+                    <textarea id="id_scanned_codes" name="scanned_codes" class="form-control scan-textarea" placeholder="Scan/paste UUID or type student_code (or national_id)
+STU0001
+550e8400-e29b-41d4-a716-446655440000" autofocus=""
+                        style="height: auto; min-height: 150px; resize: vertical;"></textarea>
+
+                    <div class="d-flex flex-wrap gap-2 mt-3">
+                        <button type="submit" class="btn btn-primary btn-lg">
+                            <i class="bi bi-send-check me-1"></i>
+                            Submit Batch
+                        </button>
+                        <button type="button" id="clear-btn" class="btn btn-outline-secondary btn-lg">
+                            <i class="bi bi-eraser me-1"></i>
+                            Clear
+                        </button>
+                    </div>
+
+                    <small class="text-muted d-block mt-2">
+                        Enter = إرسال سريع, Shift + Enter = سطر جديد | يدعم UUID و student_code و national_id
+                    </small>
+                </form>
+            </div>
+        </section>
+
+        <section class="scan-card" id="results-panel">
+            <header class="scan-card-header d-flex align-items-center justify-content-between">
+                <h5 class="mb-0">
+                    <i class="bi bi-list-check me-2"></i>
+                    نتائج المعالجة
+                </h5>
+                <div class="d-flex flex-wrap gap-1">
+                    <span class="stat-pill total"><i class="bi bi-collection"></i>{{ total_count }}</span>
+                    <span class="stat-pill success"><i class="bi bi-check2-circle"></i>{{ success_count }}</span>
+                    <span class="stat-pill warning"><i class="bi bi-exclamation-circle"></i>{{ warning_count }}</span>
+                    <span class="stat-pill danger"><i class="bi bi-x-circle"></i>{{ error_count }}</span>
+                </div>
+            </header>
+            <div class="scan-card-body">
+                {% if results %}
+                <div class="result-list" id="results-list">
+                    {% for result in results %}
+                    <article class="result-item {{ result.row_class }}">
+                        <div class="fw-semibold mb-1">
+                            <i class="bi {{ result.icon }} me-1"></i>
+                            {{ result.label }}
+                        </div>
+                        <div>{{ result.message }}</div>
+                    </article>
+                    {% endfor %}
+                </div>
+                {% else %}
+                <div class="text-center text-muted py-5" id="empty-results">
+                    <i class="bi bi-inbox display-6 d-block mb-2"></i>
+                    لا توجد نتائج بعد. قم بمسح مجموعة ثم اضغط Submit Batch.
+                </div>
+                {% endif %}
+
+                {% if recent_scans %}
+                <hr>
+                <h6 class="fw-semibold mb-2">آخر عمليات المسح (اليوم)</h6>
+                <div class="small">
+                    {% for item in recent_scans %}
+                    <div class="d-flex align-items-center justify-content-between border-bottom py-1">
+                        <span>
+                            {% if item.kind == 'student' %}
+                            <i class="bi bi-person me-1 text-primary"></i>
+                            {% else %}
+                            <i class="bi bi-person-badge me-1 text-success"></i>
+                            {% endif %}
+                            {{ item.name }}
+                        </span>
+                        <span class="text-muted">{{ item.time|time:"H:i" }}</span>
+                    </div>
+                    {% endfor %}
+                </div>
+                {% endif %}
+            </div>
+        </section>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    (function () {
+        const form = document.getElementById('scan-form');
+        const textarea = document.getElementById('id_scanned_codes');
+        const clearBtn = document.getElementById('clear-btn');
+        const resultsList = document.getElementById('results-list');
+        const emptyResults = document.getElementById('empty-results');
+
+        const successCount = Number('{{ success_count|default:"0" }}');
+        const errorCount = Number('{{ error_count|default:"0" }}');
+
+        function beep(frequency, duration) {
+            try {
+                const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+                const oscillator = audioCtx.createOscillator();
+                const gainNode = audioCtx.createGain();
+                oscillator.connect(gainNode);
+                gainNode.connect(audioCtx.destination);
+                oscillator.type = 'sine';
+                oscillator.frequency.value = frequency;
+                gainNode.gain.value = 0.05;
+                oscillator.start();
+                setTimeout(() => {
+                    oscillator.stop();
+                    audioCtx.close();
+                }, duration);
+            } catch (e) { }
+        }
+
+        if (textarea && form) {
+            textarea.focus();
+            textarea.addEventListener('keydown', function (event) {
+                if (event.key === 'Enter' && !event.shiftKey) {
+                    event.preventDefault();
+                    if (textarea.value.trim()) {
+                        form.submit();
+                    }
+                }
+            });
+        }
+
+        if (clearBtn && textarea) {
+            clearBtn.addEventListener('click', function () {
+                textarea.value = '';
+                textarea.focus();
+                if (resultsList) {
+                    resultsList.innerHTML = '';
+                }
+                if (emptyResults) {
+                    emptyResults.classList.remove('d-none');
+                }
+            });
+        }
+
+        if (successCount > 0 && errorCount === 0) {
+            beep(820, 120);
+        } else if (errorCount > 0) {
+            beep(280, 180);
+        }
+    })();
+</script>
+{% endblock %}

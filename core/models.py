@@ -140,6 +140,14 @@ class Student(models.Model):
         unique=True,
         help_text="National ID or student registration number"
     )
+    student_code = models.CharField(
+        max_length=30,
+        unique=True,
+        blank=True,
+        null=True,
+        db_index=True,
+        help_text="Easy student ID for manual entry (e.g., STU1001)"
+    )
     full_name = models.CharField(
         max_length=255,
         help_text="Student's full name"
@@ -160,7 +168,14 @@ class Student(models.Model):
         verbose_name_plural = 'Students'
 
     def __str__(self) -> str:
-        return f"{self.full_name} ({self.national_id})"
+        label = self.student_code or self.national_id
+        return f"{self.full_name} ({label})"
+
+    def save(self, *args, **kwargs):
+        """Auto-fill student_code from national_id when not provided."""
+        if not self.student_code and self.national_id:
+            self.student_code = self.national_id.strip().upper()
+        super().save(*args, **kwargs)
 
 
 class Teacher(models.Model):
