@@ -7,11 +7,12 @@ This module contains tests for:
 """
 
 import uuid
+from django.contrib.messages import get_messages
 from django.test import TestCase, Client
 from django.urls import reverse
 
 from core.models import User, Student, Teacher, StudentTeacherLink
-from attendance.models import StudentAttendanceRecord
+from attendance.models import StudentAttendanceRecord, TeacherAttendanceRecord
 from django.utils.timezone import localdate
 
 
@@ -79,7 +80,34 @@ class TeacherScanTestCase(TestCase):
             last_name='Teacher'
         )
 
-        cls.teacher_obj = Teacher.objects.create(user=cls.teacher_user)
+        cls.teacher_obj = Teacher.objects.create(
+            user=cls.teacher_user,
+            full_name='Test Teacher'
+        )
+
+        # Another teacher — used to test scanning a teacher UUID from teacher portal
+        cls.teacher_user_2 = User.objects.create_user(
+            phone='01234567892',
+            email='teacher2@test.com',
+            password='teacher2pass123',
+            role=User.Role.TEACHER,
+            first_name='Another',
+            last_name='Teacher'
+        )
+        cls.another_teacher = Teacher.objects.create(
+            user=cls.teacher_user_2,
+            full_name='Another Teacher'
+        )
+
+        # Admin user — used to verify admin cannot hit teacher scan endpoint
+        cls.admin_user = User.objects.create_user(
+            phone='01234567890',
+            email='admin@test.com',
+            password='adminpass123',
+            role=User.Role.ADMIN,
+            first_name='Test',
+            last_name='Admin'
+        )
 
         # Students linked to teacher
         cls.linked_student1 = Student.objects.create(
@@ -249,6 +277,91 @@ class TeacherScanTestCase(TestCase):
         self.assertEqual(response.status_code, 302)
         self.assertIn('/login/', response.url)
 
+    def test_admin_cannot_use_teacher_scan_endpoint(self):
+        """Test that an admin user is redirected away from the teacher scan endpoint."""
+        self.client.logout()
+        self.client.login(phone='01234567890', password='adminpass123')
+        response = self.client.post(self.scan_url, {
+            'scanned_codes': str(self.linked_student1.id)
+        })
+        self.assertEqual(response.status_code, 302)
+        self.assertFalse(
+            StudentAttendanceRecord.objects.filter(
+                student=self.linked_student1,
+                date=localdate()
+            ).exists()
+        )
+
+    def test_teacher_scan_empty_input_shows_warning(self):
+        """Test that submitting no codes produces a warning message."""
+        response = self.client.post(self.scan_url, {'scanned_codes': ''})
+        self.assertEqual(response.status_code, 302)
+        messages_list = list(get_messages(response.wsgi_request))
+        self.assertEqual(len(messages_list), 1)
+        self.assertEqual(messages_list[0].level_tag, 'warning')
+
+    def test_teacher_scan_unknown_code_not_in_db(self):
+        """Test scanning a code that matches no student shows an error message."""
+        response = self.client.post(
+            self.scan_url, {'scanned_codes': 'NOEXIST999'})
+        self.assertEqual(response.status_code, 302)
+        messages_list = list(get_messages(response.wsgi_request))
+        self.assertEqual(len(messages_list), 1)
+        self.assertEqual(messages_list[0].level_tag, 'error')
+        self.assertIn('لم يتم العثور', str(messages_list[0]))
+
+    def test_teacher_scan_unknown_uuid_not_in_db(self):
+        """Test scanning a valid UUID matching no record shows an error message."""
+        unknown_uuid = str(uuid.uuid4())
+        response = self.client.post(
+            self.scan_url, {'scanned_codes': unknown_uuid})
+        self.assertEqual(response.status_code, 302)
+        messages_list = list(get_messages(response.wsgi_request))
+        self.assertEqual(len(messages_list), 1)
+        self.assertEqual(messages_list[0].level_tag, 'error')
+
+    def test_teacher_scan_teacher_uuid_shows_warning_not_record(self):
+        """Test scanning another teacher's UUID produces a warning and no TeacherAttendanceRecord."""
+        response = self.client.post(self.scan_url, {
+            'scanned_codes': str(self.another_teacher.id)
+        })
+        self.assertEqual(response.status_code, 302)
+        messages_list = list(get_messages(response.wsgi_request))
+        self.assertEqual(len(messages_list), 1)
+        self.assertEqual(messages_list[0].level_tag, 'warning')
+        # No teacher record should have been created
+        self.assertFalse(
+            TeacherAttendanceRecord.objects.filter(
+                teacher=self.another_teacher,
+                date=localdate()
+            ).exists()
+        )
+
+    def test_teacher_scan_unlinked_student_message_differs_from_not_found(self):
+        """Unlinked student error includes student name; not-found error uses generic phrase."""
+        # Use separate clients so session messages don't bleed across requests
+        client_a = Client()
+        client_a.login(phone='01234567891', password='teacherpass123')
+        response_unlinked = client_a.post(self.scan_url, {
+            'scanned_codes': str(self.unlinked_student.id)
+        })
+        msgs_unlinked = list(get_messages(response_unlinked.wsgi_request))
+        unlinked_text = str(msgs_unlinked[0])
+
+        client_b = Client()
+        client_b.login(phone='01234567891', password='teacherpass123')
+        response_unknown = client_b.post(
+            self.scan_url, {'scanned_codes': 'NO-SUCH-CODE'})
+        msgs_unknown = list(get_messages(response_unknown.wsgi_request))
+        unknown_text = str(msgs_unknown[0])
+
+        # Unlinked message contains the student's name
+        self.assertIn(self.unlinked_student.full_name, unlinked_text)
+        # Not-found message contains the generic Arabic phrase
+        self.assertIn('لم يتم العثور', unknown_text)
+        # The two messages are different
+        self.assertNotEqual(unlinked_text, unknown_text)
+
 
 class ScanStationAdminScansTestCase(TestCase):
     """Test cases for admin scan functionality."""
@@ -271,14 +384,28 @@ class ScanStationAdminScansTestCase(TestCase):
             student_code='TST001'
         )
 
+        # Teacher for admin-scan-teacher tests
+        cls.teacher_user = User.objects.create_user(
+            phone='01234567891',
+            email='teacher@test.com',
+            password='teacherpass123',
+            role=User.Role.TEACHER,
+            first_name='Test',
+            last_name='Teacher'
+        )
+        cls.teacher_for_scan = Teacher.objects.create(
+            user=cls.teacher_user,
+            full_name='Test Teacher For Scan'
+        )
+
     def setUp(self):
         """Set up test fixtures."""
         self.client = Client()
         self.scan_url = reverse('attendance:station')
         self.client.login(phone='01234567890', password='adminpass123')
 
-    def test_admin_can_scan_any_student(self):
-        """Test that admin can scan any student in the system."""
+    def test_admin_scan_by_uuid(self):
+        """Test admin can scan by student UUID."""
         response = self.client.post(self.scan_url, {
             'scanned_codes': str(self.student.id)
         })
@@ -307,3 +434,100 @@ class ScanStationAdminScansTestCase(TestCase):
                 date=localdate()
             ).exists()
         )
+
+    def test_admin_scan_by_national_id(self):
+        """Test admin can scan by national_id."""
+        response = self.client.post(
+            self.scan_url, {'scanned_codes': '12345678901234'})
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(
+            StudentAttendanceRecord.objects.filter(
+                student=self.student,
+                date=localdate()
+            ).exists()
+        )
+
+    def test_admin_scan_teacher_uuid_creates_teacher_record(self):
+        """Test admin scanning a teacher UUID creates a TeacherAttendanceRecord."""
+        response = self.client.post(self.scan_url, {
+            'scanned_codes': str(self.teacher_for_scan.id)
+        })
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(
+            TeacherAttendanceRecord.objects.filter(
+                teacher=self.teacher_for_scan,
+                date=localdate()
+            ).exists()
+        )
+
+    def test_admin_scan_teacher_result_is_success(self):
+        """Test admin scan of teacher UUID shows success result."""
+        response = self.client.post(self.scan_url, {
+            'scanned_codes': str(self.teacher_for_scan.id)
+        })
+        results = response.context['results']
+        self.assertEqual(len(results), 1)
+        self.assertEqual(results[0]['status'], 'success')
+        self.assertIn(self.teacher_for_scan.full_name, results[0]['message'])
+
+    def test_admin_scan_already_scanned_student_shows_warning(self):
+        """Test scanning an already-scanned student shows warning result."""
+        self.client.post(
+            self.scan_url, {'scanned_codes': str(self.student.id)})
+        response = self.client.post(
+            self.scan_url, {'scanned_codes': str(self.student.id)})
+        results = response.context['results']
+        self.assertEqual(results[0]['status'], 'warning')
+
+    def test_admin_scan_already_scanned_teacher_shows_warning(self):
+        """Test scanning an already-scanned teacher shows warning result."""
+        self.client.post(
+            self.scan_url, {'scanned_codes': str(self.teacher_for_scan.id)})
+        response = self.client.post(
+            self.scan_url, {'scanned_codes': str(self.teacher_for_scan.id)})
+        results = response.context['results']
+        self.assertEqual(results[0]['status'], 'warning')
+
+    def test_admin_scan_unknown_code_shows_error(self):
+        """Test scanning an unknown non-UUID code shows error result."""
+        response = self.client.post(
+            self.scan_url, {'scanned_codes': 'UNKNOWN-CODE-XYZ'})
+        self.assertEqual(response.status_code, 200)
+        results = response.context['results']
+        self.assertEqual(len(results), 1)
+        self.assertEqual(results[0]['status'], 'error')
+
+    def test_admin_scan_unknown_uuid_shows_error(self):
+        """Test scanning a valid UUID that matches no record shows error result."""
+        unknown_uuid = str(uuid.uuid4())
+        response = self.client.post(
+            self.scan_url, {'scanned_codes': unknown_uuid})
+        self.assertEqual(response.status_code, 200)
+        results = response.context['results']
+        self.assertEqual(len(results), 1)
+        self.assertEqual(results[0]['status'], 'error')
+
+    def test_admin_scan_empty_input_no_results(self):
+        """Test empty input produces no results."""
+        response = self.client.post(self.scan_url, {'scanned_codes': ''})
+        self.assertEqual(response.status_code, 200)
+        results = response.context.get('results', [])
+        self.assertEqual(len(results), 0)
+
+    def test_admin_scan_result_context_counts(self):
+        """Test mixed batch: success + warning (duplicate) + error gives correct counts."""
+        # Pre-scan teacher to force a warning on second attempt
+        self.client.post(
+            self.scan_url, {'scanned_codes': str(self.teacher_for_scan.id)})
+
+        batch = '\n'.join([
+            str(self.student.id),           # success
+            str(self.teacher_for_scan.id),  # warning (already scanned)
+            'TOTALLY-UNKNOWN-CODE',          # error
+        ])
+        response = self.client.post(self.scan_url, {'scanned_codes': batch})
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.context['success_count'], 1)
+        self.assertEqual(response.context['warning_count'], 1)
+        self.assertEqual(response.context['error_count'], 1)
+        self.assertEqual(response.context['total_count'], 3)

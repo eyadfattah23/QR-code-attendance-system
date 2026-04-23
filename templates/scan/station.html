@@ -146,7 +146,7 @@
                 <form id="scan-form" method="post">
                     {% csrf_token %}
                     <label for="id_scanned_codes" class="form-label fw-semibold">الأكواد (كل كود في سطر)</label>
-                    <textarea id="id_scanned_codes" name="scanned_codes" class="form-control scan-textarea" placeholder="Scan/paste UUID or type student_code (or national_id)
+                    <textarea id="id_scanned_codes" name="scanned_codes" class="form-control scan-textarea" placeholder="الصق أو امسح الأكواد هنا (UUID أو كود الطالب أو الرقم الوطني)
 STU0001
 550e8400-e29b-41d4-a716-446655440000" autofocus=""
                         style="height: auto; min-height: 150px; resize: vertical;"></textarea>
@@ -154,11 +154,11 @@ STU0001
                     <div class="d-flex flex-wrap gap-2 mt-3">
                         <button type="submit" class="btn btn-primary btn-lg">
                             <i class="bi bi-send-check me-1"></i>
-                            Submit Batch
+                            إرسال
                         </button>
                         <button type="button" id="clear-btn" class="btn btn-outline-secondary btn-lg">
                             <i class="bi bi-eraser me-1"></i>
-                            Clear
+                            مسح
                         </button>
                     </div>
 
@@ -198,7 +198,7 @@ STU0001
                 {% else %}
                 <div class="text-center text-muted py-5" id="empty-results">
                     <i class="bi bi-inbox display-6 d-block mb-2"></i>
-                    لا توجد نتائج بعد. قم بمسح مجموعة ثم اضغط Submit Batch.
+                    لا توجد نتائج بعد. قم بمسح مجموعة ثم اضغط إرسال.
                 </div>
                 {% endif %}
 

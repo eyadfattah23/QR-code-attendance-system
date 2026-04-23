@@ -181,7 +181,9 @@
     document.getElementById('scan-input').addEventListener('keydown', function (e) {
         if (e.key === 'Enter' && !e.shiftKey) {
             e.preventDefault();
-            document.getElementById('attendance-form').submit();
+            if (document.getElementById('scan-input').value.trim()) {
+                document.getElementById('attendance-form').submit();
+            }
         }
     });
 </script>

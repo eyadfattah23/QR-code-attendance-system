@@ -74,77 +74,99 @@ def teacher_scan(request):
     try:
         teacher = Teacher.objects.get(user=request.user)
 
-        # Get teacher's linked students
-        student_links = StudentTeacherLink.objects.filter(
-            teacher=teacher
-        ).select_related('student')
-        linked_student_ids = set(link.student_id for link in student_links)
+        linked_student_ids = set(
+            StudentTeacherLink.objects.filter(teacher=teacher)
+            .values_list('student_id', flat=True)
+        )
 
-        # Process scanned codes
         scanned_codes = request.POST.get("scanned_codes", "").strip()
         codes = [line.strip()
                  for line in scanned_codes.splitlines() if line.strip()]
 
+        if not codes:
+            messages.warning(
+                request, "الرجاء إدخال رمز واحد على الأقل قبل الإرسال")
+            return redirect('teacher_portal:dashboard')
+
         today = localdate()
-        results = []
 
         for raw_code in codes:
             student = None
 
             try:
-                # Try UUID lookup
                 code_uuid = uuid.UUID(raw_code)
-                student = Student.objects.filter(
-                    id=code_uuid,
-                    id__in=linked_student_ids
-                ).first()
-            except ValueError:
-                # Try student_code or national_id lookup
-                lookup = raw_code.strip().upper()
-                student = Student.objects.filter(
-                    student_code__iexact=lookup,
-                    id__in=linked_student_ids
-                ).first()
-                if student is None:
-                    student = Student.objects.filter(
-                        national_id__iexact=lookup,
-                        id__in=linked_student_ids
-                    ).first()
 
-            if student is not None:
-                primary_link = (
-                    StudentTeacherLink.objects.filter(student=student)
-                    .order_by("-is_primary", "created_at")
-                    .select_related("teacher")
-                    .first()
-                )
-                original_teacher = primary_link.teacher if primary_link else None
-
-                student_record, created = StudentAttendanceRecord.objects.get_or_create(
-                    student=student,
-                    date=today,
-                    defaults={
-                        "check_in_time": localtime(),
-                        "recorded_by": request.user,
-                        "original_teacher": original_teacher,
-                        "assigned_teacher": original_teacher,
-                        "substitute_note": "",
-                        "rating": 6,
-                    },
-                )
-
-                if created:
-                    messages.success(
-                        request,
-                        f"{student.full_name} - تم تسجيل الحضور بنجاح"
-                    )
-                else:
+                # Teacher QR card → teacher attendance is recorded by admin only
+                if Teacher.objects.filter(id=code_uuid).exists():
                     messages.warning(
                         request,
-                        f"{student.full_name} - مسجل مسبقاً الساعة {student_record.check_in_time.strftime('%H:%M')}"
+                        f"تسجيل حضور المعلمين يتم من قِبَل المسؤول فقط - الرمز: {raw_code}",
                     )
+                    continue
+
+                any_student = Student.objects.filter(id=code_uuid).first()
+                if any_student is None:
+                    messages.error(
+                        request, f"لم يتم العثور على هذا الرمز: {raw_code}")
+                    continue
+
+                if any_student.id not in linked_student_ids:
+                    messages.error(
+                        request, f"{any_student.full_name} - ليس ضمن قائمة طلابك")
+                    continue
+
+                student = any_student
+
+            except ValueError:
+                lookup = raw_code.strip().upper()
+                any_student = (
+                    Student.objects.filter(student_code__iexact=lookup).first()
+                    or Student.objects.filter(national_id__iexact=lookup).first()
+                )
+                if any_student is None:
+                    messages.error(
+                        request, f"لم يتم العثور على هذا الرمز: {raw_code}")
+                    continue
+
+                if any_student.id not in linked_student_ids:
+                    messages.error(
+                        request, f"{any_student.full_name} - ليس ضمن قائمة طلابك")
+                    continue
+
+                student = any_student
+
+            primary_link = (
+                StudentTeacherLink.objects.filter(student=student)
+                .order_by("-is_primary", "created_at")
+                .select_related("teacher")
+                .first()
+            )
+            original_teacher = primary_link.teacher if primary_link else None
+
+            student_record, created = StudentAttendanceRecord.objects.get_or_create(
+                student=student,
+                date=today,
+                defaults={
+                    "check_in_time": localtime(),
+                    "recorded_by": request.user,
+                    "original_teacher": original_teacher,
+                    "assigned_teacher": original_teacher,
+                    "substitute_note": "",
+                    "rating": 6,
+                },
+            )
+
+            if created:
+                messages.success(
+                    request,
+                    f"{student.full_name} - تم تسجيل الحضور بنجاح",
+                )
             else:
-                messages.error(request, f"الطالب غير مرتبط بك: {raw_code}")
+                messages.warning(
+                    request,
+                    f"{student.full_name} - مسجل مسبقاً الساعة "
+                    f"{student_record.check_in_time.strftime('%H:%M')}",
+                )
 
     except Teacher.DoesNotExist:
         messages.error(request, 'لم يتم ربط حسابك بملف معلم')
