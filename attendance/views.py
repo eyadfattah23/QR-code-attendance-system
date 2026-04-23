@@ -160,10 +160,20 @@ def station_view(request):
     error_count = sum(1 for item in results if item["status"] == "error")
 
     today = localdate()
-    recent_student_scans = StudentAttendanceRecord.objects.filter(
-        date=today).select_related("student")[:8]
-    recent_teacher_scans = TeacherAttendanceRecord.objects.filter(
-        date=today).select_related("teacher")[:8]
+    total_today = (
+        StudentAttendanceRecord.objects.filter(date=today).count()
+        + TeacherAttendanceRecord.objects.filter(date=today).count()
+    )
+    recent_student_scans = (
+        StudentAttendanceRecord.objects.filter(date=today)
+        .select_related("student")
+        .order_by("-check_in_time")[:8]
+    )
+    recent_teacher_scans = (
+        TeacherAttendanceRecord.objects.filter(date=today)
+        .select_related("teacher")
+        .order_by("-check_in_time")[:8]
+    )
 
     recent_scans = [
         {
@@ -193,5 +203,6 @@ def station_view(request):
         "error_count": error_count,
         "total_count": len(results),
         "recent_scans": recent_scans,
+        "total_today": total_today,
     }
     return render(request, "scan/station.html", context)

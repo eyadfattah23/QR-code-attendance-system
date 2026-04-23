@@ -10,7 +10,7 @@
             <i class="bi bi-speedometer2 me-2"></i>
             لوحة التحكم
         </h1>
-        <span class="text-muted">مرحباً، {{ user.get_full_name|default:user.phone }} | {{ today }}</span>
+        <span class="text-muted">مرحباً، {{ user.get_full_name|default:user.phone }} | {{ today|date:"j F Y" }}</span>
     </div>
 
     <!-- Statistics Cards -->
@@ -26,8 +26,13 @@
                         </div>
                         <div class="flex-grow-1 me-3 mx-2">
                             <h6 class="text-muted mb-1">حضور الطلاب اليوم</h6>
-                            <h3 class="mb-0">{{ today_student_attendance_count }}</h3>
-                            <small class="text-muted">من أصل {{ total_students }}</small>
+                            <h3 class="mb-0">{{ today_student_attendance_count }} <small
+                                    class="fs-6 text-muted fw-normal">/ {{ total_students }}</small></h3>
+                            <div class="progress mt-2" style="height:6px;">
+                                <div class="progress-bar bg-primary" role="progressbar"
+                                    style="width:{% widthratio today_student_attendance_count total_students 100 %}%">
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -45,8 +50,13 @@
                         </div>
                         <div class="flex-grow-1 me-3 mx-2">
                             <h6 class="text-muted mb-1">حضور المعلمين اليوم</h6>
-                            <h3 class="mb-0">{{ today_teacher_attendance_count }}</h3>
-                            <small class="text-muted">من أصل {{ total_teachers }}</small>
+                            <h3 class="mb-0">{{ today_teacher_attendance_count }} <small
+                                    class="fs-6 text-muted fw-normal">/ {{ total_teachers }}</small></h3>
+                            <div class="progress mt-2" style="height:6px;">
+                                <div class="progress-bar bg-success" role="progressbar"
+                                    style="width:{% widthratio today_teacher_attendance_count total_teachers 100 %}%">
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -103,7 +113,7 @@
         <div class="card-body">
             <div class="row g-3">
                 <div class="col-md-3 col-6">
-                    <a href="{% url 'admin_portal:dashboard' %}" class="btn btn-outline-primary w-100 py-3">
+                    <a href="{% url 'admin_portal:student_list' %}" class="btn btn-outline-primary w-100 py-3">
                         <i class="bi bi-person-plus-fill d-block fs-4 mb-1"></i>
                         إدارة الطلاب
                     </a>

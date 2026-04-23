@@ -204,7 +204,10 @@ STU0001
 
                 {% if recent_scans %}
                 <hr>
-                <h6 class="fw-semibold mb-2">آخر عمليات المسح (اليوم)</h6>
+                <h6 class="fw-semibold mb-2 d-flex justify-content-between align-items-center">
+                    <span>آخر عمليات المسح (اليوم)</span>
+                    <span class="badge bg-primary rounded-pill">{{ total_today }} إجمالي اليوم</span>
+                </h6>
                 <div class="small">
                     {% for item in recent_scans %}
                     <div class="d-flex align-items-center justify-content-between border-bottom py-1">
@@ -241,19 +244,28 @@ STU0001
 
         function beep(frequency, duration) {
             try {
-                const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-                const oscillator = audioCtx.createOscillator();
-                const gainNode = audioCtx.createGain();
-                oscillator.connect(gainNode);
-                gainNode.connect(audioCtx.destination);
-                oscillator.type = 'sine';
-                oscillator.frequency.value = frequency;
-                gainNode.gain.value = 0.05;
-                oscillator.start();
-                setTimeout(() => {
-                    oscillator.stop();
-                    audioCtx.close();
-                }, duration);
+                const AudioCtx = window.AudioContext || window.webkitAudioContext;
+                if (!AudioCtx) return;
+                const audioCtx = new AudioCtx();
+                const play = () => {
+                    const oscillator = audioCtx.createOscillator();
+                    const gainNode = audioCtx.createGain();
+                    oscillator.connect(gainNode);
+                    gainNode.connect(audioCtx.destination);
+                    oscillator.type = 'sine';
+                    oscillator.frequency.value = frequency;
+                    gainNode.gain.value = 0.05;
+                    oscillator.start();
+                    setTimeout(() => {
+                        oscillator.stop();
+                        audioCtx.close();
+                    }, duration);
+                };
+                if (audioCtx.state === 'suspended') {
+                    audioCtx.resume().then(play);
+                } else {
+                    play();
+                }
             } catch (e) { }
         }
 
