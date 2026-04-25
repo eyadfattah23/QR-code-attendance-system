@@ -12,7 +12,7 @@ from django.utils.timezone import localdate
 from django.views.decorators.http import require_http_methods
 from functools import wraps
 
-from core.models import Student, Teacher, User
+from core.models import Student, Teacher, User, StudentTeacherLink
 from attendance.models import StudentAttendanceRecord, TeacherAttendanceRecord
 from .forms import StudentForm, TeacherForm
 
@@ -358,3 +358,93 @@ def teacher_delete(request, pk):
     teacher.user.delete()
     messages.success(request, f'تم حذف المعلم "{name}" بنجاح')
     return redirect('admin_portal:teacher_list')
+
+
+# ---------------------------------------------------------------------------
+# Student-Teacher linking
+# ---------------------------------------------------------------------------
+
+@admin_required
+def teacher_students(request, pk):
+    """Manage which students are linked to a teacher.
+
+    GET  – renders all students with checkboxes (linked ones pre-ticked).
+    POST – atomically replaces the teacher's student links with the
+           submitted set of student IDs and primary flags.
+    """
+    teacher = get_object_or_404(Teacher.objects.select_related('user'), pk=pk)
+
+    # Search/filter within the student pool
+    q = request.GET.get('q', '').strip()
+    grade_filter = request.GET.get('grade', '').strip()
+
+    all_students = Student.objects.all()
+    if q:
+        all_students = all_students.filter(
+            Q(full_name__icontains=q)
+            | Q(national_id__icontains=q)
+            | Q(student_code__icontains=q)
+        )
+    if grade_filter:
+        all_students = all_students.filter(grade=grade_filter)
+
+    grades = (
+        Student.objects
+        .exclude(grade__isnull=True).exclude(grade='')
+        .values_list('grade', flat=True).distinct().order_by('grade')
+    )
+
+    if request.method == 'POST':
+        # Collect submitted student IDs and which ones are marked primary
+        selected_ids = set(request.POST.getlist('students'))
+        primary_ids = set(request.POST.getlist('primary'))
+
+        # Validate that every submitted ID is a real Student UUID
+        existing_ids = set(
+            Student.objects.filter(pk__in=selected_ids)
+            .values_list('id', flat=True)
+        )
+        # Cast to str for comparison (UUIDs come back as UUID objects)
+        existing_ids_str = {str(i) for i in existing_ids}
+        invalid = selected_ids - existing_ids_str
+        if invalid:
+            messages.error(request, 'بعض الطلاب المحددين غير موجودين')
+            return redirect('admin_portal:teacher_students', pk=pk)
+
+        from django.db import transaction
+        with transaction.atomic():
+            # Remove links for de-selected students
+            StudentTeacherLink.objects.filter(teacher=teacher).exclude(
+                student_id__in=existing_ids
+            ).delete()
+
+            # Upsert links for selected students
+            for sid in existing_ids_str:
+                is_primary = sid in primary_ids
+                StudentTeacherLink.objects.update_or_create(
+                    teacher=teacher,
+                    student_id=sid,
+                    defaults={'is_primary': is_primary},
+                )
+
+        count = len(existing_ids_str)
+        messages.success(
+            request, f'تم تحديث قائمة طلاب "{teacher.full_name}" — {count} طالب مرتبط')
+        return redirect('admin_portal:teacher_students', pk=pk)
+
+    # Build sets of currently-linked and primary student IDs for template use
+    links_qs = StudentTeacherLink.objects.filter(teacher=teacher)
+    linked_ids = {str(link.student_id) for link in links_qs}
+    primary_ids = {str(link.student_id)
+                   for link in links_qs if link.is_primary}
+
+    return render(request, 'admin_portal/teacher_students.html', {
+        'teacher': teacher,
+        'students': all_students,
+        'linked_ids': linked_ids,
+        'primary_ids': primary_ids,
+        'q': q,
+        'grade_filter': grade_filter,
+        'grades': grades,
+        'linked_count': len(linked_ids),
+    })

@@ -23,4 +23,6 @@ urlpatterns = [
     path('teachers/<uuid:pk>/edit/', views.teacher_edit, name='teacher_edit'),
     path('teachers/<uuid:pk>/delete/',
          views.teacher_delete, name='teacher_delete'),
+    path('teachers/<uuid:pk>/students/',
+         views.teacher_students, name='teacher_students'),
 ]

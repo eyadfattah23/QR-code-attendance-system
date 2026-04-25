@@ -85,6 +85,10 @@
                             </td>
                             <td>
                                 <div class="btn-group btn-group-sm">
+                                    <a href="{% url 'admin_portal:teacher_students' teacher.id %}"
+                                        class="btn btn-outline-success" title="إدارة الطلاب">
+                                        <i class="bi bi-diagram-3"></i>
+                                    </a>
                                     <a href="{% url 'admin_portal:teacher_edit' teacher.id %}"
                                         class="btn btn-outline-primary" title="تعديل">
                                         <i class="bi bi-pencil"></i>

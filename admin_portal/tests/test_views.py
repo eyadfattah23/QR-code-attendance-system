@@ -6,7 +6,7 @@ from django.test import TestCase, Client
 from django.urls import reverse
 from django.utils.timezone import localdate, localtime
 
-from core.models import User, Student, Teacher
+from core.models import User, Student, Teacher, StudentTeacherLink
 from attendance.models import StudentAttendanceRecord, TeacherAttendanceRecord
 
 
@@ -714,3 +714,165 @@ class TeacherDeleteTestCase(_TeacherManagementBase):
         url = reverse('admin_portal:teacher_delete', args=[self.teacher.id])
         response = self.client.get(url)
         self.assertEqual(response.status_code, 405)
+
+
+# ---------------------------------------------------------------------------
+# Student-Teacher linking tests
+# ---------------------------------------------------------------------------
+
+class TeacherStudentsTestCase(TestCase):
+    """Tests for the teacher_students (linking) view."""
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.admin_user = User.objects.create_user(
+            phone='01900000000', email='admin@link.com', password='adminpass',
+            role=User.Role.ADMIN,
+        )
+        cls.teacher_user = User.objects.create_user(
+            phone='01911111111', email='teacher@link.com', password='teacherpass',
+            role=User.Role.TEACHER,
+        )
+        cls.teacher = Teacher.objects.create(
+            user=cls.teacher_user, full_name='معلم الربط',
+        )
+        cls.student_a = Student.objects.create(
+            full_name='طالب ألف', national_id='10000000000001', student_code='LNK001',
+            grade='الصف الأول',
+        )
+        cls.student_b = Student.objects.create(
+            full_name='طالب باء', national_id='10000000000002', student_code='LNK002',
+            grade='الصف الثاني',
+        )
+        cls.student_c = Student.objects.create(
+            full_name='طالب جيم', national_id='10000000000003', student_code='LNK003',
+            grade='الصف الأول',
+        )
+
+    def setUp(self):
+        self.client = Client()
+        self.client.login(phone='01900000000', password='adminpass')
+        self.url = reverse('admin_portal:teacher_students',
+                           args=[self.teacher.id])
+        # Clear links before each test
+        StudentTeacherLink.objects.filter(teacher=self.teacher).delete()
+
+    # --- access control ---
+
+    def test_admin_can_access(self):
+        response = self.client.get(self.url)
+        self.assertEqual(response.status_code, 200)
+
+    def test_teacher_cannot_access(self):
+        self.client.logout()
+        self.client.login(phone='01911111111', password='teacherpass')
+        response = self.client.get(self.url)
+        self.assertEqual(response.status_code, 302)
+
+    def test_unauthenticated_redirected(self):
+        self.client.logout()
+        response = self.client.get(self.url)
+        self.assertIn('/login/', response.url)
+
+    def test_nonexistent_teacher_returns_404(self):
+        import uuid
+        url = reverse('admin_portal:teacher_students', args=[uuid.uuid4()])
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, 404)
+
+    # --- GET context ---
+
+    def test_get_includes_all_students(self):
+        response = self.client.get(self.url)
+        self.assertEqual(response.status_code, 200)
+        self.assertIn('students', response.context)
+        self.assertEqual(response.context['students'].count(), 3)
+
+    def test_get_shows_prelinked_students_in_linked_ids(self):
+        StudentTeacherLink.objects.create(
+            teacher=self.teacher, student=self.student_a, is_primary=True)
+        response = self.client.get(self.url)
+        linked_ids = response.context['linked_ids']
+        self.assertIn(str(self.student_a.id), linked_ids)
+        self.assertNotIn(str(self.student_b.id), linked_ids)
+
+    def test_get_shows_primary_ids(self):
+        StudentTeacherLink.objects.create(
+            teacher=self.teacher, student=self.student_a, is_primary=True)
+        StudentTeacherLink.objects.create(
+            teacher=self.teacher, student=self.student_b, is_primary=False)
+        response = self.client.get(self.url)
+        primary_ids = response.context['primary_ids']
+        self.assertIn(str(self.student_a.id), primary_ids)
+        self.assertNotIn(str(self.student_b.id), primary_ids)
+
+    def test_search_filters_students(self):
+        response = self.client.get(self.url, {'q': 'ألف'})
+        self.assertEqual(response.context['students'].count(), 1)
+        self.assertEqual(
+            response.context['students'].first().full_name, 'طالب ألف')
+
+    def test_grade_filter_filters_students(self):
+        response = self.client.get(self.url, {'grade': 'الصف الأول'})
+        self.assertEqual(response.context['students'].count(), 2)
+
+    # --- POST: link ---
+
+    def test_post_links_selected_students(self):
+        self.client.post(self.url, {
+            'students': [str(self.student_a.id), str(self.student_b.id)],
+        })
+        self.assertEqual(
+            StudentTeacherLink.objects.filter(teacher=self.teacher).count(), 2)
+        self.assertTrue(
+            StudentTeacherLink.objects.filter(
+                teacher=self.teacher, student=self.student_a).exists())
+
+    def test_post_removes_deselected_students(self):
+        # Pre-link all three
+        for s in [self.student_a, self.student_b, self.student_c]:
+            StudentTeacherLink.objects.create(teacher=self.teacher, student=s)
+        # Submit only student_a
+        self.client.post(self.url, {'students': [str(self.student_a.id)]})
+        self.assertEqual(
+            StudentTeacherLink.objects.filter(teacher=self.teacher).count(), 1)
+        self.assertTrue(
+            StudentTeacherLink.objects.filter(
+                teacher=self.teacher, student=self.student_a).exists())
+
+    def test_post_marks_primary_correctly(self):
+        self.client.post(self.url, {
+            'students': [str(self.student_a.id), str(self.student_b.id)],
+            'primary':  [str(self.student_a.id)],
+        })
+        link_a = StudentTeacherLink.objects.get(
+            teacher=self.teacher, student=self.student_a)
+        link_b = StudentTeacherLink.objects.get(
+            teacher=self.teacher, student=self.student_b)
+        self.assertTrue(link_a.is_primary)
+        self.assertFalse(link_b.is_primary)
+
+    def test_post_empty_submission_removes_all_links(self):
+        StudentTeacherLink.objects.create(
+            teacher=self.teacher, student=self.student_a)
+        self.client.post(self.url, {})  # no students submitted
+        self.assertEqual(
+            StudentTeacherLink.objects.filter(teacher=self.teacher).count(), 0)
+
+    def test_post_redirects_back_to_same_page(self):
+        response = self.client.post(self.url, {
+            'students': [str(self.student_a.id)],
+        })
+        self.assertRedirects(response, self.url)
+
+    def test_post_updates_existing_link_primary_flag(self):
+        StudentTeacherLink.objects.create(
+            teacher=self.teacher, student=self.student_a, is_primary=False)
+        # Now mark as primary
+        self.client.post(self.url, {
+            'students': [str(self.student_a.id)],
+            'primary':  [str(self.student_a.id)],
+        })
+        link = StudentTeacherLink.objects.get(
+            teacher=self.teacher, student=self.student_a)
+        self.assertTrue(link.is_primary)

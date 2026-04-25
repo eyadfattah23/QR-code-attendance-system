@@ -1,0 +1,253 @@
+{% extends 'base.html' %}
+
+{% block title %}طلاب {{ teacher.full_name }} - نظام الحضور{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+
+    <!-- Page header -->
+    <div class="d-flex align-items-center mb-4 mt-2">
+        <a href="{% url 'admin_portal:teacher_list' %}" class="btn btn-outline-secondary btn-sm me-3" title="رجوع">
+            <i class="bi bi-arrow-right"></i>
+        </a>
+        <div>
+            <h1 class="h3 mb-0">
+                <i class="bi bi-diagram-3 me-2 text-success"></i>
+                طلاب المعلم: <strong>{{ teacher.full_name }}</strong>
+            </h1>
+            <small class="text-muted">
+                {{ linked_count }} طالب مرتبط حالياً
+                {% if teacher.subject %}— {{ teacher.subject }}{% endif %}
+            </small>
+        </div>
+    </div>
+
+    <form method="post" id="link-form">
+        {% csrf_token %}
+        <div class="row g-3">
+
+            <!-- Left: filters + student list -->
+            <div class="col-lg-8">
+
+                <!-- Search & filter -->
+                <div class="card border-0 shadow-sm mb-3">
+                    <div class="card-body py-3">
+                        <div class="row g-2 align-items-end">
+                            <div class="col-md-5">
+                                <label class="form-label mb-1 small fw-semibold">بحث في الطلاب</label>
+                                <input type="text" id="search-input" value="{{ q }}" class="form-control"
+                                    placeholder="الاسم، الرقم القومي، الكود…" oninput="filterRows(this.value)">
+                            </div>
+                            <div class="col-md-3">
+                                <label class="form-label mb-1 small fw-semibold">الصف</label>
+                                <select id="grade-filter" class="form-select" onchange="filterByGrade(this.value)">
+                                    <option value="">— الكل —</option>
+                                    {% for g in grades %}
+                                    <option value="{{ g }}" {% if g==grade_filter %}selected{% endif %}>{{ g }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            <div class="col-md-2">
+                                <button type="button" class="btn btn-outline-secondary w-100" onclick="clearFilters()">
+                                    <i class="bi bi-x-lg me-1"></i>مسح
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Student table -->
+                <div class="card border-0 shadow-sm">
+                    <div class="card-header bg-transparent d-flex justify-content-between align-items-center py-2">
+                        <span class="fw-semibold small">
+                            <i class="bi bi-people me-1 text-primary"></i>
+                            <span id="visible-count">{{ students|length }}</span> طالب معروض
+                        </span>
+                        <div class="d-flex gap-2">
+                            <button type="button" class="btn btn-outline-primary btn-sm" onclick="selectAll()">
+                                تحديد الكل
+                            </button>
+                            <button type="button" class="btn btn-outline-secondary btn-sm" onclick="deselectAll()">
+                                إلغاء الكل
+                            </button>
+                        </div>
+                    </div>
+                    <div class="card-body p-0">
+                        {% if students %}
+                        <div class="table-responsive" style="max-height: 65vh; overflow-y: auto;">
+                            <table class="table table-hover align-middle mb-0" id="students-table">
+                                <thead class="table-light sticky-top">
+                                    <tr>
+                                        <th style="width:2.5rem">
+                                            <input type="checkbox" class="form-check-input" id="check-all"
+                                                title="تحديد الكل" onchange="toggleAll(this.checked)">
+                                        </th>
+                                        <th>الاسم</th>
+                                        <th>الكود</th>
+                                        <th>الصف</th>
+                                        <th style="width:7rem" class="text-center">أساسي</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for student in students %}
+                                    {% with sid=student.id|stringformat:"s" %}
+                                    <tr data-name="{{ student.full_name|lower }}"
+                                        data-code="{{ student.student_code|lower|default:'' }}"
+                                        data-national="{{ student.national_id|lower }}"
+                                        data-grade="{{ student.grade|default:'' }}">
+                                        <td>
+                                            <input type="checkbox" class="form-check-input student-cb" name="students"
+                                                value="{{ student.id }}" id="cb-{{ student.id }}" {% if sid in
+                                                linked_ids %}checked{% endif %} onchange="onStudentToggle(this)">
+                                        </td>
+                                        <td>
+                                            <label class="mb-0 fw-semibold" for="cb-{{ student.id }}"
+                                                style="cursor:pointer">
+                                                {{ student.full_name }}
+                                            </label>
+                                        </td>
+                                        <td class="font-monospace small text-muted">
+                                            {{ student.student_code|default:"—" }}
+                                        </td>
+                                        <td>
+                                            {% if student.grade %}
+                                            <span class="badge bg-light text-dark border">{{ student.grade }}</span>
+                                            {% else %}—{% endif %}
+                                        </td>
+                                        <td class="text-center">
+                                            <input type="checkbox" class="form-check-input primary-cb" name="primary"
+                                                value="{{ student.id }}" id="primary-{{ student.id }}"
+                                                title="معلم أساسي لهذا الطالب" {% if sid in primary_ids %}checked{%
+                                                endif %} {% if sid not in linked_ids %}disabled{% endif %}>
+                                        </td>
+                                    </tr>
+                                    {% endwith %}
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                        {% else %}
+                        <div class="text-center py-5">
+                            <i class="bi bi-people display-1 text-muted"></i>
+                            <p class="text-muted mt-3">لا يوجد طلاب مسجلون بعد</p>
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+
+            <!-- Right: summary panel + save -->
+            <div class="col-lg-4">
+                <div class="card border-0 shadow-sm sticky-top" style="top: 1rem;">
+                    <div class="card-header bg-success text-white fw-semibold">
+                        <i class="bi bi-check2-square me-2"></i>ملخص الربط
+                    </div>
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between mb-2">
+                            <span class="text-muted">إجمالي الطلاب</span>
+                            <strong>{{ students|length }}</strong>
+                        </div>
+                        <div class="d-flex justify-content-between mb-2">
+                            <span class="text-muted">مرتبط حالياً</span>
+                            <strong class="text-success" id="summary-linked">{{ linked_count }}</strong>
+                        </div>
+                        <div class="d-flex justify-content-between mb-4">
+                            <span class="text-muted">مُحدَّد الآن</span>
+                            <strong class="text-primary" id="summary-selected">{{ linked_count }}</strong>
+                        </div>
+
+                        <div class="d-grid gap-2">
+                            <button type="submit" class="btn btn-success">
+                                <i class="bi bi-floppy me-1"></i>حفظ التغييرات
+                            </button>
+                            <a href="{% url 'admin_portal:teacher_list' %}" class="btn btn-outline-secondary">إلغاء</a>
+                        </div>
+                    </div>
+                    <div class="card-footer text-muted small">
+                        <i class="bi bi-info-circle me-1"></i>
+                        "أساسي" يعني أن هذا المعلم هو المعلم الرئيسي للطالب في سجلات الحضور.
+                    </div>
+                </div>
+            </div>
+        </div>
+    </form>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    // ── live counter ──────────────────────────────────────────────────────────
+    function updateCounter() {
+        const count = document.querySelectorAll('.student-cb:checked').length;
+        document.getElementById('summary-selected').textContent = count;
+    }
+
+    // ── enable/disable the "primary" checkbox based on the student checkbox ──
+    function onStudentToggle(cb) {
+        const primaryCb = document.getElementById('primary-' + cb.value);
+        if (primaryCb) {
+            primaryCb.disabled = !cb.checked;
+            if (!cb.checked) primaryCb.checked = false;
+        }
+        updateCounter();
+    }
+
+    // ── select / deselect all visible rows ───────────────────────────────────
+    function selectAll() {
+        document.querySelectorAll('#students-table tbody tr:not([style*="display: none"]) .student-cb')
+            .forEach(cb => { cb.checked = true; onStudentToggle(cb); });
+        updateCounter();
+    }
+
+    function deselectAll() {
+        document.querySelectorAll('.student-cb').forEach(cb => {
+            cb.checked = false; onStudentToggle(cb);
+        });
+        updateCounter();
+    }
+
+    function toggleAll(checked) {
+        document.querySelectorAll('.student-cb').forEach(cb => {
+            cb.checked = checked; onStudentToggle(cb);
+        });
+        updateCounter();
+    }
+
+    // ── client-side row filtering ─────────────────────────────────────────────
+    function filterRows(term) {
+        const t = term.toLowerCase().trim();
+        const grade = document.getElementById('grade-filter').value.toLowerCase();
+        let visible = 0;
+        document.querySelectorAll('#students-table tbody tr').forEach(row => {
+            const matchesSearch = !t ||
+                row.dataset.name.includes(t) ||
+                row.dataset.code.includes(t) ||
+                row.dataset.national.includes(t);
+            const matchesGrade = !grade || row.dataset.grade === grade;
+            const show = matchesSearch && matchesGrade;
+            row.style.display = show ? '' : 'none';
+            if (show) visible++;
+        });
+        document.getElementById('visible-count').textContent = visible;
+    }
+
+    function filterByGrade(grade) {
+        filterRows(document.getElementById('search-input').value);
+    }
+
+    function clearFilters() {
+        document.getElementById('search-input').value = '';
+        document.getElementById('grade-filter').value = '';
+        filterRows('');
+    }
+
+    // ── init ──────────────────────────────────────────────────────────────────
+    document.addEventListener('DOMContentLoaded', function () {
+        updateCounter();
+        // Apply any server-side filter values on load
+        const q = document.getElementById('search-input').value;
+        const g = document.getElementById('grade-filter').value;
+        if (q || g) filterRows(q);
+    });
+</script>
+{% endblock %}
