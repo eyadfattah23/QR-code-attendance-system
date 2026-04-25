@@ -453,3 +453,264 @@ class StudentImportTestCase(_StudentManagementBase):
         self.client.post(self.url, {'excel_file': upload})
         self.assertFalse(Student.objects.filter(
             national_id='44444444444444').exists())
+
+
+# ---------------------------------------------------------------------------
+# Teacher management tests
+# ---------------------------------------------------------------------------
+
+class _TeacherManagementBase(TestCase):
+    """Shared fixtures for teacher management test cases."""
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.admin_user = User.objects.create_user(
+            phone='01000000000', email='admin@test.com', password='adminpass123',
+            role=User.Role.ADMIN,
+        )
+        cls.teacher_user = User.objects.create_user(
+            phone='01111111111', email='teacher@test.com', password='teacherpass',
+            role=User.Role.TEACHER, first_name='جورج', last_name='حبيب',
+        )
+        cls.teacher = Teacher.objects.create(
+            user=cls.teacher_user, full_name='جورج حبيب', subject='رياضيات',
+        )
+
+    def setUp(self):
+        self.client = Client()
+        self.client.login(phone='01000000000', password='adminpass123')
+
+
+class TeacherListTestCase(_TeacherManagementBase):
+
+    def setUp(self):
+        super().setUp()
+        self.url = reverse('admin_portal:teacher_list')
+
+    def test_admin_can_access_list(self):
+        response = self.client.get(self.url)
+        self.assertEqual(response.status_code, 200)
+
+    def test_teacher_cannot_access_list(self):
+        self.client.logout()
+        self.client.login(phone='01111111111', password='teacherpass')
+        response = self.client.get(self.url)
+        self.assertEqual(response.status_code, 302)
+
+    def test_unauthenticated_redirected(self):
+        self.client.logout()
+        response = self.client.get(self.url)
+        self.assertEqual(response.status_code, 302)
+        self.assertIn('/login/', response.url)
+
+    def test_search_by_name(self):
+        response = self.client.get(self.url, {'q': 'جورج'})
+        teachers = list(response.context['page_obj'])
+        self.assertEqual(len(teachers), 1)
+        self.assertEqual(teachers[0].full_name, 'جورج حبيب')
+
+    def test_search_by_subject(self):
+        response = self.client.get(self.url, {'q': 'رياضيات'})
+        self.assertEqual(len(list(response.context['page_obj'])), 1)
+
+    def test_search_by_phone(self):
+        response = self.client.get(self.url, {'q': '01111111111'})
+        self.assertEqual(len(list(response.context['page_obj'])), 1)
+
+    def test_search_no_match_returns_empty(self):
+        response = self.client.get(self.url, {'q': 'لا يوجد'})
+        self.assertEqual(len(list(response.context['page_obj'])), 0)
+
+    def test_total_count_in_context(self):
+        response = self.client.get(self.url)
+        self.assertEqual(response.context['total_count'], 1)
+
+
+class TeacherCreateTestCase(_TeacherManagementBase):
+
+    def setUp(self):
+        super().setUp()
+        self.url = reverse('admin_portal:teacher_create')
+
+    def test_get_shows_form(self):
+        response = self.client.get(self.url)
+        self.assertEqual(response.status_code, 200)
+        self.assertIn('form', response.context)
+
+    def test_create_valid_teacher(self):
+        response = self.client.post(self.url, {
+            'full_name': 'محمد سليمان',
+            'subject': 'علوم',
+            'phone': '01222222222',
+            'first_name': 'محمد',
+            'last_name': 'سليمان',
+            'password': 'StrongPass1!',
+        })
+        self.assertEqual(response.status_code, 302)
+        self.assertTrue(Teacher.objects.filter(
+            full_name='محمد سليمان').exists())
+        self.assertTrue(User.objects.filter(phone='01222222222').exists())
+
+    def test_create_redirects_to_list(self):
+        response = self.client.post(self.url, {
+            'full_name': 'سارة علي',
+            'subject': '',
+            'phone': '01333333333',
+            'first_name': '',
+            'last_name': '',
+            'password': 'pass1234',
+        })
+        self.assertRedirects(response, reverse('admin_portal:teacher_list'))
+
+    def test_create_duplicate_phone_rejected(self):
+        response = self.client.post(self.url, {
+            'full_name': 'مكرر',
+            'subject': '',
+            'phone': '01111111111',  # already in use
+            'first_name': '',
+            'last_name': '',
+            'password': 'pass1234',
+        })
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(Teacher.objects.filter(full_name='مكرر').count(), 0)
+
+    def test_create_missing_password_rejected(self):
+        response = self.client.post(self.url, {
+            'full_name': 'بدون كلمة مرور',
+            'subject': '',
+            'phone': '01444444444',
+            'first_name': '',
+            'last_name': '',
+            'password': '',
+        })
+        self.assertEqual(response.status_code, 200)
+        self.assertFalse(User.objects.filter(phone='01444444444').exists())
+
+    def test_user_created_with_teacher_role(self):
+        self.client.post(self.url, {
+            'full_name': 'أستاذ جديد',
+            'subject': 'فيزياء',
+            'phone': '01555555555',
+            'first_name': '',
+            'last_name': '',
+            'password': 'pass1234',
+        })
+        user = User.objects.get(phone='01555555555')
+        self.assertEqual(user.role, User.Role.TEACHER)
+
+    def test_teacher_cannot_access_create(self):
+        self.client.logout()
+        self.client.login(phone='01111111111', password='teacherpass')
+        response = self.client.get(self.url)
+        self.assertEqual(response.status_code, 302)
+
+
+class TeacherEditTestCase(_TeacherManagementBase):
+
+    def setUp(self):
+        super().setUp()
+        self.url = reverse('admin_portal:teacher_edit', args=[self.teacher.id])
+
+    def test_get_shows_prepopulated_form(self):
+        response = self.client.get(self.url)
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(
+            response.context['form'].initial['full_name'], 'جورج حبيب')
+        self.assertEqual(
+            response.context['form'].initial['phone'], '01111111111')
+
+    def test_edit_updates_teacher_fields(self):
+        self.client.post(self.url, {
+            'full_name': 'جورج حبيب محدث',
+            'subject': 'فيزياء',
+            'phone': '01111111111',
+            'first_name': 'جورج',
+            'last_name': 'حبيب',
+            'password': '',
+        })
+        self.teacher.refresh_from_db()
+        self.assertEqual(self.teacher.full_name, 'جورج حبيب محدث')
+        self.assertEqual(self.teacher.subject, 'فيزياء')
+
+    def test_edit_updates_user_phone(self):
+        self.client.post(self.url, {
+            'full_name': 'جورج حبيب',
+            'subject': 'رياضيات',
+            'phone': '01666666666',
+            'first_name': '',
+            'last_name': '',
+            'password': '',
+        })
+        self.teacher_user.refresh_from_db()
+        self.assertEqual(self.teacher_user.phone, '01666666666')
+
+    def test_edit_blank_password_keeps_existing(self):
+        import hashlib
+        old_hash = self.teacher_user.password
+        self.client.post(self.url, {
+            'full_name': 'جورج حبيب',
+            'subject': 'رياضيات',
+            'phone': '01111111111',
+            'first_name': '',
+            'last_name': '',
+            'password': '',
+        })
+        self.teacher_user.refresh_from_db()
+        self.assertEqual(self.teacher_user.password, old_hash)
+
+    def test_edit_with_new_password_updates_hash(self):
+        self.client.post(self.url, {
+            'full_name': 'جورج حبيب',
+            'subject': 'رياضيات',
+            'phone': '01111111111',
+            'first_name': '',
+            'last_name': '',
+            'password': 'NewPass999',
+        })
+        self.teacher_user.refresh_from_db()
+        self.assertTrue(self.teacher_user.check_password('NewPass999'))
+
+    def test_edit_redirects_to_list(self):
+        response = self.client.post(self.url, {
+            'full_name': 'جورج حبيب',
+            'subject': '',
+            'phone': '01111111111',
+            'first_name': '',
+            'last_name': '',
+            'password': '',
+        })
+        self.assertRedirects(response, reverse('admin_portal:teacher_list'))
+
+    def test_edit_nonexistent_returns_404(self):
+        import uuid
+        url = reverse('admin_portal:teacher_edit', args=[uuid.uuid4()])
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, 404)
+
+
+class TeacherDeleteTestCase(_TeacherManagementBase):
+
+    def test_delete_removes_teacher_and_user(self):
+        new_user = User.objects.create_user(
+            phone='01777777777', email='del@test.com', password='delpass',
+            role=User.Role.TEACHER,
+        )
+        new_teacher = Teacher.objects.create(
+            user=new_user, full_name='معلم للحذف',
+        )
+        url = reverse('admin_portal:teacher_delete', args=[new_teacher.id])
+        response = self.client.post(url)
+        self.assertRedirects(response, reverse('admin_portal:teacher_list'))
+        self.assertFalse(Teacher.objects.filter(pk=new_teacher.pk).exists())
+        self.assertFalse(User.objects.filter(pk=new_user.pk).exists())
+
+    def test_delete_nonexistent_returns_404(self):
+        import uuid
+        url = reverse('admin_portal:teacher_delete', args=[uuid.uuid4()])
+        response = self.client.post(url)
+        self.assertEqual(response.status_code, 404)
+
+    def test_delete_requires_post(self):
+        url = reverse('admin_portal:teacher_delete', args=[self.teacher.id])
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, 405)

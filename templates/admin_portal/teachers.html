@@ -1,0 +1,211 @@
+{% extends 'base.html' %}
+
+{% block title %}إدارة المعلمين - نظام الحضور{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+
+    <!-- Page header -->
+    <div class="d-flex justify-content-between align-items-center mb-4 mt-2">
+        <h1 class="h3 mb-0">
+            <i class="bi bi-person-badge-fill me-2"></i>
+            إدارة المعلمين
+        </h1>
+        <a href="{% url 'admin_portal:teacher_create' %}" class="btn btn-primary">
+            <i class="bi bi-person-plus me-1"></i>
+            إضافة معلم
+        </a>
+    </div>
+
+    <!-- Search bar -->
+    <div class="card border-0 shadow-sm mb-4">
+        <div class="card-body py-3">
+            <form method="get" class="row g-2 align-items-end">
+                <div class="col-md-6">
+                    <label class="form-label mb-1 small fw-semibold">بحث</label>
+                    <input type="text" name="q" value="{{ q }}" class="form-control"
+                        placeholder="الاسم، المجموعة، رقم الهاتف…">
+                </div>
+                <div class="col-md-2">
+                    <button type="submit" class="btn btn-outline-primary w-100">
+                        <i class="bi bi-search me-1"></i>بحث
+                    </button>
+                </div>
+                {% if q %}
+                <div class="col-md-2">
+                    <a href="{% url 'admin_portal:teacher_list' %}" class="btn btn-outline-secondary w-100">
+                        <i class="bi bi-x-lg me-1"></i>مسح
+                    </a>
+                </div>
+                {% endif %}
+            </form>
+        </div>
+    </div>
+
+    <!-- Teachers table -->
+    <div class="card border-0 shadow-sm">
+        <div class="card-header bg-transparent d-flex justify-content-between align-items-center">
+            <span class="fw-semibold">
+                <i class="bi bi-person-badge me-1 text-success"></i>
+                {{ total_count }} معلم
+                {% if q %}
+                <small class="text-muted fw-normal ms-1">(نتائج مصفاة)</small>
+                {% endif %}
+            </span>
+        </div>
+        <div class="card-body p-0">
+            {% if page_obj.object_list %}
+            <div class="table-responsive">
+                <table class="table table-hover align-middle mb-0 text-center">
+                    <thead class="table-light">
+                        <tr>
+                            <th style="width:3rem">#</th>
+                            <th>الاسم الكامل</th>
+                            <th>رقم الهاتف</th>
+                            <th>المجموعة</th>
+                            <th>عدد الطلاب</th>
+                            <th style="width:8rem">إجراءات</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for teacher in page_obj %}
+                        <tr>
+                            <td class="text-muted small">{{ forloop.counter|add:page_obj.start_index|add:"-1" }}</td>
+                            <td class="fw-semibold">{{ teacher.full_name }}</td>
+                            <td class="font-monospace small text-muted" dir="ltr">{{ teacher.user.phone }}</td>
+                            <td>
+                                {% if teacher.subject %}
+                                <span class="badge bg-light text-dark border">{{ teacher.subject }}</span>
+                                {% else %}—{% endif %}
+                            </td>
+                            <td>
+                                <span class="badge bg-primary-subtle text-primary-emphasis rounded-pill">
+                                    {{ teacher.student_links.count }}
+                                </span>
+                            </td>
+                            <td>
+                                <div class="btn-group btn-group-sm">
+                                    <a href="{% url 'admin_portal:teacher_edit' teacher.id %}"
+                                        class="btn btn-outline-primary" title="تعديل">
+                                        <i class="bi bi-pencil"></i>
+                                    </a>
+                                    <button type="button" class="btn btn-outline-danger" title="حذف"
+                                        data-bs-toggle="modal" data-bs-target="#deleteModal"
+                                        data-delete-url="{% url 'admin_portal:teacher_delete' teacher.id %}"
+                                        data-teacher-name="{{ teacher.full_name }}"
+                                        data-student-count="{{ teacher.student_links.count }}">
+                                        <i class="bi bi-trash"></i>
+                                    </button>
+                                </div>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Pagination -->
+            {% if page_obj.has_other_pages %}
+            <div class="d-flex justify-content-center py-3">
+                <nav aria-label="تصفح الصفحات">
+                    <ul class="pagination mb-0">
+                        {% if page_obj.has_previous %}
+                        <li class="page-item">
+                            <a class="page-link"
+                                href="?page={{ page_obj.previous_page_number }}{% if q %}&q={{ q }}{% endif %}">
+                                &laquo;
+                            </a>
+                        </li>
+                        {% endif %}
+
+                        {% for num in page_obj.paginator.page_range %}
+                        {% if num == page_obj.number %}
+                        <li class="page-item active"><span class="page-link">{{ num }}</span></li>
+                        {% elif num >= page_obj.number|add:"-2" and num <= page_obj.number|add:"2" %} <li
+                            class="page-item">
+                            <a class="page-link" href="?page={{ num }}{% if q %}&q={{ q }}{% endif %}">{{ num }}</a>
+                            </li>
+                            {% endif %}
+                            {% endfor %}
+
+                            {% if page_obj.has_next %}
+                            <li class="page-item">
+                                <a class="page-link"
+                                    href="?page={{ page_obj.next_page_number }}{% if q %}&q={{ q }}{% endif %}">
+                                    &raquo;
+                                </a>
+                            </li>
+                            {% endif %}
+                    </ul>
+                </nav>
+            </div>
+            {% endif %}
+
+            {% else %}
+            <div class="text-center py-5">
+                <i class="bi bi-person-badge display-1 text-muted"></i>
+                <p class="text-muted mt-3 mb-3">
+                    {% if q %}
+                    لا يوجد معلمون مطابقون للبحث
+                    {% else %}
+                    لا يوجد معلمون مسجلون بعد
+                    {% endif %}
+                </p>
+                {% if not q %}
+                <a href="{% url 'admin_portal:teacher_create' %}" class="btn btn-primary">
+                    <i class="bi bi-person-plus me-1"></i>إضافة معلم
+                </a>
+                {% endif %}
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<!-- Delete Confirmation Modal -->
+<div class="modal fade" id="deleteModal" tabindex="-1" aria-labelledby="deleteModalLabel">
+    <div class="modal-dialog modal-sm">
+        <div class="modal-content">
+            <div class="modal-header border-0 pb-0">
+                <h5 class="modal-title text-danger" id="deleteModalLabel">
+                    <i class="bi bi-exclamation-triangle me-2"></i>تأكيد الحذف
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <p class="mb-1">هل أنت متأكد من حذف:</p>
+                <p class="fw-semibold" id="delete-teacher-name"></p>
+                <p class="text-danger small mb-0" id="delete-warning">
+                    <i class="bi bi-exclamation-circle me-1"></i>
+                    سيتم حذف حساب المعلم وجميع سجلاته.
+                </p>
+            </div>
+            <div class="modal-footer border-0 pt-0">
+                <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">إلغاء</button>
+                <form id="delete-form" method="post">
+                    {% csrf_token %}
+                    <button type="submit" class="btn btn-danger btn-sm">
+                        <i class="bi bi-trash me-1"></i>حذف
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    document.getElementById('deleteModal').addEventListener('show.bs.modal', function (event) {
+        const btn = event.relatedTarget;
+        document.getElementById('delete-teacher-name').textContent = btn.dataset.teacherName;
+        document.getElementById('delete-form').action = btn.dataset.deleteUrl;
+        const count = parseInt(btn.dataset.studentCount, 10);
+        if (count > 0) {
+            document.getElementById('delete-warning').innerHTML =
+                '<i class="bi bi-exclamation-circle me-1"></i>' +
+                'سيتم حذف حساب المعلم وجميع سجلاته. يرتبط به <strong>' + count + '</strong> طالب.';
+        }
+    });
+</script>
+{% endblock %}

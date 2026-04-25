@@ -14,7 +14,7 @@ from functools import wraps
 
 from core.models import Student, Teacher, User
 from attendance.models import StudentAttendanceRecord, TeacherAttendanceRecord
-from .forms import StudentForm
+from .forms import StudentForm, TeacherForm
 
 
 def admin_required(view_func):
@@ -267,3 +267,94 @@ def student_import_template(request):
     )
     response['Content-Disposition'] = 'attachment; filename="students_import_template.xlsx"'
     return response
+
+
+# ---------------------------------------------------------------------------
+# Teacher management
+# ---------------------------------------------------------------------------
+
+@admin_required
+def teacher_list(request):
+    """Paginated teacher list with name / phone / subject search."""
+    q = request.GET.get('q', '').strip()
+
+    qs = Teacher.objects.select_related('user').all()
+    if q:
+        qs = qs.filter(
+            Q(full_name__icontains=q)
+            | Q(subject__icontains=q)
+            | Q(user__phone__icontains=q)
+        )
+
+    paginator = Paginator(qs, 25)
+    page_obj = paginator.get_page(request.GET.get('page'))
+
+    return render(request, 'admin_portal/teachers.html', {
+        'page_obj': page_obj,
+        'q': q,
+        'total_count': qs.count(),
+    })
+
+
+@admin_required
+def teacher_create(request):
+    """Create a new teacher with a linked user account."""
+    if request.method == 'POST':
+        form = TeacherForm(request.POST)
+        if form.is_valid():
+            teacher = form.save()
+            messages.success(
+                request, f'تم إضافة المعلم "{teacher.full_name}" بنجاح')
+            return redirect('admin_portal:teacher_list')
+    else:
+        form = TeacherForm()
+
+    return render(request, 'admin_portal/teacher_form.html', {
+        'form': form,
+        'title': 'إضافة معلم جديد',
+        'submit_label': 'إضافة',
+    })
+
+
+@admin_required
+def teacher_edit(request, pk):
+    """Edit an existing teacher and their linked user account."""
+    teacher = get_object_or_404(Teacher.objects.select_related('user'), pk=pk)
+
+    if request.method == 'POST':
+        form = TeacherForm(request.POST, instance=teacher)
+        if form.is_valid():
+            form.save()
+            messages.success(
+                request, f'تم تحديث بيانات "{teacher.full_name}" بنجاح')
+            return redirect('admin_portal:teacher_list')
+    else:
+        form = TeacherForm(
+            initial={
+                'full_name': teacher.full_name,
+                'subject': teacher.subject or '',
+                'phone': teacher.user.phone,
+                'first_name': teacher.user.first_name,
+                'last_name': teacher.user.last_name,
+            },
+            instance=teacher,
+        )
+
+    return render(request, 'admin_portal/teacher_form.html', {
+        'form': form,
+        'teacher': teacher,
+        'title': f'تعديل: {teacher.full_name}',
+        'submit_label': 'حفظ التغييرات',
+    })
+
+
+@admin_required
+@require_http_methods(['POST'])
+def teacher_delete(request, pk):
+    """Delete a teacher (and their user account) — POST only."""
+    teacher = get_object_or_404(Teacher, pk=pk)
+    name = teacher.full_name
+    # Deleting the user cascades to the Teacher profile
+    teacher.user.delete()
+    messages.success(request, f'تم حذف المعلم "{name}" بنجاح')
+    return redirect('admin_portal:teacher_list')

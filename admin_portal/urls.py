@@ -16,4 +16,11 @@ urlpatterns = [
     path('students/<uuid:pk>/edit/', views.student_edit, name='student_edit'),
     path('students/<uuid:pk>/delete/',
          views.student_delete, name='student_delete'),
+
+    # Teacher management
+    path('teachers/', views.teacher_list, name='teacher_list'),
+    path('teachers/create/', views.teacher_create, name='teacher_create'),
+    path('teachers/<uuid:pk>/edit/', views.teacher_edit, name='teacher_edit'),
+    path('teachers/<uuid:pk>/delete/',
+         views.teacher_delete, name='teacher_delete'),
 ]
