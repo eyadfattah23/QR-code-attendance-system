@@ -96,6 +96,10 @@
                             </td>
                             <td>
                                 <div class="btn-group btn-group-sm">
+                                    <a href="{% url 'admin_portal:student_history' student.id %}"
+                                        class="btn btn-outline-info" title="سجل الحضور">
+                                        <i class="bi bi-clock-history"></i>
+                                    </a>
                                     <a href="{% url 'admin_portal:student_edit' student.id %}"
                                         class="btn btn-outline-primary" title="تعديل">
                                         <i class="bi bi-pencil"></i>

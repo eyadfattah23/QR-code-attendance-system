@@ -1,0 +1,245 @@
+{% extends 'base.html' %}
+
+{% block title %}سجل حضور {{ student.full_name }} - نظام الحضور{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+
+    <!-- Page header -->
+    <div class="d-flex align-items-center mb-4 mt-2">
+        <a href="{% url 'admin_portal:student_list' %}" class="btn btn-outline-secondary btn-sm me-3" title="رجوع">
+            <i class="bi bi-arrow-right"></i>
+        </a>
+        <div>
+            <h1 class="h3 mb-0">
+                <i class="bi bi-clock-history me-2 text-info"></i>
+                سجل حضور: <strong>{{ student.full_name }}</strong>
+            </h1>
+            <small class="text-muted">
+                {% if student.grade %}{{ student.grade }} — {% endif %}
+                {{ total_records }} يوم حضور مسجّل
+            </small>
+        </div>
+    </div>
+
+    <div class="row g-3">
+
+        <!-- Left: attendance table -->
+        <div class="col-lg-9">
+            <div class="card border-0 shadow-sm">
+                <div class="card-header bg-white border-bottom py-3 d-flex align-items-center justify-content-between">
+                    <span class="fw-semibold">
+                        <i class="bi bi-table me-1 text-muted"></i>
+                        سجل الحضور التفصيلي
+                    </span>
+                    <span class="badge bg-info text-white rounded-pill">{{ total_records }}</span>
+                </div>
+
+                {% if records %}
+                <div class="table-responsive">
+                    <table class="table table-hover align-middle mb-0" id="history-table">
+                        <thead class="table-light">
+                            <tr>
+                                <th>#</th>
+                                <th>التاريخ</th>
+                                <th>وقت الحضور</th>
+                                <th>المعلم المكلف</th>
+                                <th>التقييم</th>
+                                <th>ملاحظة النيابة</th>
+                                <th>صورة اليوم</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for record in records %}
+                            <tr>
+                                <td class="text-muted small">{{ forloop.counter }}</td>
+                                <td class="fw-semibold">{{ record.date|date:"Y/m/d" }}</td>
+                                <td class="font-monospace small text-muted">
+                                    {{ record.check_in_time|time:"H:i" }}
+                                </td>
+                                <td>
+                                    {% if record.assigned_teacher %}
+                                        <span class="badge bg-light text-dark border">
+                                            {{ record.assigned_teacher.full_name }}
+                                        </span>
+                                        {% if record.original_teacher and record.original_teacher != record.assigned_teacher %}
+                                            <br>
+                                            <small class="text-muted">
+                                                <i class="bi bi-arrow-left-right"></i>
+                                                بدلاً عن: {{ record.original_teacher.full_name }}
+                                            </small>
+                                        {% endif %}
+                                    {% else %}
+                                        <span class="text-muted">—</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% if record.rating %}
+                                    <span class="badge
+                                        {% if record.rating >= 8 %}bg-success
+                                        {% elif record.rating >= 5 %}bg-warning text-dark
+                                        {% else %}bg-danger{% endif %}">
+                                        {{ record.rating }}/10
+                                    </span>
+                                    {% else %}
+                                    <span class="text-muted">—</span>
+                                    {% endif %}
+                                </td>
+                                <td class="small text-muted">
+                                    {{ record.substitute_note|default:"—" }}
+                                </td>
+                                <td>
+                                    {% if record.daily_photo %}
+                                    <a href="{{ record.daily_photo.url }}" target="_blank"
+                                       title="عرض الصورة" class="d-inline-block">
+                                        <img src="{{ record.daily_photo.url }}"
+                                             alt="صورة {{ record.date }}"
+                                             class="rounded"
+                                             style="width:48px;height:48px;object-fit:cover;cursor:pointer;"
+                                             data-bs-toggle="modal"
+                                             data-bs-target="#photoModal"
+                                             data-photo-url="{{ record.daily_photo.url }}"
+                                             data-photo-date="{{ record.date|date:'Y/m/d' }}"
+                                             onclick="event.preventDefault();showPhoto(this)">
+                                    </a>
+                                    {% else %}
+                                    <span class="text-muted small">لا توجد</span>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% else %}
+                <div class="card-body text-center text-muted py-5">
+                    <i class="bi bi-calendar-x display-4 d-block mb-3 opacity-25"></i>
+                    <p class="mb-0">لا يوجد سجل حضور لهذا الطالب حتى الآن</p>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- Right: student info + teacher links -->
+        <div class="col-lg-3">
+
+            <!-- Student info card -->
+            <div class="card border-0 shadow-sm mb-3">
+                <div class="card-header bg-white border-bottom py-2">
+                    <span class="fw-semibold small">
+                        <i class="bi bi-person-circle me-1 text-muted"></i>
+                        بيانات الطالب
+                    </span>
+                </div>
+                <div class="card-body py-3">
+                    <div class="mb-2">
+                        <div class="small text-muted">الاسم الكامل</div>
+                        <div class="fw-semibold">{{ student.full_name }}</div>
+                    </div>
+                    {% if student.national_id %}
+                    <div class="mb-2">
+                        <div class="small text-muted">الرقم القومي</div>
+                        <div class="font-monospace small">{{ student.national_id }}</div>
+                    </div>
+                    {% endif %}
+                    {% if student.student_code %}
+                    <div class="mb-2">
+                        <div class="small text-muted">كود الطالب</div>
+                        <div class="font-monospace small">{{ student.student_code }}</div>
+                    </div>
+                    {% endif %}
+                    {% if student.grade %}
+                    <div class="mb-2">
+                        <div class="small text-muted">الصف</div>
+                        <span class="badge bg-light text-dark border">{{ student.grade }}</span>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- Linked teachers card -->
+            <div class="card border-0 shadow-sm mb-3">
+                <div class="card-header bg-white border-bottom py-2">
+                    <span class="fw-semibold small">
+                        <i class="bi bi-diagram-3 me-1 text-muted"></i>
+                        المعلمون المرتبطون
+                    </span>
+                </div>
+                <div class="card-body py-3">
+                    {% if teachers %}
+                    <ul class="list-unstyled mb-0">
+                        {% for link in teachers %}
+                        <li class="mb-2 d-flex align-items-center gap-2">
+                            <i class="bi bi-person text-secondary"></i>
+                            <div>
+                                <div class="small fw-semibold">{{ link.teacher.full_name }}</div>
+                                {% if link.is_primary %}
+                                <span class="badge bg-success-subtle text-success border border-success-subtle" style="font-size:.65rem;">
+                                    المعلم الأصلي
+                                </span>
+                                {% endif %}
+                            </div>
+                        </li>
+                        {% endfor %}
+                    </ul>
+                    {% else %}
+                    <p class="text-muted small mb-0">لا يوجد معلم مرتبط</p>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- Attendance stats card -->
+            <div class="card border-0 shadow-sm">
+                <div class="card-header bg-white border-bottom py-2">
+                    <span class="fw-semibold small">
+                        <i class="bi bi-bar-chart me-1 text-muted"></i>
+                        إحصائيات الحضور
+                    </span>
+                </div>
+                <div class="card-body py-3">
+                    <div class="mb-2 d-flex justify-content-between">
+                        <span class="small text-muted">إجمالي أيام الحضور</span>
+                        <span class="fw-bold text-info">{{ total_records }}</span>
+                    </div>
+                    {% if records %}
+                    <div class="mb-2 d-flex justify-content-between">
+                        <span class="small text-muted">آخر حضور</span>
+                        <span class="small fw-semibold">{{ records.0.date|date:"Y/m/d" }}</span>
+                    </div>
+                    {% if oldest_record %}
+                    <div class="d-flex justify-content-between">
+                        <span class="small text-muted">أول حضور</span>
+                        <span class="small fw-semibold">{{ oldest_record.date|date:"Y/m/d" }}</span>
+                    </div>
+                    {% endif %}
+                    {% endif %}
+                </div>
+            </div>
+
+        </div>
+    </div>
+</div>
+
+<!-- Photo lightbox modal -->
+<div class="modal fade" id="photoModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow">
+            <div class="modal-header border-0 pb-0">
+                <h6 class="modal-title" id="photoModalLabel">صورة يوم —</h6>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body text-center">
+                <img id="modalPhoto" src="" alt="" class="img-fluid rounded" style="max-height:70vh;">
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+function showPhoto(el) {
+    document.getElementById('modalPhoto').src = el.dataset.photoUrl;
+    document.getElementById('photoModalLabel').textContent = 'صورة يوم — ' + el.dataset.photoDate;
+    new bootstrap.Modal(document.getElementById('photoModal')).show();
+}
+</script>
+{% endblock %}

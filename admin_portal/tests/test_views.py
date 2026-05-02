@@ -876,3 +876,124 @@ class TeacherStudentsTestCase(TestCase):
         link = StudentTeacherLink.objects.get(
             teacher=self.teacher, student=self.student_a)
         self.assertTrue(link.is_primary)
+
+
+# ---------------------------------------------------------------------------
+# Student attendance history tests
+# ---------------------------------------------------------------------------
+
+class StudentHistoryTestCase(TestCase):
+    """Tests for the student_history view."""
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.admin_user = User.objects.create_user(
+            phone='01600000000', email='admin@hist.com', password='adminpass',
+            role=User.Role.ADMIN,
+        )
+        cls.teacher_user = User.objects.create_user(
+            phone='01611111111', email='teacher@hist.com', password='teacherpass',
+            role=User.Role.TEACHER,
+        )
+        cls.teacher = Teacher.objects.create(
+            user=cls.teacher_user, full_name='معلم التاريخ',
+        )
+        cls.student = Student.objects.create(
+            full_name='طالب السجل', national_id='20000000000001',
+            student_code='HST001', grade='الصف الثالث',
+        )
+        # Two attendance records on different dates
+        cls.record1 = StudentAttendanceRecord.objects.create(
+            student=cls.student,
+            date='2025-01-10',
+            check_in_time='2025-01-10 08:00:00',
+            assigned_teacher=cls.teacher,
+            rating=8,
+        )
+        cls.record2 = StudentAttendanceRecord.objects.create(
+            student=cls.student,
+            date='2025-01-11',
+            check_in_time='2025-01-11 08:05:00',
+            assigned_teacher=cls.teacher,
+            rating=6,
+        )
+        # Another student with no records
+        cls.student_empty = Student.objects.create(
+            full_name='طالب بلا سجل', national_id='20000000000002',
+            student_code='HST002',
+        )
+
+    def setUp(self):
+        self.client = Client()
+        self.client.login(phone='01600000000', password='adminpass')
+        self.url = reverse('admin_portal:student_history', args=[self.student.id])
+
+    # --- access control ---
+
+    def test_admin_can_access(self):
+        response = self.client.get(self.url)
+        self.assertEqual(response.status_code, 200)
+
+    def test_teacher_cannot_access(self):
+        self.client.logout()
+        self.client.login(phone='01611111111', password='teacherpass')
+        response = self.client.get(self.url)
+        self.assertEqual(response.status_code, 302)
+
+    def test_unauthenticated_redirected(self):
+        self.client.logout()
+        response = self.client.get(self.url)
+        self.assertIn('/login/', response.url)
+
+    def test_nonexistent_student_returns_404(self):
+        import uuid
+        url = reverse('admin_portal:student_history', args=[uuid.uuid4()])
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, 404)
+
+    # --- context ---
+
+    def test_context_contains_student(self):
+        response = self.client.get(self.url)
+        self.assertEqual(response.context['student'], self.student)
+
+    def test_context_total_records(self):
+        response = self.client.get(self.url)
+        self.assertEqual(response.context['total_records'], 2)
+
+    def test_context_records_ordered_desc(self):
+        response = self.client.get(self.url)
+        records = list(response.context['records'])
+        self.assertEqual(records[0].date.isoformat(), '2025-01-11')
+        self.assertEqual(records[1].date.isoformat(), '2025-01-10')
+
+    def test_context_teachers_present(self):
+        # Link teacher to student
+        StudentTeacherLink.objects.get_or_create(
+            teacher=self.teacher, student=self.student)
+        response = self.client.get(self.url)
+        self.assertIn('teachers', response.context)
+
+    # --- empty state ---
+
+    def test_empty_history_student(self):
+        url = reverse('admin_portal:student_history', args=[self.student_empty.id])
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.context['total_records'], 0)
+
+    # --- template rendering ---
+
+    def test_uses_correct_template(self):
+        response = self.client.get(self.url)
+        self.assertTemplateUsed(response, 'admin_portal/student_history.html')
+
+    def test_student_name_in_response(self):
+        response = self.client.get(self.url)
+        self.assertContains(response, self.student.full_name)
+
+    def test_record_dates_in_response(self):
+        response = self.client.get(self.url)
+        self.assertContains(response, '2025/01/10')
+        self.assertContains(response, '2025/01/11')
+

@@ -448,3 +448,33 @@ def teacher_students(request, pk):
         'grades': grades,
         'linked_count': len(linked_ids),
     })
+
+
+# ---------------------------------------------------------------------------
+# Student attendance history
+# ---------------------------------------------------------------------------
+
+@admin_required
+def student_history(request, pk):
+    """Full attendance history for a single student."""
+    student = get_object_or_404(Student, pk=pk)
+    records = (
+        StudentAttendanceRecord.objects
+        .filter(student=student)
+        .select_related('assigned_teacher', 'original_teacher')
+        .order_by('-date', '-check_in_time')
+    )
+    teachers = (
+        StudentTeacherLink.objects
+        .filter(student=student)
+        .select_related('teacher')
+    )
+    total_records = records.count()
+    oldest_record = records.last() if total_records else None
+    return render(request, 'admin_portal/student_history.html', {
+        'student': student,
+        'records': records,
+        'total_records': total_records,
+        'teachers': teachers,
+        'oldest_record': oldest_record,
+    })
