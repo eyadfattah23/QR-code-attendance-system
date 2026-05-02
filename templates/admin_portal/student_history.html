@@ -74,36 +74,54 @@
                                     {% endif %}
                                 </td>
                                 <td>
-                                    {% if record.rating %}
-                                    <span class="badge
-                                        {% if record.rating >= 8 %}bg-success
-                                        {% elif record.rating >= 5 %}bg-warning text-dark
-                                        {% else %}bg-danger{% endif %}">
-                                        {{ record.rating }}/10
-                                    </span>
-                                    {% else %}
-                                    <span class="text-muted">—</span>
-                                    {% endif %}
+                                    <div class="d-flex align-items-center gap-2">
+                                        {% if record.rating %}
+                                        <span class="badge
+                                            {% if record.rating >= 8 %}bg-success
+                                            {% elif record.rating >= 5 %}bg-warning text-dark
+                                            {% else %}bg-danger{% endif %}">
+                                            {{ record.rating }}/10
+                                        </span>
+                                        {% else %}
+                                        <span class="text-muted">—</span>
+                                        {% endif %}
+                                        <a href="{% url 'admin_portal:attendance_record_edit_rating' record.id %}"
+                                           class="btn btn-outline-secondary btn-sm p-1" title="تعديل التقييم">
+                                            <i class="bi bi-pencil" style="font-size:.75rem;"></i>
+                                        </a>
+                                    </div>
                                 </td>
                                 <td class="small text-muted">
                                     {{ record.substitute_note|default:"—" }}
                                 </td>
                                 <td>
                                     {% if record.daily_photo %}
-                                    <a href="{{ record.daily_photo.url }}" target="_blank"
-                                       title="عرض الصورة" class="d-inline-block">
-                                        <img src="{{ record.daily_photo.url }}"
-                                             alt="صورة {{ record.date }}"
-                                             class="rounded"
-                                             style="width:48px;height:48px;object-fit:cover;cursor:pointer;"
-                                             data-bs-toggle="modal"
-                                             data-bs-target="#photoModal"
-                                             data-photo-url="{{ record.daily_photo.url }}"
-                                             data-photo-date="{{ record.date|date:'Y/m/d' }}"
-                                             onclick="event.preventDefault();showPhoto(this)">
-                                    </a>
+                                    <div class="d-flex align-items-center gap-2">
+                                        <a href="{{ record.daily_photo.url }}" target="_blank"
+                                           title="عرض الصورة" class="d-inline-block">
+                                            <img src="{{ record.daily_photo.url }}"
+                                                 alt="صورة {{ record.date }}"
+                                                 class="rounded"
+                                                 style="width:48px;height:48px;object-fit:cover;cursor:pointer;"
+                                                 data-bs-toggle="modal"
+                                                 data-bs-target="#photoModal"
+                                                 data-photo-url="{{ record.daily_photo.url }}"
+                                                 data-photo-date="{{ record.date|date:'Y/m/d' }}"
+                                                 onclick="event.preventDefault();showPhoto(this)">
+                                        </a>
+                                        <a href="{% url 'admin_portal:attendance_record_edit_photo' record.id %}"
+                                           class="btn btn-outline-secondary btn-sm p-1" title="تعديل الصورة">
+                                            <i class="bi bi-pencil" style="font-size:.75rem;"></i>
+                                        </a>
+                                    </div>
                                     {% else %}
-                                    <span class="text-muted small">لا توجد</span>
+                                    <div class="d-flex align-items-center gap-2">
+                                        <span class="text-muted small">لا توجد</span>
+                                        <a href="{% url 'admin_portal:attendance_record_edit_photo' record.id %}"
+                                           class="btn btn-outline-primary btn-sm p-1" title="إضافة صورة">
+                                            <i class="bi bi-plus-lg" style="font-size:.75rem;"></i>
+                                        </a>
+                                    </div>
                                     {% endif %}
                                 </td>
                             </tr>

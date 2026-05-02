@@ -1,0 +1,79 @@
+{% extends 'base.html' %}
+
+{% block title %}تعديل صورة الحضور - {{ student.full_name }}{% endblock %}
+
+{% block content %}
+<div class="container" style="max-width:540px;">
+
+    <div class="d-flex align-items-center mb-4 mt-2">
+        <a href="{% url 'admin_portal:student_history' student.id %}"
+           class="btn btn-outline-secondary btn-sm me-3" title="رجوع">
+            <i class="bi bi-arrow-right"></i>
+        </a>
+        <div>
+            <h1 class="h4 mb-0">
+                <i class="bi bi-image me-2 text-primary"></i>
+                تعديل صورة يوم الحضور
+            </h1>
+            <small class="text-muted">
+                {{ student.full_name }} — {{ record.date|date:"Y/m/d" }}
+            </small>
+        </div>
+    </div>
+
+    <div class="card border-0 shadow-sm">
+        <div class="card-body p-4">
+
+            <!-- Current photo -->
+            <div class="mb-4 text-center">
+                {% if record.daily_photo %}
+                <img src="{{ record.daily_photo.url }}" alt="الصورة الحالية"
+                     class="img-thumbnail rounded mb-2"
+                     style="max-height:260px;object-fit:contain;">
+                <p class="small text-muted mb-0">الصورة الحالية</p>
+                {% else %}
+                <div class="text-muted py-4">
+                    <i class="bi bi-image display-4 opacity-25 d-block mb-2"></i>
+                    <span class="small">لا توجد صورة لهذا اليوم</span>
+                </div>
+                {% endif %}
+            </div>
+
+            <!-- Upload new photo -->
+            <form method="post" enctype="multipart/form-data">
+                {% csrf_token %}
+                <div class="mb-3">
+                    <label class="form-label fw-semibold">
+                        {% if record.daily_photo %}استبدال الصورة{% else %}رفع صورة{% endif %}
+                    </label>
+                    <input type="file" name="daily_photo" accept="image/*"
+                           class="form-control">
+                </div>
+                <div class="d-flex gap-2">
+                    <button type="submit" class="btn btn-primary">
+                        <i class="bi bi-upload me-1"></i>
+                        حفظ الصورة
+                    </button>
+                    <a href="{% url 'admin_portal:student_history' student.id %}"
+                       class="btn btn-outline-secondary">إلغاء</a>
+                </div>
+            </form>
+
+            <!-- Remove photo -->
+            {% if record.daily_photo %}
+            <hr class="my-4">
+            <form method="post">
+                {% csrf_token %}
+                <button type="submit" name="remove_photo" value="1"
+                        class="btn btn-outline-danger btn-sm"
+                        onclick="return confirm('هل تريد حذف الصورة نهائياً؟')">
+                    <i class="bi bi-trash me-1"></i>
+                    حذف الصورة
+                </button>
+            </form>
+            {% endif %}
+
+        </div>
+    </div>
+</div>
+{% endblock %}

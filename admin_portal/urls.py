@@ -19,6 +19,13 @@ urlpatterns = [
     path('students/<uuid:pk>/delete/',
          views.student_delete, name='student_delete'),
 
+    # Attendance records
+    path('attendance/', views.attendance_records, name='attendance_records'),
+    path('attendance/<uuid:pk>/edit-photo/',
+         views.attendance_record_edit_photo, name='attendance_record_edit_photo'),
+    path('attendance/<uuid:pk>/edit-rating/',
+         views.attendance_record_edit_rating, name='attendance_record_edit_rating'),
+
     # Teacher management
     path('teachers/', views.teacher_list, name='teacher_list'),
     path('teachers/create/', views.teacher_create, name='teacher_create'),

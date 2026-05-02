@@ -132,9 +132,15 @@
                             </td>
                             <td>
                                 {% if row.attendance %}
-                                <span class="badge bg-info-subtle text-info-emphasis">
-                                    {{ row.attendance.rating }}/10
-                                </span>
+                                <div class="d-flex align-items-center gap-1">
+                                    <span class="badge bg-info-subtle text-info-emphasis">
+                                        {{ row.attendance.rating }}/10
+                                    </span>
+                                    <a href="{% url 'admin_portal:attendance_record_edit_rating' row.attendance.id %}"
+                                       class="btn btn-outline-secondary btn-sm p-1" title="تعديل التقييم">
+                                        <i class="bi bi-pencil" style="font-size:.75rem;"></i>
+                                    </a>
+                                </div>
                                 {% else %}
                                 -
                                 {% endif %}

@@ -8,6 +8,7 @@ from django.db import models
 from django.db.models import Q
 from django.http import HttpResponse
 from django.shortcuts import get_object_or_404, render, redirect
+from django.urls import reverse
 from django.utils.timezone import localdate
 from django.views.decorators.http import require_http_methods
 from functools import wraps
@@ -477,4 +478,176 @@ def student_history(request, pk):
         'total_records': total_records,
         'teachers': teachers,
         'oldest_record': oldest_record,
+    })
+
+
+# ---------------------------------------------------------------------------
+# Attendance records browser
+# ---------------------------------------------------------------------------
+
+@admin_required
+def attendance_records(request):
+    """Filterable table of student and teacher attendance records (tabbed)."""
+    tab = request.GET.get('tab', 'students')  # 'students' | 'teachers'
+
+    date_from  = request.GET.get('date_from', '').strip()
+    date_to    = request.GET.get('date_to', '').strip()
+    teacher_id = request.GET.get('teacher', '').strip()
+    student_q  = request.GET.get('student', '').strip()
+    grade      = request.GET.get('grade', '').strip()
+    teacher_q  = request.GET.get('teacher_q', '').strip()
+
+    # --- student records ---
+    student_qs = (
+        StudentAttendanceRecord.objects
+        .select_related('student', 'assigned_teacher', 'original_teacher')
+        .order_by('-date', '-check_in_time')
+    )
+    if date_from:
+        student_qs = student_qs.filter(date__gte=date_from)
+    if date_to:
+        student_qs = student_qs.filter(date__lte=date_to)
+    if teacher_id:
+        student_qs = student_qs.filter(
+            Q(assigned_teacher_id=teacher_id) | Q(original_teacher_id=teacher_id)
+        )
+    if student_q:
+        student_qs = student_qs.filter(
+            Q(student__full_name__icontains=student_q)
+            | Q(student__national_id__icontains=student_q)
+            | Q(student__student_code__icontains=student_q)
+        )
+    if grade:
+        student_qs = student_qs.filter(student__grade=grade)
+
+    # --- teacher records ---
+    teacher_qs = (
+        TeacherAttendanceRecord.objects
+        .select_related('teacher', 'teacher__user')
+        .order_by('-date', '-check_in_time')
+    )
+    if date_from:
+        teacher_qs = teacher_qs.filter(date__gte=date_from)
+    if date_to:
+        teacher_qs = teacher_qs.filter(date__lte=date_to)
+    if teacher_q:
+        teacher_qs = teacher_qs.filter(
+            Q(teacher__full_name__icontains=teacher_q)
+            | Q(teacher__user__phone__icontains=teacher_q)
+        )
+
+    student_total = student_qs.count()
+    teacher_total = teacher_qs.count()
+
+    if tab == 'teachers':
+        paginator = Paginator(teacher_qs, 50)
+        teacher_page = paginator.get_page(request.GET.get('page'))
+        student_page = None
+    else:
+        paginator = Paginator(student_qs, 50)
+        student_page = paginator.get_page(request.GET.get('page'))
+        teacher_page = None
+
+    teachers = Teacher.objects.select_related('user').order_by('full_name')
+    grades = (
+        Student.objects
+        .exclude(grade__isnull=True).exclude(grade='')
+        .values_list('grade', flat=True).distinct().order_by('grade')
+    )
+
+    return render(request, 'admin_portal/attendance_records.html', {
+        'tab': tab,
+        'student_page': student_page,
+        'teacher_page': teacher_page,
+        'student_total': student_total,
+        'teacher_total': teacher_total,
+        'teachers': teachers,
+        'grades': grades,
+        'date_from': date_from,
+        'date_to': date_to,
+        'teacher_id': teacher_id,
+        'student_q': student_q,
+        'grade': grade,
+        'teacher_q': teacher_q,
+    })
+
+
+# ---------------------------------------------------------------------------
+# Edit student attendance record rating (admin + linked teacher)
+# ---------------------------------------------------------------------------
+
+@login_required
+def attendance_record_edit_rating(request, pk):
+    """Allow admin or a teacher linked to the student to edit the record rating."""
+    record = get_object_or_404(
+        StudentAttendanceRecord.objects.select_related('student'), pk=pk
+    )
+    user = request.user
+    if user.is_admin:
+        can_edit = True
+    elif user.is_teacher:
+        can_edit = StudentTeacherLink.objects.filter(
+            teacher__user=user, student=record.student
+        ).exists()
+    else:
+        can_edit = False
+
+    if not can_edit:
+        messages.error(request, 'ليس لديك صلاحية تعديل هذا السجل')
+        return redirect('dashboard')
+
+    if request.method == 'POST':
+        try:
+            rating = int(request.POST.get('rating', ''))
+            if not 1 <= rating <= 10:
+                raise ValueError
+        except (ValueError, TypeError):
+            messages.error(request, 'التقييم يجب أن يكون رقماً من 1 إلى 10')
+        else:
+            record.rating = rating
+            record.save(update_fields=['rating'])
+            messages.success(request, f'تم تحديث التقييم إلى {rating}/10')
+            if user.is_admin:
+                return redirect('admin_portal:student_history', pk=record.student_id)
+            return redirect('teacher_portal:dashboard')
+
+    return render(request, 'admin_portal/attendance_record_edit_rating.html', {
+        'record': record,
+        'student': record.student,
+        'rating_choices': range(1, 11),
+        'back_url': (
+            reverse('admin_portal:student_history', args=[record.student_id])
+            if user.is_admin else
+            reverse('teacher_portal:dashboard')
+        ),
+    })
+
+
+# ---------------------------------------------------------------------------
+# Edit student attendance record photo
+# ---------------------------------------------------------------------------
+
+@admin_required
+def attendance_record_edit_photo(request, pk):
+    """Upload or remove the daily_photo of a StudentAttendanceRecord."""
+    record = get_object_or_404(
+        StudentAttendanceRecord.objects.select_related('student'), pk=pk
+    )
+    if request.method == 'POST':
+        if 'remove_photo' in request.POST:
+            if record.daily_photo:
+                record.daily_photo.delete(save=False)
+            record.daily_photo = None
+            record.save(update_fields=['daily_photo'])
+            messages.success(request, 'تم حذف الصورة بنجاح')
+        elif 'daily_photo' in request.FILES:
+            if record.daily_photo:
+                record.daily_photo.delete(save=False)
+            record.daily_photo = request.FILES['daily_photo']
+            record.save(update_fields=['daily_photo'])
+            messages.success(request, 'تم تحديث الصورة بنجاح')
+        return redirect('admin_portal:student_history', pk=record.student_id)
+    return render(request, 'admin_portal/attendance_record_edit_photo.html', {
+        'record': record,
+        'student': record.student,
     })

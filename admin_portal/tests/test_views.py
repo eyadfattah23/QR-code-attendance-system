@@ -997,3 +997,315 @@ class StudentHistoryTestCase(TestCase):
         self.assertContains(response, '2025/01/10')
         self.assertContains(response, '2025/01/11')
 
+
+# ---------------------------------------------------------------------------
+# Attendance records browser tests
+# ---------------------------------------------------------------------------
+
+class AttendanceRecordsTestCase(TestCase):
+    """Tests for the attendance_records view."""
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.admin_user = User.objects.create_user(
+            phone='01700000000', email='admin@att.com', password='adminpass',
+            role=User.Role.ADMIN,
+        )
+        cls.teacher_user = User.objects.create_user(
+            phone='01711111111', email='teacher@att.com', password='teacherpass',
+            role=User.Role.TEACHER,
+        )
+        cls.teacher = Teacher.objects.create(
+            user=cls.teacher_user, full_name='معلم السجلات',
+        )
+        cls.student_a = Student.objects.create(
+            full_name='طالب أول', national_id='30000000000001',
+            student_code='ATT001', grade='الصف الأول',
+        )
+        cls.student_b = Student.objects.create(
+            full_name='طالب ثاني', national_id='30000000000002',
+            student_code='ATT002', grade='الصف الثاني',
+        )
+        from django.utils.timezone import make_aware
+        import datetime
+        cls.rec_a = StudentAttendanceRecord.objects.create(
+            student=cls.student_a,
+            date='2025-03-01',
+            check_in_time=make_aware(datetime.datetime(2025, 3, 1, 8, 0)),
+            assigned_teacher=cls.teacher,
+            rating=7,
+        )
+        cls.rec_b = StudentAttendanceRecord.objects.create(
+            student=cls.student_b,
+            date='2025-03-02',
+            check_in_time=make_aware(datetime.datetime(2025, 3, 2, 8, 5)),
+            rating=5,
+        )
+
+    def setUp(self):
+        self.client = Client()
+        self.client.login(phone='01700000000', password='adminpass')
+        self.url = reverse('admin_portal:attendance_records')
+
+    # --- access control ---
+
+    def test_admin_can_access(self):
+        response = self.client.get(self.url)
+        self.assertEqual(response.status_code, 200)
+
+    def test_teacher_cannot_access(self):
+        self.client.logout()
+        self.client.login(phone='01711111111', password='teacherpass')
+        response = self.client.get(self.url)
+        self.assertEqual(response.status_code, 302)
+
+    def test_unauthenticated_redirected(self):
+        self.client.logout()
+        response = self.client.get(self.url)
+        self.assertIn('/login/', response.url)
+
+    @classmethod
+    def _make_teacher_record(cls):
+        from django.utils.timezone import make_aware
+        import datetime
+        return TeacherAttendanceRecord.objects.create(
+            teacher=cls.teacher,
+            date='2025-03-05',
+            check_in_time=make_aware(datetime.datetime(2025, 3, 5, 7, 45)),
+        )
+
+    # --- unfiltered context (students tab default) ---
+
+    def test_uses_correct_template(self):
+        response = self.client.get(self.url)
+        self.assertTemplateUsed(response, 'admin_portal/attendance_records.html')
+
+    def test_default_tab_is_students(self):
+        response = self.client.get(self.url)
+        self.assertEqual(response.context['tab'], 'students')
+
+    def test_returns_all_student_records_unfiltered(self):
+        response = self.client.get(self.url)
+        self.assertEqual(response.context['student_total'], 2)
+
+    def test_context_has_teachers_and_grades(self):
+        response = self.client.get(self.url)
+        self.assertIn('teachers', response.context)
+        self.assertIn('grades', response.context)
+
+    # --- student date filters ---
+
+    def test_filter_date_from(self):
+        response = self.client.get(self.url, {'tab': 'students', 'date_from': '2025-03-02'})
+        self.assertEqual(response.context['student_total'], 1)
+        self.assertContains(response, self.student_b.full_name)
+
+    def test_filter_date_to(self):
+        response = self.client.get(self.url, {'tab': 'students', 'date_to': '2025-03-01'})
+        self.assertEqual(response.context['student_total'], 1)
+        self.assertContains(response, self.student_a.full_name)
+
+    def test_filter_date_range_no_results(self):
+        response = self.client.get(self.url, {'tab': 'students', 'date_from': '2020-01-01', 'date_to': '2020-01-31'})
+        self.assertEqual(response.context['student_total'], 0)
+
+    # --- teacher filter (on students tab) ---
+
+    def test_filter_by_teacher(self):
+        response = self.client.get(self.url, {'tab': 'students', 'teacher': str(self.teacher.id)})
+        self.assertEqual(response.context['student_total'], 1)
+        self.assertContains(response, self.student_a.full_name)
+
+    # --- student search ---
+
+    def test_filter_by_student_name(self):
+        response = self.client.get(self.url, {'tab': 'students', 'student': 'أول'})
+        self.assertEqual(response.context['student_total'], 1)
+        self.assertContains(response, self.student_a.full_name)
+
+    def test_filter_by_student_code(self):
+        response = self.client.get(self.url, {'tab': 'students', 'student': 'ATT002'})
+        self.assertEqual(response.context['student_total'], 1)
+        self.assertContains(response, self.student_b.full_name)
+
+    # --- grade filter ---
+
+    def test_filter_by_grade(self):
+        response = self.client.get(self.url, {'tab': 'students', 'grade': 'الصف الأول'})
+        self.assertEqual(response.context['student_total'], 1)
+        self.assertContains(response, self.student_a.full_name)
+        self.assertNotContains(response, self.student_b.full_name)
+
+    # --- empty state ---
+
+    def test_empty_student_result_renders_correctly(self):
+        response = self.client.get(self.url, {'tab': 'students', 'student': 'طالب غير موجود'})
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.context['student_total'], 0)
+
+    # --- teachers tab ---
+
+    def test_teachers_tab_loads(self):
+        response = self.client.get(self.url, {'tab': 'teachers'})
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.context['tab'], 'teachers')
+
+    def test_teachers_tab_shows_teacher_records(self):
+        rec = self._make_teacher_record()
+        response = self.client.get(self.url, {'tab': 'teachers'})
+        self.assertEqual(response.context['teacher_total'], 1)
+        self.assertContains(response, self.teacher.full_name)
+        rec.delete()
+
+    def test_teachers_tab_filter_by_name(self):
+        rec = self._make_teacher_record()
+        response = self.client.get(self.url, {'tab': 'teachers', 'teacher_q': 'السجلات'})
+        self.assertEqual(response.context['teacher_total'], 1)
+        response2 = self.client.get(self.url, {'tab': 'teachers', 'teacher_q': 'غير موجود'})
+        self.assertEqual(response2.context['teacher_total'], 0)
+        rec.delete()
+
+    def test_teachers_tab_filter_by_date(self):
+        rec = self._make_teacher_record()
+        response = self.client.get(self.url, {'tab': 'teachers', 'date_from': '2025-03-06'})
+        self.assertEqual(response.context['teacher_total'], 0)
+        rec.delete()
+
+
+# ---------------------------------------------------------------------------
+# Attendance record edit rating tests
+# ---------------------------------------------------------------------------
+
+class AttendanceRecordEditRatingTestCase(TestCase):
+    """Tests for the attendance_record_edit_rating view."""
+
+    @classmethod
+    def setUpTestData(cls):
+        from django.utils.timezone import make_aware
+        import datetime
+
+        cls.admin_user = User.objects.create_user(
+            phone='01800000000', email='admin@rating.com', password='adminpass',
+            role=User.Role.ADMIN,
+        )
+        # Teacher linked to the student
+        cls.linked_teacher_user = User.objects.create_user(
+            phone='01811111111', email='linked@rating.com', password='teacherpass',
+            role=User.Role.TEACHER,
+        )
+        cls.linked_teacher = Teacher.objects.create(
+            user=cls.linked_teacher_user, full_name='معلم مرتبط',
+        )
+        # Teacher NOT linked to the student
+        cls.other_teacher_user = User.objects.create_user(
+            phone='01822222222', email='other@rating.com', password='otherpass',
+            role=User.Role.TEACHER,
+        )
+        Teacher.objects.create(user=cls.other_teacher_user, full_name='معلم غير مرتبط')
+
+        cls.student = Student.objects.create(
+            full_name='طالب التقييم', national_id='40000000000001', student_code='RTG001',
+        )
+        StudentTeacherLink.objects.create(teacher=cls.linked_teacher, student=cls.student)
+
+        cls.record = StudentAttendanceRecord.objects.create(
+            student=cls.student,
+            date='2025-04-01',
+            check_in_time=make_aware(datetime.datetime(2025, 4, 1, 8, 0)),
+            rating=6,
+        )
+
+    def setUp(self):
+        self.client = Client()
+        self.url = reverse('admin_portal:attendance_record_edit_rating', args=[self.record.id])
+
+    # --- access control ---
+
+    def test_admin_can_access(self):
+        self.client.login(phone='01800000000', password='adminpass')
+        response = self.client.get(self.url)
+        self.assertEqual(response.status_code, 200)
+
+    def test_linked_teacher_can_access(self):
+        self.client.login(phone='01811111111', password='teacherpass')
+        response = self.client.get(self.url)
+        self.assertEqual(response.status_code, 200)
+
+    def test_unlinked_teacher_redirected(self):
+        self.client.login(phone='01822222222', password='otherpass')
+        response = self.client.get(self.url)
+        self.assertEqual(response.status_code, 302)
+
+    def test_unauthenticated_redirected(self):
+        response = self.client.get(self.url)
+        self.assertIn('/login/', response.url)
+
+    # --- GET context ---
+
+    def test_context_contains_record_and_student(self):
+        self.client.login(phone='01800000000', password='adminpass')
+        response = self.client.get(self.url)
+        self.assertEqual(response.context['record'], self.record)
+        self.assertEqual(response.context['student'], self.student)
+
+    def test_context_rating_choices(self):
+        self.client.login(phone='01800000000', password='adminpass')
+        response = self.client.get(self.url)
+        self.assertEqual(list(response.context['rating_choices']), list(range(1, 11)))
+
+    # --- POST: admin updates rating ---
+
+    def test_admin_can_update_rating(self):
+        self.client.login(phone='01800000000', password='adminpass')
+        self.client.post(self.url, {'rating': '9'})
+        self.record.refresh_from_db()
+        self.assertEqual(self.record.rating, 9)
+        self.record.rating = 6
+        self.record.save(update_fields=['rating'])  # restore
+
+    def test_admin_redirects_to_student_history(self):
+        self.client.login(phone='01800000000', password='adminpass')
+        response = self.client.post(self.url, {'rating': '8'})
+        self.assertRedirects(
+            response,
+            reverse('admin_portal:student_history', args=[self.student.id]),
+        )
+        self.record.rating = 6
+        self.record.save(update_fields=['rating'])  # restore
+
+    def test_linked_teacher_can_update_rating(self):
+        self.client.login(phone='01811111111', password='teacherpass')
+        self.client.post(self.url, {'rating': '7'})
+        self.record.refresh_from_db()
+        self.assertEqual(self.record.rating, 7)
+        self.record.rating = 6
+        self.record.save(update_fields=['rating'])  # restore
+
+    def test_linked_teacher_redirects_to_teacher_dashboard(self):
+        self.client.login(phone='01811111111', password='teacherpass')
+        response = self.client.post(self.url, {'rating': '5'})
+        self.assertRedirects(response, reverse('teacher_portal:dashboard'))
+        self.record.rating = 6
+        self.record.save(update_fields=['rating'])  # restore
+
+    # --- POST: invalid rating ---
+
+    def test_invalid_rating_zero_rejected(self):
+        self.client.login(phone='01800000000', password='adminpass')
+        response = self.client.post(self.url, {'rating': '0'})
+        self.record.refresh_from_db()
+        self.assertEqual(self.record.rating, 6)  # unchanged
+        self.assertEqual(response.status_code, 200)
+
+    def test_invalid_rating_eleven_rejected(self):
+        self.client.login(phone='01800000000', password='adminpass')
+        response = self.client.post(self.url, {'rating': '11'})
+        self.record.refresh_from_db()
+        self.assertEqual(self.record.rating, 6)
+
+    def test_invalid_rating_text_rejected(self):
+        self.client.login(phone='01800000000', password='adminpass')
+        response = self.client.post(self.url, {'rating': 'abc'})
+        self.record.refresh_from_db()
+        self.assertEqual(self.record.rating, 6)
+
