@@ -139,4 +139,12 @@ Key environment variables (see `.env.example`):
 
 ## License
 
-This project is for internal use by [Organization Name].
+This project is for internal use by [Redwan Oasis].
+---
+|Cards/page | Grid | Approx. card size |
+|-----------|------|-------------------|
+|1 | 1×1 | 190×277 mm |
+|4 | 2×2 | 95×138 mm |
+|8 | 2×4 | 95×69 mm (≈ ID card) |
+|10 | 2×5 | 95×55 mm (≈ business card) |
+|12 | 3×4 | 63×69 mm |

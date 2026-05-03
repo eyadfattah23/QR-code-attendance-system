@@ -59,7 +59,7 @@
                     <select name="teacher" class="form-select form-select-sm">
                         <option value="">— الكل —</option>
                         {% for t in teachers %}
-                        <option value="{{ t.id }}" {% if t.id|stringformat:"s"==teacher_id %}selected{% endif %}>
+                        <option value="{{ t.id }}" {% if t.id|stringformat:"s" == teacher_id %}selected{% endif %}>
                             {{ t.full_name }}
                         </option>
                         {% endfor %}
@@ -70,7 +70,7 @@
                     <select name="grade" class="form-select form-select-sm">
                         <option value="">— الكل —</option>
                         {% for g in grades %}
-                        <option value="{{ g }}" {% if g==grade %}selected{% endif %}>{{ g }}</option>
+                        <option value="{{ g }}" {% if g == grade %}selected{% endif %}>{{ g }}</option>
                         {% endfor %}
                     </select>
                 </div>

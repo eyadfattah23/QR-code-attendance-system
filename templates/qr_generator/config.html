@@ -1,0 +1,169 @@
+{% extends 'base.html' %}
+
+{% block title %}طباعة بطاقات QR - نظام الحضور{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- Page Header -->
+    <div class="d-flex justify-content-between align-items-center mb-4 mt-2">
+        <h1 class="h3 mb-0 mt-2">
+            <i class="bi bi-qr-code me-2"></i>
+            طباعة بطاقات QR
+        </h1>
+    </div>
+
+    <div class="row">
+        <!-- Filters sidebar -->
+        <div class="col-lg-3 mb-4">
+            <div class="card shadow-sm h-100">
+                <div class="card-header bg-white fw-semibold">
+                    <i class="bi bi-funnel me-1"></i> تصفية الطلاب
+                </div>
+                <div class="card-body">
+                    <form method="get" id="filterForm">
+                        <div class="mb-3">
+                            <label for="grade" class="form-label">الصف</label>
+                            <select name="grade" id="grade" class="form-select">
+                                <option value="">-- جميع الصفوف --</option>
+                                {% for g in grades %}
+                                <option value="{{ g }}" {% if g == grade_filter %}selected{% endif %}>{{ g }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="mb-3">
+                            <label for="name" class="form-label">اسم الطالب</label>
+                            <input type="text" id="name" name="name" value="{{ name_filter }}"
+                                   class="form-control" placeholder="ابحث بالاسم...">
+                        </div>
+                        <div class="d-grid gap-2">
+                            <button type="submit" class="btn btn-primary">
+                                <i class="bi bi-search me-1"></i> بحث
+                            </button>
+                            <a href="{% url 'qr_generator:qr_cards_config' %}" class="btn btn-outline-secondary">
+                                <i class="bi bi-arrow-counterclockwise me-1"></i> إعادة ضبط
+                            </a>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <!-- Student list + config -->
+        <div class="col-lg-9">
+            <form method="post" id="printForm">
+                {% csrf_token %}
+
+                <!-- Cards per page selector -->
+                <div class="card shadow-sm mb-3">
+                    <div class="card-body py-3">
+                        <div class="row align-items-center">
+                            <div class="col-auto">
+                                <label class="form-label mb-0 fw-semibold">
+                                    <i class="bi bi-grid me-1"></i> عدد البطاقات في الصفحة:
+                                </label>
+                            </div>
+                            <div class="col-auto">
+                                <select name="cards_per_page" class="form-select form-select-sm" style="width:auto">
+                                    {% for n in cards_per_page_range %}
+                                    <option value="{{ n }}" {% if n == 8 %}selected{% endif %}>{{ n }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            <div class="col-auto me-auto">
+                                <span class="text-muted small">
+                                    (تملأ البطاقات الصفحة بشكل متناسب مهما كان العدد)
+                                </span>
+                            </div>
+                            <div class="col-auto">
+                                <button type="submit" class="btn btn-success"
+                                        onclick="return validateSelection()">
+                                    <i class="bi bi-printer me-1"></i> معاينة وطباعة
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Student table -->
+                <div class="card shadow-sm">
+                    <div class="card-header bg-white d-flex justify-content-between align-items-center">
+                        <span class="fw-semibold">
+                            <i class="bi bi-people me-1"></i>
+                            الطلاب ({{ students|length }})
+                        </span>
+                        <div>
+                            <button type="button" class="btn btn-sm btn-outline-primary me-1"
+                                    onclick="selectAll()">تحديد الكل</button>
+                            <button type="button" class="btn btn-sm btn-outline-secondary"
+                                    onclick="deselectAll()">إلغاء الكل</button>
+                        </div>
+                    </div>
+
+                    {% if students %}
+                    <div class="table-responsive">
+                        <table class="table table-hover table-sm mb-0 align-middle">
+                            <thead class="table-light">
+                                <tr>
+                                    <th style="width:3rem">
+                                        <input type="checkbox" class="form-check-input"
+                                               id="selectAllCheck"
+                                               onchange="toggleAll(this)">
+                                    </th>
+                                    <th>الاسم</th>
+                                    <th>الكود</th>
+                                    <th>الصف</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for student in students %}
+                                <tr>
+                                    <td>
+                                        <input type="checkbox" class="form-check-input student-check"
+                                               name="student_ids" value="{{ student.id }}">
+                                    </td>
+                                    <td class="fw-semibold">{{ student.full_name }}</td>
+                                    <td class="text-muted small font-monospace">{{ student.student_code }}</td>
+                                    <td>
+                                        {% if student.grade %}
+                                        <span class="badge bg-secondary">{{ student.grade }}</span>
+                                        {% else %}<span class="text-muted">—</span>{% endif %}
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    {% else %}
+                    <div class="card-body text-center text-muted py-5">
+                        <i class="bi bi-people display-4"></i>
+                        <p class="mt-2">لا يوجد طلاب مطابقون للبحث.</p>
+                    </div>
+                    {% endif %}
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+function selectAll() {
+    document.querySelectorAll('.student-check').forEach(cb => cb.checked = true);
+    document.getElementById('selectAllCheck').checked = true;
+}
+function deselectAll() {
+    document.querySelectorAll('.student-check').forEach(cb => cb.checked = false);
+    document.getElementById('selectAllCheck').checked = false;
+}
+function toggleAll(masterCb) {
+    document.querySelectorAll('.student-check').forEach(cb => cb.checked = masterCb.checked);
+}
+function validateSelection() {
+    const checked = document.querySelectorAll('.student-check:checked').length;
+    if (checked === 0) {
+        alert('يرجى تحديد طالب واحد على الأقل.');
+        return false;
+    }
+    return true;
+}
+</script>
+{% endblock %}

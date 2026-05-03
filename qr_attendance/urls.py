@@ -12,6 +12,7 @@ urlpatterns = [
     path('scan/', include('attendance.urls')),
     path('portal/admin/', include('admin_portal.urls')),
     path('portal/teacher/', include('teacher_portal.urls')),
+    path('qr-cards/', include('qr_generator.urls')),
 ]
 
 if settings.DEBUG:
