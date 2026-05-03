@@ -1329,6 +1329,157 @@ class AttendanceRecordEditRatingTestCase(TestCase):
 
 
 # ---------------------------------------------------------------------------
+# Teacher attendance record edit (rating + notes) tests
+# ---------------------------------------------------------------------------
+
+class TeacherAttendanceRecordEditTestCase(TestCase):
+    """Tests for the teacher_attendance_record_edit view (admin only)."""
+
+    @classmethod
+    def setUpTestData(cls):
+        from django.utils.timezone import make_aware
+        import datetime
+
+        cls.admin = User.objects.create_user(
+            phone='01850000000', password='adminpass',
+            role=User.Role.ADMIN,
+        )
+        cls.teacher_user = User.objects.create_user(
+            phone='01860000000', password='teacherpass',
+            role=User.Role.TEACHER,
+        )
+        cls.teacher = Teacher.objects.create(
+            user=cls.teacher_user, full_name='معلم التقييم',
+        )
+        cls.record = TeacherAttendanceRecord.objects.create(
+            teacher=cls.teacher,
+            date='2025-05-01',
+            check_in_time=make_aware(datetime.datetime(2025, 5, 1, 8, 0)),
+            rating=7,
+            notes='',
+        )
+        cls.url = reverse(
+            'admin_portal:teacher_attendance_record_edit', args=[cls.record.pk])
+
+    def setUp(self):
+        self.client = Client()
+
+    # --- access control ---
+
+    def test_admin_can_access(self):
+        self.client.login(phone='01850000000', password='adminpass')
+        response = self.client.get(self.url)
+        self.assertEqual(response.status_code, 200)
+
+    def test_unauthenticated_redirected(self):
+        response = self.client.get(self.url)
+        self.assertEqual(response.status_code, 302)
+        self.assertIn('/login/', response.url)
+
+    def test_teacher_cannot_access(self):
+        self.client.login(phone='01860000000', password='teacherpass')
+        response = self.client.get(self.url)
+        self.assertEqual(response.status_code, 302)
+
+    # --- GET context ---
+
+    def test_context_contains_record_and_teacher(self):
+        self.client.login(phone='01850000000', password='adminpass')
+        response = self.client.get(self.url)
+        self.assertEqual(response.context['record'], self.record)
+        self.assertEqual(response.context['teacher'], self.teacher)
+
+    def test_context_rating_choices_1_to_10(self):
+        self.client.login(phone='01850000000', password='adminpass')
+        response = self.client.get(self.url)
+        self.assertEqual(list(response.context['rating_choices']), list(range(1, 11)))
+
+    def test_teacher_name_in_response(self):
+        self.client.login(phone='01850000000', password='adminpass')
+        response = self.client.get(self.url)
+        self.assertContains(response, 'معلم التقييم')
+
+    # --- POST: valid rating ---
+
+    def test_admin_can_update_rating(self):
+        self.client.login(phone='01850000000', password='adminpass')
+        self.client.post(self.url, {'rating': '9', 'notes': ''})
+        self.record.refresh_from_db()
+        self.assertEqual(self.record.rating, 9)
+        self.record.rating = 7
+        self.record.save(update_fields=['rating'])
+
+    def test_admin_can_update_notes(self):
+        self.client.login(phone='01850000000', password='adminpass')
+        self.client.post(self.url, {'rating': '7', 'notes': 'حضر متأخراً'})
+        self.record.refresh_from_db()
+        self.assertEqual(self.record.notes, 'حضر متأخراً')
+        self.record.notes = ''
+        self.record.save(update_fields=['notes'])
+
+    def test_admin_can_save_both_rating_and_notes(self):
+        self.client.login(phone='01850000000', password='adminpass')
+        self.client.post(self.url, {'rating': '5', 'notes': 'ملاحظة مهمة'})
+        self.record.refresh_from_db()
+        self.assertEqual(self.record.rating, 5)
+        self.assertEqual(self.record.notes, 'ملاحظة مهمة')
+        self.record.rating = 7
+        self.record.notes = ''
+        self.record.save(update_fields=['rating', 'notes'])
+
+    def test_successful_post_redirects_to_teachers_tab(self):
+        self.client.login(phone='01850000000', password='adminpass')
+        response = self.client.post(self.url, {'rating': '8', 'notes': ''})
+        expected = reverse('admin_portal:attendance_records') + '?tab=teachers'
+        self.assertRedirects(response, expected)
+        self.record.rating = 7
+        self.record.save(update_fields=['rating'])
+
+    def test_notes_blank_on_save_clears_field(self):
+        self.record.notes = 'قديم'
+        self.record.save(update_fields=['notes'])
+        self.client.login(phone='01850000000', password='adminpass')
+        self.client.post(self.url, {'rating': '7', 'notes': ''})
+        self.record.refresh_from_db()
+        self.assertEqual(self.record.notes, '')
+
+    # --- POST: invalid rating ---
+
+    def test_invalid_rating_zero_rejected(self):
+        self.client.login(phone='01850000000', password='adminpass')
+        self.client.post(self.url, {'rating': '0', 'notes': ''})
+        self.record.refresh_from_db()
+        self.assertEqual(self.record.rating, 7)
+
+    def test_invalid_rating_eleven_rejected(self):
+        self.client.login(phone='01850000000', password='adminpass')
+        self.client.post(self.url, {'rating': '11', 'notes': ''})
+        self.record.refresh_from_db()
+        self.assertEqual(self.record.rating, 7)
+
+    def test_invalid_rating_text_rejected(self):
+        self.client.login(phone='01850000000', password='adminpass')
+        self.client.post(self.url, {'rating': 'bad', 'notes': ''})
+        self.record.refresh_from_db()
+        self.assertEqual(self.record.rating, 7)
+
+    # --- default rating value ---
+
+    def test_new_record_default_rating_is_seven(self):
+        from django.utils.timezone import make_aware
+        import datetime
+        new_teacher_user = User.objects.create_user(
+            phone='01870000000', password='tp', role=User.Role.TEACHER)
+        new_teacher = Teacher.objects.create(user=new_teacher_user, full_name='معلم جديد')
+        rec = TeacherAttendanceRecord.objects.create(
+            teacher=new_teacher,
+            date='2025-06-01',
+            check_in_time=make_aware(datetime.datetime(2025, 6, 1, 8, 0)),
+        )
+        self.assertEqual(rec.rating, 7)
+
+
+# ---------------------------------------------------------------------------
 # Excel export tests
 # ---------------------------------------------------------------------------
 

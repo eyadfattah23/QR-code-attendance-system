@@ -108,6 +108,15 @@ class TeacherAttendanceRecord(models.Model):
         related_name='recorded_teacher_attendance',
         help_text='Admin user who recorded attendance',
     )
+    rating = models.PositiveSmallIntegerField(
+        default=7,
+        help_text='Daily teacher rating from 1 to 10',
+    )
+    notes = models.TextField(
+        blank=True,
+        default='',
+        help_text='Admin notes for this attendance record',
+    )
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
@@ -119,7 +128,11 @@ class TeacherAttendanceRecord(models.Model):
             models.UniqueConstraint(
                 fields=['teacher', 'date'],
                 name='unique_teacher_attendance_per_day',
-            )
+            ),
+            models.CheckConstraint(
+                condition=models.Q(rating__gte=1) & models.Q(rating__lte=10),
+                name='teacher_attendance_rating_range_1_to_10',
+            ),
         ]
 
     def __str__(self) -> str:

@@ -610,12 +610,14 @@ def export_attendance_excel(request):
                 Q(teacher__full_name__icontains=teacher_q)
                 | Q(teacher__user__phone__icontains=teacher_q)
             )
-        ws.append(['التاريخ', 'المعلم', 'وقت الحضور'])
+        ws.append(['التاريخ', 'المعلم', 'وقت الحضور', 'التقييم', 'ملاحظات'])
         for rec in qs:
             ws.append([
                 str(rec.date),
                 rec.teacher.full_name,
                 rec.check_in_time.strftime('%H:%M'),
+                rec.rating,
+                rec.notes,
             ])
         filename = 'teacher_attendance'
     else:
@@ -750,4 +752,39 @@ def attendance_record_edit_photo(request, pk):
     return render(request, 'admin_portal/attendance_record_edit_photo.html', {
         'record': record,
         'student': record.student,
+    })
+
+
+# ---------------------------------------------------------------------------
+# Edit teacher attendance record rating + notes (admin only)
+# ---------------------------------------------------------------------------
+
+@admin_required
+def teacher_attendance_record_edit(request, pk):
+    """Allow admin to set rating (1-10) and notes on a TeacherAttendanceRecord."""
+    record = get_object_or_404(
+        TeacherAttendanceRecord.objects.select_related('teacher'), pk=pk
+    )
+    back_url = reverse('admin_portal:attendance_records') + '?tab=teachers'
+
+    if request.method == 'POST':
+        notes = request.POST.get('notes', '').strip()
+        try:
+            rating = int(request.POST.get('rating', ''))
+            if not 1 <= rating <= 10:
+                raise ValueError
+        except (ValueError, TypeError):
+            messages.error(request, 'التقييم يجب أن يكون رقماً من 1 إلى 10')
+        else:
+            record.rating = rating
+            record.notes = notes
+            record.save(update_fields=['rating', 'notes'])
+            messages.success(request, f'تم تحديث التقييم إلى {rating}/10')
+            return redirect(back_url)
+
+    return render(request, 'admin_portal/teacher_attendance_record_edit.html', {
+        'record': record,
+        'teacher': record.teacher,
+        'rating_choices': range(1, 11),
+        'back_url': back_url,
     })

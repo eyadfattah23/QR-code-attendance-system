@@ -246,6 +246,9 @@
                         <th>التاريخ</th>
                         <th>المعلم</th>
                         <th>وقت الحضور</th>
+                        <th>التقييم</th>
+                        <th>ملاحظات</th>
+                        <th></th>
                     </tr>
                 </thead>
                 <tbody>
@@ -255,6 +258,21 @@
                         <td class="fw-semibold">{{ rec.date|date:"Y/m/d" }}</td>
                         <td class="fw-semibold">{{ rec.teacher.full_name }}</td>
                         <td class="font-monospace small text-muted">{{ rec.check_in_time|time:"H:i" }}</td>
+                        <td>
+                            <span class="badge
+                                {% if rec.rating >= 8 %}bg-success
+                                {% elif rec.rating >= 5 %}bg-warning text-dark
+                                {% else %}bg-danger{% endif %}">
+                                {{ rec.rating }}/10
+                            </span>
+                        </td>
+                        <td class="small text-muted" style="max-width:200px;white-space:pre-wrap;">{{ rec.notes|default:"—" }}</td>
+                        <td>
+                            <a href="{% url 'admin_portal:teacher_attendance_record_edit' rec.pk %}"
+                               class="btn btn-outline-secondary btn-sm" title="تعديل">
+                                <i class="bi bi-pencil"></i>
+                            </a>
+                        </td>
                     </tr>
                     {% endfor %}
                 </tbody>
