@@ -16,8 +16,7 @@
     <!-- Tabs -->
     <ul class="nav nav-tabs mb-0" id="attendanceTabs">
         <li class="nav-item">
-            <a class="nav-link {% if tab == 'students' %}active{% endif %}"
-               href="?tab=students">
+            <a class="nav-link {% if tab == 'students' %}active{% endif %}" href="?tab=students">
                 <i class="bi bi-people me-1"></i>
                 حضور الطلاب
                 <span class="badge {% if tab == 'students' %}bg-primary{% else %}bg-secondary{% endif %} ms-1">
@@ -26,8 +25,7 @@
             </a>
         </li>
         <li class="nav-item">
-            <a class="nav-link {% if tab == 'teachers' %}active{% endif %}"
-               href="?tab=teachers">
+            <a class="nav-link {% if tab == 'teachers' %}active{% endif %}" href="?tab=teachers">
                 <i class="bi bi-person-badge me-1"></i>
                 حضور المعلمين
                 <span class="badge {% if tab == 'teachers' %}bg-primary{% else %}bg-secondary{% endif %} ms-1">
@@ -61,7 +59,7 @@
                     <select name="teacher" class="form-select form-select-sm">
                         <option value="">— الكل —</option>
                         {% for t in teachers %}
-                        <option value="{{ t.id }}" {% if t.id|stringformat:"s" == teacher_id %}selected{% endif %}>
+                        <option value="{{ t.id }}" {% if t.id|stringformat:"s"==teacher_id %}selected{% endif %}>
                             {{ t.full_name }}
                         </option>
                         {% endfor %}
@@ -72,7 +70,7 @@
                     <select name="grade" class="form-select form-select-sm">
                         <option value="">— الكل —</option>
                         {% for g in grades %}
-                        <option value="{{ g }}" {% if g == grade %}selected{% endif %}>{{ g }}</option>
+                        <option value="{{ g }}" {% if g==grade %}selected{% endif %}>{{ g }}</option>
                         {% endfor %}
                     </select>
                 </div>
@@ -82,6 +80,10 @@
                     </button>
                     <a href="?tab=students" class="btn btn-outline-secondary btn-sm" title="إعادة تعيين">
                         <i class="bi bi-x-lg"></i>
+                    </a>
+                    <a href="{% url 'admin_portal:attendance_export' %}?tab=students{% if date_from %}&date_from={{ date_from }}{% endif %}{% if date_to %}&date_to={{ date_to }}{% endif %}{% if teacher_id %}&teacher={{ teacher_id }}{% endif %}{% if student_q %}&student={{ student_q }}{% endif %}{% if grade %}&grade={{ grade }}{% endif %}"
+                        class="btn btn-outline-success btn-sm" title="تصدير Excel">
+                        <i class="bi bi-file-earmark-excel"></i>
                     </a>
                 </div>
             </form>
@@ -132,7 +134,8 @@
                         </td>
                         <td>
                             {% if rec.rating %}
-                            <span class="badge {% if rec.rating >= 8 %}bg-success{% elif rec.rating >= 5 %}bg-warning text-dark{% else %}bg-danger{% endif %}">
+                            <span
+                                class="badge {% if rec.rating >= 8 %}bg-success{% elif rec.rating >= 5 %}bg-warning text-dark{% else %}bg-danger{% endif %}">
                                 {{ rec.rating }}/10
                             </span>
                             {% else %}—{% endif %}
@@ -159,28 +162,33 @@
         </div>
         {% if student_page.has_other_pages %}
         <div class="d-flex justify-content-between align-items-center px-3 py-3 border-top">
-            <small class="text-muted">عرض {{ student_page.start_index }}–{{ student_page.end_index }} من {{ student_total }}</small>
+            <small class="text-muted">عرض {{ student_page.start_index }}–{{ student_page.end_index }} من {{
+                student_total }}</small>
             <nav>
                 <ul class="pagination pagination-sm mb-0">
                     {% if student_page.has_previous %}
                     <li class="page-item">
-                        <a class="page-link" href="?tab=students&page={{ student_page.previous_page_number }}{% if date_from %}&date_from={{ date_from }}{% endif %}{% if date_to %}&date_to={{ date_to }}{% endif %}{% if teacher_id %}&teacher={{ teacher_id }}{% endif %}{% if student_q %}&student={{ student_q }}{% endif %}{% if grade %}&grade={{ grade }}{% endif %}">&laquo;</a>
+                        <a class="page-link"
+                            href="?tab=students&page={{ student_page.previous_page_number }}{% if date_from %}&date_from={{ date_from }}{% endif %}{% if date_to %}&date_to={{ date_to }}{% endif %}{% if teacher_id %}&teacher={{ teacher_id }}{% endif %}{% if student_q %}&student={{ student_q }}{% endif %}{% if grade %}&grade={{ grade }}{% endif %}">&laquo;</a>
                     </li>
                     {% endif %}
                     {% for num in student_page.paginator.page_range %}
                     {% if student_page.number == num %}
                     <li class="page-item active"><span class="page-link">{{ num }}</span></li>
-                    {% elif num > student_page.number|add:"-3" and num < student_page.number|add:"3" %}
-                    <li class="page-item">
-                        <a class="page-link" href="?tab=students&page={{ num }}{% if date_from %}&date_from={{ date_from }}{% endif %}{% if date_to %}&date_to={{ date_to }}{% endif %}{% if teacher_id %}&teacher={{ teacher_id }}{% endif %}{% if student_q %}&student={{ student_q }}{% endif %}{% if grade %}&grade={{ grade }}{% endif %}">{{ num }}</a>
-                    </li>
-                    {% endif %}
-                    {% endfor %}
-                    {% if student_page.has_next %}
-                    <li class="page-item">
-                        <a class="page-link" href="?tab=students&page={{ student_page.next_page_number }}{% if date_from %}&date_from={{ date_from }}{% endif %}{% if date_to %}&date_to={{ date_to }}{% endif %}{% if teacher_id %}&teacher={{ teacher_id }}{% endif %}{% if student_q %}&student={{ student_q }}{% endif %}{% if grade %}&grade={{ grade }}{% endif %}">&raquo;</a>
-                    </li>
-                    {% endif %}
+                    {% elif num > student_page.number|add:"-3" and num < student_page.number|add:"3" %} <li
+                        class="page-item">
+                        <a class="page-link"
+                            href="?tab=students&page={{ num }}{% if date_from %}&date_from={{ date_from }}{% endif %}{% if date_to %}&date_to={{ date_to }}{% endif %}{% if teacher_id %}&teacher={{ teacher_id }}{% endif %}{% if student_q %}&student={{ student_q }}{% endif %}{% if grade %}&grade={{ grade }}{% endif %}">{{
+                            num }}</a>
+                        </li>
+                        {% endif %}
+                        {% endfor %}
+                        {% if student_page.has_next %}
+                        <li class="page-item">
+                            <a class="page-link"
+                                href="?tab=students&page={{ student_page.next_page_number }}{% if date_from %}&date_from={{ date_from }}{% endif %}{% if date_to %}&date_to={{ date_to }}{% endif %}{% if teacher_id %}&teacher={{ teacher_id }}{% endif %}{% if student_q %}&student={{ student_q }}{% endif %}{% if grade %}&grade={{ grade }}{% endif %}">&raquo;</a>
+                        </li>
+                        {% endif %}
                 </ul>
             </nav>
         </div>
@@ -219,6 +227,10 @@
                     <a href="?tab=teachers" class="btn btn-outline-secondary btn-sm" title="إعادة تعيين">
                         <i class="bi bi-x-lg"></i>
                     </a>
+                    <a href="{% url 'admin_portal:attendance_export' %}?tab=teachers{% if date_from %}&date_from={{ date_from }}{% endif %}{% if date_to %}&date_to={{ date_to }}{% endif %}{% if teacher_q %}&teacher_q={{ teacher_q }}{% endif %}"
+                        class="btn btn-outline-success btn-sm" title="تصدير Excel">
+                        <i class="bi bi-file-earmark-excel"></i>
+                    </a>
                 </div>
             </form>
         </div>
@@ -250,28 +262,33 @@
         </div>
         {% if teacher_page.has_other_pages %}
         <div class="d-flex justify-content-between align-items-center px-3 py-3 border-top">
-            <small class="text-muted">عرض {{ teacher_page.start_index }}–{{ teacher_page.end_index }} من {{ teacher_total }}</small>
+            <small class="text-muted">عرض {{ teacher_page.start_index }}–{{ teacher_page.end_index }} من {{
+                teacher_total }}</small>
             <nav>
                 <ul class="pagination pagination-sm mb-0">
                     {% if teacher_page.has_previous %}
                     <li class="page-item">
-                        <a class="page-link" href="?tab=teachers&page={{ teacher_page.previous_page_number }}{% if date_from %}&date_from={{ date_from }}{% endif %}{% if date_to %}&date_to={{ date_to }}{% endif %}{% if teacher_q %}&teacher_q={{ teacher_q }}{% endif %}">&laquo;</a>
+                        <a class="page-link"
+                            href="?tab=teachers&page={{ teacher_page.previous_page_number }}{% if date_from %}&date_from={{ date_from }}{% endif %}{% if date_to %}&date_to={{ date_to }}{% endif %}{% if teacher_q %}&teacher_q={{ teacher_q }}{% endif %}">&laquo;</a>
                     </li>
                     {% endif %}
                     {% for num in teacher_page.paginator.page_range %}
                     {% if teacher_page.number == num %}
                     <li class="page-item active"><span class="page-link">{{ num }}</span></li>
-                    {% elif num > teacher_page.number|add:"-3" and num < teacher_page.number|add:"3" %}
-                    <li class="page-item">
-                        <a class="page-link" href="?tab=teachers&page={{ num }}{% if date_from %}&date_from={{ date_from }}{% endif %}{% if date_to %}&date_to={{ date_to }}{% endif %}{% if teacher_q %}&teacher_q={{ teacher_q }}{% endif %}">{{ num }}</a>
-                    </li>
-                    {% endif %}
-                    {% endfor %}
-                    {% if teacher_page.has_next %}
-                    <li class="page-item">
-                        <a class="page-link" href="?tab=teachers&page={{ teacher_page.next_page_number }}{% if date_from %}&date_from={{ date_from }}{% endif %}{% if date_to %}&date_to={{ date_to }}{% endif %}{% if teacher_q %}&teacher_q={{ teacher_q }}{% endif %}">&raquo;</a>
-                    </li>
-                    {% endif %}
+                    {% elif num > teacher_page.number|add:"-3" and num < teacher_page.number|add:"3" %} <li
+                        class="page-item">
+                        <a class="page-link"
+                            href="?tab=teachers&page={{ num }}{% if date_from %}&date_from={{ date_from }}{% endif %}{% if date_to %}&date_to={{ date_to }}{% endif %}{% if teacher_q %}&teacher_q={{ teacher_q }}{% endif %}">{{
+                            num }}</a>
+                        </li>
+                        {% endif %}
+                        {% endfor %}
+                        {% if teacher_page.has_next %}
+                        <li class="page-item">
+                            <a class="page-link"
+                                href="?tab=teachers&page={{ teacher_page.next_page_number }}{% if date_from %}&date_from={{ date_from }}{% endif %}{% if date_to %}&date_to={{ date_to }}{% endif %}{% if teacher_q %}&teacher_q={{ teacher_q }}{% endif %}">&raquo;</a>
+                        </li>
+                        {% endif %}
                 </ul>
             </nav>
         </div>

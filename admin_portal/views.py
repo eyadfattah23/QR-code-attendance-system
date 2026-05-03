@@ -490,12 +490,12 @@ def attendance_records(request):
     """Filterable table of student and teacher attendance records (tabbed)."""
     tab = request.GET.get('tab', 'students')  # 'students' | 'teachers'
 
-    date_from  = request.GET.get('date_from', '').strip()
-    date_to    = request.GET.get('date_to', '').strip()
+    date_from = request.GET.get('date_from', '').strip()
+    date_to = request.GET.get('date_to', '').strip()
     teacher_id = request.GET.get('teacher', '').strip()
-    student_q  = request.GET.get('student', '').strip()
-    grade      = request.GET.get('grade', '').strip()
-    teacher_q  = request.GET.get('teacher_q', '').strip()
+    student_q = request.GET.get('student', '').strip()
+    grade = request.GET.get('grade', '').strip()
+    teacher_q = request.GET.get('teacher_q', '').strip()
 
     # --- student records ---
     student_qs = (
@@ -509,7 +509,8 @@ def attendance_records(request):
         student_qs = student_qs.filter(date__lte=date_to)
     if teacher_id:
         student_qs = student_qs.filter(
-            Q(assigned_teacher_id=teacher_id) | Q(original_teacher_id=teacher_id)
+            Q(assigned_teacher_id=teacher_id) | Q(
+                original_teacher_id=teacher_id)
         )
     if student_q:
         student_qs = student_qs.filter(
@@ -570,6 +571,105 @@ def attendance_records(request):
         'grade': grade,
         'teacher_q': teacher_q,
     })
+
+
+# ---------------------------------------------------------------------------
+# Excel export for attendance records
+# ---------------------------------------------------------------------------
+
+@admin_required
+def export_attendance_excel(request):
+    """Download filtered attendance records as .xlsx.
+
+    Accepts the same GET params as attendance_records.
+    """
+    tab = request.GET.get('tab', 'students')
+    date_from = request.GET.get('date_from', '').strip()
+    date_to = request.GET.get('date_to', '').strip()
+    teacher_id = request.GET.get('teacher', '').strip()
+    student_q = request.GET.get('student', '').strip()
+    grade = request.GET.get('grade', '').strip()
+    teacher_q = request.GET.get('teacher_q', '').strip()
+
+    wb = openpyxl.Workbook()
+    ws = wb.active
+
+    if tab == 'teachers':
+        ws.title = 'حضور المعلمين'
+        qs = (
+            TeacherAttendanceRecord.objects
+            .select_related('teacher', 'teacher__user')
+            .order_by('-date', '-check_in_time')
+        )
+        if date_from:
+            qs = qs.filter(date__gte=date_from)
+        if date_to:
+            qs = qs.filter(date__lte=date_to)
+        if teacher_q:
+            qs = qs.filter(
+                Q(teacher__full_name__icontains=teacher_q)
+                | Q(teacher__user__phone__icontains=teacher_q)
+            )
+        ws.append(['التاريخ', 'المعلم', 'وقت الحضور'])
+        for rec in qs:
+            ws.append([
+                str(rec.date),
+                rec.teacher.full_name,
+                rec.check_in_time.strftime('%H:%M'),
+            ])
+        filename = 'teacher_attendance'
+    else:
+        ws.title = 'حضور الطلاب'
+        qs = (
+            StudentAttendanceRecord.objects
+            .select_related('student', 'assigned_teacher', 'original_teacher')
+            .order_by('-date', '-check_in_time')
+        )
+        if date_from:
+            qs = qs.filter(date__gte=date_from)
+        if date_to:
+            qs = qs.filter(date__lte=date_to)
+        if teacher_id:
+            qs = qs.filter(
+                Q(assigned_teacher_id=teacher_id) | Q(
+                    original_teacher_id=teacher_id)
+            )
+        if student_q:
+            qs = qs.filter(
+                Q(student__full_name__icontains=student_q)
+                | Q(student__national_id__icontains=student_q)
+                | Q(student__student_code__icontains=student_q)
+            )
+        if grade:
+            qs = qs.filter(student__grade=grade)
+        ws.append([
+            'التاريخ', 'اسم الطالب', 'الرقم القومي', 'الكود', 'الصف',
+            'وقت الحضور', 'المعلم المكلف', 'التقييم', 'نيابة', 'ملاحظات',
+        ])
+        for rec in qs:
+            ws.append([
+                str(rec.date),
+                rec.student.full_name,
+                rec.student.national_id,
+                rec.student.student_code or '',
+                rec.student.grade or '',
+                rec.check_in_time.strftime('%H:%M'),
+                rec.assigned_teacher.full_name if rec.assigned_teacher else '',
+                rec.rating,
+                'نعم' if rec.is_substitute_assignment else 'لا',
+                rec.substitute_note,
+            ])
+        filename = 'student_attendance'
+
+    buf = io.BytesIO()
+    wb.save(buf)
+    buf.seek(0)
+    response = HttpResponse(
+        buf.read(),
+        content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    )
+    response['Content-Disposition'] = f'attachment; filename="{filename}.xlsx"'
+    return response
 
 
 # ---------------------------------------------------------------------------

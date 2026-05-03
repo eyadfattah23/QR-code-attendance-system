@@ -926,7 +926,8 @@ class StudentHistoryTestCase(TestCase):
     def setUp(self):
         self.client = Client()
         self.client.login(phone='01600000000', password='adminpass')
-        self.url = reverse('admin_portal:student_history', args=[self.student.id])
+        self.url = reverse('admin_portal:student_history',
+                           args=[self.student.id])
 
     # --- access control ---
 
@@ -977,7 +978,8 @@ class StudentHistoryTestCase(TestCase):
     # --- empty state ---
 
     def test_empty_history_student(self):
-        url = reverse('admin_portal:student_history', args=[self.student_empty.id])
+        url = reverse('admin_portal:student_history',
+                      args=[self.student_empty.id])
         response = self.client.get(url)
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.context['total_records'], 0)
@@ -1078,7 +1080,8 @@ class AttendanceRecordsTestCase(TestCase):
 
     def test_uses_correct_template(self):
         response = self.client.get(self.url)
-        self.assertTemplateUsed(response, 'admin_portal/attendance_records.html')
+        self.assertTemplateUsed(
+            response, 'admin_portal/attendance_records.html')
 
     def test_default_tab_is_students(self):
         response = self.client.get(self.url)
@@ -1096,42 +1099,49 @@ class AttendanceRecordsTestCase(TestCase):
     # --- student date filters ---
 
     def test_filter_date_from(self):
-        response = self.client.get(self.url, {'tab': 'students', 'date_from': '2025-03-02'})
+        response = self.client.get(
+            self.url, {'tab': 'students', 'date_from': '2025-03-02'})
         self.assertEqual(response.context['student_total'], 1)
         self.assertContains(response, self.student_b.full_name)
 
     def test_filter_date_to(self):
-        response = self.client.get(self.url, {'tab': 'students', 'date_to': '2025-03-01'})
+        response = self.client.get(
+            self.url, {'tab': 'students', 'date_to': '2025-03-01'})
         self.assertEqual(response.context['student_total'], 1)
         self.assertContains(response, self.student_a.full_name)
 
     def test_filter_date_range_no_results(self):
-        response = self.client.get(self.url, {'tab': 'students', 'date_from': '2020-01-01', 'date_to': '2020-01-31'})
+        response = self.client.get(
+            self.url, {'tab': 'students', 'date_from': '2020-01-01', 'date_to': '2020-01-31'})
         self.assertEqual(response.context['student_total'], 0)
 
     # --- teacher filter (on students tab) ---
 
     def test_filter_by_teacher(self):
-        response = self.client.get(self.url, {'tab': 'students', 'teacher': str(self.teacher.id)})
+        response = self.client.get(
+            self.url, {'tab': 'students', 'teacher': str(self.teacher.id)})
         self.assertEqual(response.context['student_total'], 1)
         self.assertContains(response, self.student_a.full_name)
 
     # --- student search ---
 
     def test_filter_by_student_name(self):
-        response = self.client.get(self.url, {'tab': 'students', 'student': 'أول'})
+        response = self.client.get(
+            self.url, {'tab': 'students', 'student': 'أول'})
         self.assertEqual(response.context['student_total'], 1)
         self.assertContains(response, self.student_a.full_name)
 
     def test_filter_by_student_code(self):
-        response = self.client.get(self.url, {'tab': 'students', 'student': 'ATT002'})
+        response = self.client.get(
+            self.url, {'tab': 'students', 'student': 'ATT002'})
         self.assertEqual(response.context['student_total'], 1)
         self.assertContains(response, self.student_b.full_name)
 
     # --- grade filter ---
 
     def test_filter_by_grade(self):
-        response = self.client.get(self.url, {'tab': 'students', 'grade': 'الصف الأول'})
+        response = self.client.get(
+            self.url, {'tab': 'students', 'grade': 'الصف الأول'})
         self.assertEqual(response.context['student_total'], 1)
         self.assertContains(response, self.student_a.full_name)
         self.assertNotContains(response, self.student_b.full_name)
@@ -1139,7 +1149,8 @@ class AttendanceRecordsTestCase(TestCase):
     # --- empty state ---
 
     def test_empty_student_result_renders_correctly(self):
-        response = self.client.get(self.url, {'tab': 'students', 'student': 'طالب غير موجود'})
+        response = self.client.get(
+            self.url, {'tab': 'students', 'student': 'طالب غير موجود'})
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.context['student_total'], 0)
 
@@ -1159,15 +1170,18 @@ class AttendanceRecordsTestCase(TestCase):
 
     def test_teachers_tab_filter_by_name(self):
         rec = self._make_teacher_record()
-        response = self.client.get(self.url, {'tab': 'teachers', 'teacher_q': 'السجلات'})
+        response = self.client.get(
+            self.url, {'tab': 'teachers', 'teacher_q': 'السجلات'})
         self.assertEqual(response.context['teacher_total'], 1)
-        response2 = self.client.get(self.url, {'tab': 'teachers', 'teacher_q': 'غير موجود'})
+        response2 = self.client.get(
+            self.url, {'tab': 'teachers', 'teacher_q': 'غير موجود'})
         self.assertEqual(response2.context['teacher_total'], 0)
         rec.delete()
 
     def test_teachers_tab_filter_by_date(self):
         rec = self._make_teacher_record()
-        response = self.client.get(self.url, {'tab': 'teachers', 'date_from': '2025-03-06'})
+        response = self.client.get(
+            self.url, {'tab': 'teachers', 'date_from': '2025-03-06'})
         self.assertEqual(response.context['teacher_total'], 0)
         rec.delete()
 
@@ -1201,12 +1215,14 @@ class AttendanceRecordEditRatingTestCase(TestCase):
             phone='01822222222', email='other@rating.com', password='otherpass',
             role=User.Role.TEACHER,
         )
-        Teacher.objects.create(user=cls.other_teacher_user, full_name='معلم غير مرتبط')
+        Teacher.objects.create(user=cls.other_teacher_user,
+                               full_name='معلم غير مرتبط')
 
         cls.student = Student.objects.create(
             full_name='طالب التقييم', national_id='40000000000001', student_code='RTG001',
         )
-        StudentTeacherLink.objects.create(teacher=cls.linked_teacher, student=cls.student)
+        StudentTeacherLink.objects.create(
+            teacher=cls.linked_teacher, student=cls.student)
 
         cls.record = StudentAttendanceRecord.objects.create(
             student=cls.student,
@@ -1217,7 +1233,8 @@ class AttendanceRecordEditRatingTestCase(TestCase):
 
     def setUp(self):
         self.client = Client()
-        self.url = reverse('admin_portal:attendance_record_edit_rating', args=[self.record.id])
+        self.url = reverse(
+            'admin_portal:attendance_record_edit_rating', args=[self.record.id])
 
     # --- access control ---
 
@@ -1251,7 +1268,8 @@ class AttendanceRecordEditRatingTestCase(TestCase):
     def test_context_rating_choices(self):
         self.client.login(phone='01800000000', password='adminpass')
         response = self.client.get(self.url)
-        self.assertEqual(list(response.context['rating_choices']), list(range(1, 11)))
+        self.assertEqual(
+            list(response.context['rating_choices']), list(range(1, 11)))
 
     # --- POST: admin updates rating ---
 
@@ -1309,3 +1327,137 @@ class AttendanceRecordEditRatingTestCase(TestCase):
         self.record.refresh_from_db()
         self.assertEqual(self.record.rating, 6)
 
+
+# ---------------------------------------------------------------------------
+# Excel export tests
+# ---------------------------------------------------------------------------
+
+class AttendanceExportTestCase(TestCase):
+    """Tests for the export_attendance_excel view."""
+
+    @classmethod
+    def setUpTestData(cls):
+        from django.utils.timezone import make_aware
+        import datetime
+
+        cls.admin_user = User.objects.create_user(
+            phone='01850000000', email='admin@export.com', password='adminpass',
+            role=User.Role.ADMIN,
+        )
+        cls.teacher_user = User.objects.create_user(
+            phone='01851111111', email='teacher@export.com', password='teacherpass',
+            role=User.Role.TEACHER,
+        )
+        cls.teacher = Teacher.objects.create(
+            user=cls.teacher_user, full_name='معلم التصدير',
+        )
+        cls.student = Student.objects.create(
+            full_name='طالب التصدير', national_id='50000000000001',
+            student_code='EXP001', grade='الصف الأول',
+        )
+        cls.rec = StudentAttendanceRecord.objects.create(
+            student=cls.student,
+            date='2025-05-01',
+            check_in_time=make_aware(datetime.datetime(2025, 5, 1, 8, 0)),
+            assigned_teacher=cls.teacher,
+            rating=8,
+        )
+        cls.teacher_rec = TeacherAttendanceRecord.objects.create(
+            teacher=cls.teacher,
+            date='2025-05-01',
+            check_in_time=make_aware(datetime.datetime(2025, 5, 1, 7, 45)),
+        )
+
+    def setUp(self):
+        self.client = Client()
+        self.client.login(phone='01850000000', password='adminpass')
+        self.url = reverse('admin_portal:attendance_export')
+
+    # --- access control ---
+
+    def test_admin_can_access(self):
+        response = self.client.get(self.url)
+        self.assertEqual(response.status_code, 200)
+
+    def test_teacher_cannot_access(self):
+        self.client.logout()
+        self.client.login(phone='01851111111', password='teacherpass')
+        response = self.client.get(self.url)
+        self.assertEqual(response.status_code, 302)
+
+    def test_unauthenticated_redirected(self):
+        self.client.logout()
+        response = self.client.get(self.url)
+        self.assertIn('/login/', response.url)
+
+    # --- response metadata ---
+
+    def test_students_tab_content_type(self):
+        response = self.client.get(self.url, {'tab': 'students'})
+        self.assertEqual(
+            response['Content-Type'],
+            'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        )
+
+    def test_students_tab_filename(self):
+        response = self.client.get(self.url, {'tab': 'students'})
+        self.assertIn('student_attendance.xlsx',
+                      response['Content-Disposition'])
+
+    def test_teachers_tab_content_type(self):
+        response = self.client.get(self.url, {'tab': 'teachers'})
+        self.assertEqual(
+            response['Content-Type'],
+            'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        )
+
+    def test_teachers_tab_filename(self):
+        response = self.client.get(self.url, {'tab': 'teachers'})
+        self.assertIn('teacher_attendance.xlsx',
+                      response['Content-Disposition'])
+
+    # --- row content ---
+
+    def _load_ws(self, response):
+        import openpyxl
+        import io
+        return openpyxl.load_workbook(io.BytesIO(response.content)).active
+
+    def test_students_sheet_has_header_and_data_row(self):
+        response = self.client.get(self.url, {'tab': 'students'})
+        ws = self._load_ws(response)
+        rows = list(ws.iter_rows(values_only=True))
+        self.assertEqual(rows[0][0], 'التاريخ')      # header
+        self.assertEqual(rows[1][0], '2025-05-01')   # data row date
+        self.assertEqual(rows[1][1], 'طالب التصدير')  # student name
+
+    def test_teachers_sheet_has_header_and_data_row(self):
+        response = self.client.get(self.url, {'tab': 'teachers'})
+        ws = self._load_ws(response)
+        rows = list(ws.iter_rows(values_only=True))
+        self.assertEqual(rows[0][0], 'التاريخ')
+        self.assertEqual(rows[1][1], 'معلم التصدير')
+
+    # --- filters applied ---
+
+    def test_date_filter_excludes_records(self):
+        response = self.client.get(
+            self.url, {'tab': 'students', 'date_from': '2025-06-01'})
+        ws = self._load_ws(response)
+        rows = list(ws.iter_rows(values_only=True))
+        # Only header row — no data matches future date
+        self.assertEqual(len(rows), 1)
+
+    def test_grade_filter_includes_matching(self):
+        response = self.client.get(
+            self.url, {'tab': 'students', 'grade': 'الصف الأول'})
+        ws = self._load_ws(response)
+        rows = list(ws.iter_rows(values_only=True))
+        self.assertEqual(len(rows), 2)  # header + 1 data row
+
+    def test_grade_filter_excludes_nonmatching(self):
+        response = self.client.get(
+            self.url, {'tab': 'students', 'grade': 'الصف الثاني'})
+        ws = self._load_ws(response)
+        rows = list(ws.iter_rows(values_only=True))
+        self.assertEqual(len(rows), 1)  # header only

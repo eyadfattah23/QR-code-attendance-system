@@ -21,6 +21,8 @@ urlpatterns = [
 
     # Attendance records
     path('attendance/', views.attendance_records, name='attendance_records'),
+    path('attendance/export/', views.export_attendance_excel,
+         name='attendance_export'),
     path('attendance/<uuid:pk>/edit-photo/',
          views.attendance_record_edit_photo, name='attendance_record_edit_photo'),
     path('attendance/<uuid:pk>/edit-rating/',
