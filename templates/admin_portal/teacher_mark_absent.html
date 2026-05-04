@@ -1,0 +1,196 @@
+{% extends 'base.html' %}
+
+{% block title %}تسجيل غياب {{ teacher.full_name }} - نظام الحضور{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+
+    <!-- Page header -->
+    <div class="d-flex align-items-center mb-4 mt-2 gap-3">
+        <a href="{% url 'admin_portal:teacher_list' %}" class="btn btn-outline-secondary btn-sm" title="رجوع">
+            <i class="bi bi-arrow-right"></i>
+        </a>
+        <div>
+            <h1 class="h3 mb-0">
+                <i class="bi bi-person-x-fill me-2 text-danger"></i>
+                تسجيل غياب معلم وتكليف بديل
+            </h1>
+            <small class="text-muted">{{ teacher.full_name }}</small>
+        </div>
+    </div>
+
+    <!-- Date picker (GET refresh) -->
+    <div class="card border-0 shadow-sm mb-4">
+        <div class="card-body py-3">
+            <form method="get" class="row g-2 align-items-end">
+                <div class="col-md-3">
+                    <label class="form-label mb-1 small fw-semibold">تاريخ الغياب</label>
+                    <input type="date" name="date" value="{{ absence_date|date:'Y-m-d' }}"
+                           class="form-control" required>
+                </div>
+                <div class="col-auto">
+                    <button type="submit" class="btn btn-outline-primary">
+                        <i class="bi bi-arrow-clockwise me-1"></i> تحديث
+                    </button>
+                </div>
+                <div class="col">
+                    <small class="text-muted">
+                        سيتم عرض طلاب هذا المعلم الذين حضروا في التاريخ المختار.
+                    </small>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Assignment form -->
+    <form method="post" id="assignForm">
+        {% csrf_token %}
+        <input type="hidden" name="date" value="{{ absence_date|date:'Y-m-d' }}">
+
+        {% if present_with_records %}
+        <!-- Bulk assign card -->
+        <div class="card border-0 shadow-sm mb-3">
+            <div class="card-header bg-white fw-semibold">
+                <i class="bi bi-people-fill me-1 text-primary"></i>
+                تكليف سريع (تطبيق على جميع الطلاب)
+            </div>
+            <div class="card-body py-3">
+                <div class="row g-2 align-items-center">
+                    <div class="col-md-4">
+                        <select id="bulkTeacher" class="form-select">
+                            <option value="">-- اختر المعلم البديل --</option>
+                            {% for t in all_teachers %}
+                            <option value="{{ t.id }}">{{ t.full_name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="col-auto">
+                        <button type="button" class="btn btn-primary" onclick="applyBulk()">
+                            <i class="bi bi-check2-all me-1"></i>
+                            تطبيق على الكل
+                        </button>
+                    </div>
+                    <div class="col">
+                        <small class="text-muted">سيتم تطبيق نفس المعلم على جميع الطلاب المُدرجين أدناه.</small>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Per-student assignments table -->
+        <div class="card border-0 shadow-sm mb-4">
+            <div class="card-header bg-white d-flex justify-content-between align-items-center">
+                <span class="fw-semibold">
+                    <i class="bi bi-person-check me-1 text-success"></i>
+                    الطلاب الحاضرون ({{ present_with_records|length }})
+                    <small class="text-muted fw-normal"> — اختر المعلم البديل لكل طالب على حدة</small>
+                </span>
+            </div>
+            <div class="table-responsive">
+                <table class="table table-hover align-middle mb-0">
+                    <thead class="table-light">
+                        <tr>
+                            <th>الطالب</th>
+                            <th>الصف</th>
+                            <th>وقت الحضور</th>
+                            <th>المعلم المكلف حالياً</th>
+                            <th>المعلم البديل الجديد</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for student, rec in present_with_records %}
+                        <tr>
+                            <td class="fw-semibold">{{ student.full_name }}</td>
+                            <td>
+                                {% if student.grade %}
+                                <span class="badge bg-secondary">{{ student.grade }}</span>
+                                {% else %}<span class="text-muted">—</span>{% endif %}
+                            </td>
+                            <td class="font-monospace small text-muted">{{ rec.check_in_time|time:"H:i" }}</td>
+                            <td>
+                                {% if rec.assigned_teacher %}
+                                <span class="badge bg-light text-dark border">
+                                    {{ rec.assigned_teacher.full_name }}
+                                    {% if rec.is_substitute_assignment %}
+                                    <i class="bi bi-arrow-left-right ms-1 text-warning" title="تكليف بديل سابق"></i>
+                                    {% endif %}
+                                </span>
+                                {% else %}
+                                <span class="text-muted">—</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                <select name="sub_{{ student.id }}"
+                                        class="form-select form-select-sm sub-select"
+                                        style="min-width:180px;">
+                                    <option value="">-- لا تغيير --</option>
+                                    {% for t in all_teachers %}
+                                    <option value="{{ t.id }}">{{ t.full_name }}</option>
+                                    {% endfor %}
+                                </select>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Submit -->
+        <div class="d-flex gap-2 mb-4">
+            <button type="submit" class="btn btn-danger">
+                <i class="bi bi-save me-1"></i>
+                حفظ التكليفات
+            </button>
+            <a href="{% url 'admin_portal:teacher_list' %}" class="btn btn-outline-secondary">إلغاء</a>
+        </div>
+
+        {% else %}
+        <!-- No present students -->
+        <div class="card border-0 shadow-sm mb-4">
+            <div class="card-body text-center text-muted py-5">
+                <i class="bi bi-calendar-x display-4 d-block mb-3 opacity-25"></i>
+                <p class="mb-1 fw-semibold">لا يوجد طلاب حضروا تحت هذا المعلم في {{ absence_date|date:"Y/m/d" }}</p>
+                <p class="small">إما أن الطلاب لم يسجلوا حضورهم بعد، أو لا يوجد طلاب مرتبطون بهذا المعلم.</p>
+            </div>
+        </div>
+        {% endif %}
+
+    </form>
+
+    <!-- Students not present (info only) -->
+    {% if not_present_students %}
+    <div class="card border-0 shadow-sm mb-4">
+        <div class="card-header bg-white fw-semibold text-muted">
+            <i class="bi bi-person-dash me-1"></i>
+            طلاب لم يسجلوا حضورهم بعد ({{ not_present_students|length }})
+            <small class="fw-normal"> — لا يمكن تكليفهم لأنه لا توجد سجلات حضور لهم</small>
+        </div>
+        <div class="card-body py-2">
+            <div class="d-flex flex-wrap gap-2">
+                {% for student in not_present_students %}
+                <span class="badge bg-light text-dark border">
+                    {{ student.full_name }}
+                    {% if student.grade %}<small class="text-muted"> ({{ student.grade }})</small>{% endif %}
+                </span>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+</div>
+
+<script>
+function applyBulk() {
+    const teacherId = document.getElementById('bulkTeacher').value;
+    if (!teacherId) {
+        alert('يرجى اختيار معلم بديل أولاً.');
+        return;
+    }
+    document.querySelectorAll('.sub-select').forEach(sel => {
+        sel.value = teacherId;
+    });
+}
+</script>
+{% endblock %}

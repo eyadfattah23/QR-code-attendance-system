@@ -1612,3 +1612,226 @@ class AttendanceExportTestCase(TestCase):
         ws = self._load_ws(response)
         rows = list(ws.iter_rows(values_only=True))
         self.assertEqual(len(rows), 1)  # header only
+
+
+class TeacherMarkAbsentTestCase(TestCase):
+    """Tests for the teacher_mark_absent view."""
+
+    @classmethod
+    def setUpTestData(cls):
+        import datetime
+        cls.today = datetime.date.today()
+
+        cls.admin_user = User.objects.create_user(
+            phone='09100000001', email='admin_absent@test.com', password='adminpass',
+            role=User.Role.ADMIN,
+        )
+        cls.teacher_user = User.objects.create_user(
+            phone='09111111101', email='teacher_absent@test.com', password='tpass',
+            role=User.Role.TEACHER, first_name='أحمد', last_name='علي',
+        )
+        cls.teacher = Teacher.objects.create(
+            user=cls.teacher_user, full_name='أحمد علي', subject='علوم',
+        )
+        # Substitute teacher
+        cls.sub_user = User.objects.create_user(
+            phone='09122222201', email='sub_absent@test.com', password='subpass',
+            role=User.Role.TEACHER, first_name='سارة', last_name='محمد',
+        )
+        cls.substitute = Teacher.objects.create(
+            user=cls.sub_user, full_name='سارة محمد', subject='رياضيات',
+        )
+        # Students
+        cls.student_present = Student.objects.create(
+            full_name='طالب حاضر', grade='الصف الأول',
+            national_id='ABSENT_TEST_001', student_code='ABSENT_TEST_001',
+        )
+        cls.student_absent = Student.objects.create(
+            full_name='طالب غائب', grade='الصف الأول',
+            national_id='ABSENT_TEST_002', student_code='ABSENT_TEST_002',
+        )
+        StudentTeacherLink.objects.create(teacher=cls.teacher, student=cls.student_present, is_primary=True)
+        StudentTeacherLink.objects.create(teacher=cls.teacher, student=cls.student_absent, is_primary=True)
+        # Attendance record only for the present student
+        from django.utils.timezone import now as tz_now
+        cls.record = StudentAttendanceRecord.objects.create(
+            student=cls.student_present,
+            date=cls.today,
+            check_in_time=tz_now(),
+            original_teacher=cls.teacher,
+            assigned_teacher=cls.teacher,
+        )
+
+    def setUp(self):
+        self.client = Client()
+        self.client.login(phone='09100000001', password='adminpass')
+        self.url = reverse('admin_portal:teacher_mark_absent', args=[self.teacher.id])
+
+    # --- Access control ---
+
+    def test_admin_can_access_get(self):
+        response = self.client.get(self.url)
+        self.assertEqual(response.status_code, 200)
+
+    def test_teacher_cannot_access(self):
+        self.client.logout()
+        self.client.login(phone='09111111101', password='tpass')
+        response = self.client.get(self.url)
+        self.assertEqual(response.status_code, 302)
+
+    def test_unauthenticated_redirected(self):
+        self.client.logout()
+        response = self.client.get(self.url)
+        self.assertEqual(response.status_code, 302)
+        self.assertIn('/login/', response.url)
+
+    def test_404_for_unknown_teacher(self):
+        import uuid
+        bad_url = reverse('admin_portal:teacher_mark_absent', args=[uuid.uuid4()])
+        response = self.client.get(bad_url)
+        self.assertEqual(response.status_code, 404)
+
+    # --- GET context ---
+
+    def test_get_shows_correct_teacher(self):
+        response = self.client.get(self.url)
+        self.assertEqual(response.context['teacher'], self.teacher)
+
+    def test_get_defaults_to_today(self):
+        response = self.client.get(self.url)
+        self.assertEqual(response.context['absence_date'], self.today)
+
+    def test_get_with_date_param(self):
+        import datetime
+        other_date = self.today - datetime.timedelta(days=1)
+        response = self.client.get(self.url, {'date': other_date.isoformat()})
+        self.assertEqual(response.context['absence_date'], other_date)
+
+    def test_present_with_records_contains_checked_in_student(self):
+        response = self.client.get(self.url, {'date': self.today.isoformat()})
+        students_in_context = [s for s, _ in response.context['present_with_records']]
+        self.assertIn(self.student_present, students_in_context)
+
+    def test_not_present_students_contains_absent_student(self):
+        response = self.client.get(self.url, {'date': self.today.isoformat()})
+        self.assertIn(self.student_absent, response.context['not_present_students'])
+
+    def test_absent_student_not_in_present_with_records(self):
+        response = self.client.get(self.url, {'date': self.today.isoformat()})
+        students_in_context = [s for s, _ in response.context['present_with_records']]
+        self.assertNotIn(self.student_absent, students_in_context)
+
+    def test_all_teachers_excludes_absent_teacher(self):
+        response = self.client.get(self.url)
+        all_teachers = list(response.context['all_teachers'])
+        self.assertNotIn(self.teacher, all_teachers)
+        self.assertIn(self.substitute, all_teachers)
+
+    # --- POST: valid assignment ---
+
+    def test_post_valid_assignment_updates_assigned_teacher(self):
+        self.client.post(self.url, {
+            'date': self.today.isoformat(),
+            f'sub_{self.student_present.id}': str(self.substitute.id),
+        })
+        self.record.refresh_from_db()
+        self.assertEqual(self.record.assigned_teacher, self.substitute)
+
+    def test_post_valid_assignment_preserves_original_teacher(self):
+        self.client.post(self.url, {
+            'date': self.today.isoformat(),
+            f'sub_{self.student_present.id}': str(self.substitute.id),
+        })
+        self.record.refresh_from_db()
+        self.assertEqual(self.record.original_teacher, self.teacher)
+
+    def test_post_sets_substitute_note(self):
+        # Reset note first
+        self.record.substitute_note = ''
+        self.record.save(update_fields=['substitute_note'])
+
+        self.client.post(self.url, {
+            'date': self.today.isoformat(),
+            f'sub_{self.student_present.id}': str(self.substitute.id),
+        })
+        self.record.refresh_from_db()
+        self.assertIn(self.teacher.full_name, self.record.substitute_note)
+
+    def test_post_does_not_overwrite_existing_substitute_note(self):
+        self.record.substitute_note = 'ملاحظة مخصصة'
+        self.record.save(update_fields=['substitute_note'])
+
+        self.client.post(self.url, {
+            'date': self.today.isoformat(),
+            f'sub_{self.student_present.id}': str(self.substitute.id),
+        })
+        self.record.refresh_from_db()
+        self.assertEqual(self.record.substitute_note, 'ملاحظة مخصصة')
+
+    def test_post_redirects_to_teacher_list(self):
+        response = self.client.post(self.url, {
+            'date': self.today.isoformat(),
+            f'sub_{self.student_present.id}': str(self.substitute.id),
+        })
+        self.assertRedirects(response, reverse('admin_portal:teacher_list'))
+
+    def test_post_success_message(self):
+        response = self.client.post(self.url, {
+            'date': self.today.isoformat(),
+            f'sub_{self.student_present.id}': str(self.substitute.id),
+        }, follow=True)
+        messages = [str(m) for m in response.context['messages']]
+        self.assertTrue(any('تم تحديث' in m for m in messages))
+
+    # --- POST: no selection ---
+
+    def test_post_no_selection_shows_info_message(self):
+        # Reset record to original state
+        self.record.assigned_teacher = self.teacher
+        self.record.substitute_note = ''
+        self.record.save(update_fields=['assigned_teacher', 'substitute_note'])
+
+        response = self.client.post(self.url, {
+            'date': self.today.isoformat(),
+        }, follow=True)
+        msgs = [str(m) for m in response.context['messages']]
+        self.assertTrue(any('لم يتم تغيير' in m for m in msgs))
+
+    def test_post_empty_sub_leaves_record_unchanged(self):
+        original_assigned = self.record.assigned_teacher_id
+        self.client.post(self.url, {
+            'date': self.today.isoformat(),
+            f'sub_{self.student_present.id}': '',
+        })
+        self.record.refresh_from_db()
+        self.assertEqual(self.record.assigned_teacher_id, original_assigned)
+
+    # --- POST: invalid teacher UUID ---
+
+    def test_post_invalid_teacher_uuid_skapped(self):
+        original_assigned = self.record.assigned_teacher_id
+        self.client.post(self.url, {
+            'date': self.today.isoformat(),
+            f'sub_{self.student_present.id}': 'not-a-valid-uuid',
+        })
+        self.record.refresh_from_db()
+        self.assertEqual(self.record.assigned_teacher_id, original_assigned)
+
+    def test_post_nonexistent_teacher_uuid_skipped(self):
+        import uuid
+        original_assigned = self.record.assigned_teacher_id
+        self.client.post(self.url, {
+            'date': self.today.isoformat(),
+            f'sub_{self.student_present.id}': str(uuid.uuid4()),
+        })
+        self.record.refresh_from_db()
+        self.assertEqual(self.record.assigned_teacher_id, original_assigned)
+
+    # --- is_substitute_assignment ---
+
+    def test_is_substitute_after_assignment(self):
+        self.record.assigned_teacher = self.substitute
+        self.record.original_teacher = self.teacher
+        self.record.save(update_fields=['assigned_teacher', 'original_teacher'])
+        self.record.refresh_from_db()
+        self.assertTrue(self.record.is_substitute_assignment)

@@ -3,6 +3,7 @@ import io
 import openpyxl
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
+from django.core.exceptions import ValidationError
 from django.core.paginator import Paginator
 from django.db import models
 from django.db.models import Q
@@ -787,4 +788,89 @@ def teacher_attendance_record_edit(request, pk):
         'teacher': record.teacher,
         'rating_choices': range(1, 11),
         'back_url': back_url,
+    })
+
+
+# ---------------------------------------------------------------------------
+# Mark teacher absent + reassign students to substitute teachers
+# ---------------------------------------------------------------------------
+
+@admin_required
+def teacher_mark_absent(request, pk):
+    """
+    Let admin mark a teacher absent for a date, then reassign each of their
+    students' attendance records to a substitute teacher (individually or in
+    bulk).
+
+    GET  ?date=YYYY-MM-DD  → show the assignment form for that date
+    POST                   → save assignments and redirect
+    """
+    from datetime import date as date_type
+
+    teacher = get_object_or_404(
+        Teacher.objects.prefetch_related('student_links__student'), pk=pk
+    )
+    all_teachers = Teacher.objects.select_related('user').exclude(pk=pk).order_by('full_name')
+
+    # --- resolve date ---
+    date_str = (request.POST.get('date') or request.GET.get('date', '')).strip()
+    try:
+        absence_date = date_type.fromisoformat(date_str)
+    except ValueError:
+        absence_date = localdate()
+
+    # --- students linked to this teacher ---
+    linked_students = list(
+        Student.objects.filter(teacher_links__teacher=teacher).order_by('full_name')
+    )
+
+    # attendance records for the selected date keyed by student UUID string
+    records_qs = (
+        StudentAttendanceRecord.objects
+        .filter(student__in=linked_students, date=absence_date)
+        .select_related('student', 'assigned_teacher', 'original_teacher')
+    )
+    record_by_student = {str(r.student_id): r for r in records_qs}
+
+    present_students = [s for s in linked_students if str(s.id) in record_by_student]
+    not_present_students = [s for s in linked_students if str(s.id) not in record_by_student]
+
+    if request.method == 'POST':
+        updated = 0
+        for student in present_students:
+            sub_id = request.POST.get(f'sub_{student.id}', '').strip()
+            if not sub_id:
+                continue
+            try:
+                substitute = Teacher.objects.get(pk=sub_id)
+            except (Teacher.DoesNotExist, ValueError, ValidationError):
+                continue
+
+            rec = record_by_student[str(student.id)]
+            # Preserve original teacher as the absent teacher
+            if not rec.original_teacher_id:
+                rec.original_teacher = teacher
+            rec.assigned_teacher = substitute
+            if not rec.substitute_note:
+                rec.substitute_note = f'غياب المعلم {teacher.full_name}'
+            rec.save(update_fields=['original_teacher', 'assigned_teacher', 'substitute_note'])
+            updated += 1
+
+        if updated:
+            messages.success(request, f'تم تحديث تكليف {updated} طالب بنجاح')
+        else:
+            messages.info(request, 'لم يتم تغيير أي تكليف')
+        return redirect(reverse('admin_portal:teacher_list'))
+
+    # Build a paired list for the template: (student, record_or_None)
+    present_with_records = [
+        (s, record_by_student[str(s.id)]) for s in present_students
+    ]
+
+    return render(request, 'admin_portal/teacher_mark_absent.html', {
+        'teacher': teacher,
+        'absence_date': absence_date,
+        'all_teachers': all_teachers,
+        'present_with_records': present_with_records,
+        'not_present_students': not_present_students,
     })
