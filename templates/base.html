@@ -108,12 +108,24 @@
                             محطة المسح
                         </a>
                     </li>
-                    <li class="nav-item">
-                        <a class="nav-link {% if '/qr-cards/' in request.path %}active{% endif %}"
-                            href="{% url 'qr_generator:qr_cards_config' %}">
+                    <li class="nav-item dropdown">
+                        <a class="nav-link dropdown-toggle {% if '/qr-cards/' in request.path %}active{% endif %}"
+                            href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false">
                             <i class="bi bi-qr-code me-1"></i>
                             بطاقات QR
                         </a>
+                        <ul class="dropdown-menu">
+                            <li>
+                                <a class="dropdown-item" href="{% url 'qr_generator:qr_cards_config' %}">
+                                    <i class="bi bi-people me-1"></i> بطاقات الطلاب
+                                </a>
+                            </li>
+                            <li>
+                                <a class="dropdown-item" href="{% url 'qr_generator:teacher_qr_cards_config' %}">
+                                    <i class="bi bi-person-badge me-1"></i> بطاقات المعلمين
+                                </a>
+                            </li>
+                        </ul>
                     </li>
                     {% elif user.is_teacher %}
                     <li class="nav-item">

@@ -1,0 +1,172 @@
+{% extends 'base.html' %}
+
+{% block title %}طباعة بطاقات QR للمعلمين - نظام الحضور{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- Page Header -->
+    <div class="d-flex justify-content-between align-items-center mb-4 mt-2">
+        <h1 class="h3 mb-0 mt-2">
+            <i class="bi bi-qr-code me-2"></i>
+            طباعة بطاقات QR للمعلمين
+        </h1>
+        <a href="{% url 'qr_generator:qr_cards_config' %}" class="btn btn-outline-secondary btn-sm">
+            <i class="bi bi-people me-1"></i> بطاقات الطلاب
+        </a>
+    </div>
+
+    <div class="row">
+        <!-- Filters sidebar -->
+        <div class="col-lg-3 mb-4">
+            <div class="card shadow-sm h-100">
+                <div class="card-header bg-white fw-semibold">
+                    <i class="bi bi-funnel me-1"></i> تصفية المعلمين
+                </div>
+                <div class="card-body">
+                    <form method="get" id="filterForm">
+                        <div class="mb-3">
+                            <label for="subject" class="form-label">المادة</label>
+                            <select name="subject" id="subject" class="form-select">
+                                <option value="">-- جميع المواد --</option>
+                                {% for s in subjects %}
+                                <option value="{{ s }}" {% if s == subject_filter %}selected{% endif %}>{{ s }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="mb-3">
+                            <label for="name" class="form-label">اسم المعلم</label>
+                            <input type="text" id="name" name="name" value="{{ name_filter }}"
+                                   class="form-control" placeholder="ابحث بالاسم...">
+                        </div>
+                        <div class="d-grid gap-2">
+                            <button type="submit" class="btn btn-primary">
+                                <i class="bi bi-search me-1"></i> بحث
+                            </button>
+                            <a href="{% url 'qr_generator:teacher_qr_cards_config' %}" class="btn btn-outline-secondary">
+                                <i class="bi bi-arrow-counterclockwise me-1"></i> إعادة ضبط
+                            </a>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <!-- Teacher list + config -->
+        <div class="col-lg-9">
+            <form method="post" id="printForm">
+                {% csrf_token %}
+
+                <!-- Cards per page selector -->
+                <div class="card shadow-sm mb-3">
+                    <div class="card-body py-3">
+                        <div class="row align-items-center">
+                            <div class="col-auto">
+                                <label class="form-label mb-0 fw-semibold">
+                                    <i class="bi bi-grid me-1"></i> عدد البطاقات في الصفحة:
+                                </label>
+                            </div>
+                            <div class="col-auto">
+                                <select name="cards_per_page" class="form-select form-select-sm" style="width:auto">
+                                    {% for n in cards_per_page_range %}
+                                    <option value="{{ n }}" {% if n == 8 %}selected{% endif %}>{{ n }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            <div class="col-auto me-auto">
+                                <span class="text-muted small">
+                                    (تملأ البطاقات الصفحة بشكل متناسب مهما كان العدد)
+                                </span>
+                            </div>
+                            <div class="col-auto">
+                                <button type="submit" class="btn btn-success"
+                                        onclick="return validateSelection()">
+                                    <i class="bi bi-printer me-1"></i> معاينة وطباعة
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Teacher table -->
+                <div class="card shadow-sm">
+                    <div class="card-header bg-white d-flex justify-content-between align-items-center">
+                        <span class="fw-semibold">
+                            <i class="bi bi-person-badge me-1"></i>
+                            المعلمون ({{ teachers|length }})
+                        </span>
+                        <div>
+                            <button type="button" class="btn btn-sm btn-outline-primary me-1"
+                                    onclick="selectAll()">تحديد الكل</button>
+                            <button type="button" class="btn btn-sm btn-outline-secondary"
+                                    onclick="deselectAll()">إلغاء الكل</button>
+                        </div>
+                    </div>
+
+                    {% if teachers %}
+                    <div class="table-responsive">
+                        <table class="table table-hover table-sm mb-0 align-middle">
+                            <thead class="table-light">
+                                <tr>
+                                    <th style="width:3rem">
+                                        <input type="checkbox" class="form-check-input"
+                                               id="selectAllCheck"
+                                               onchange="toggleAll(this)">
+                                    </th>
+                                    <th>الاسم</th>
+                                    <th>المادة</th>
+                                    <th>رقم الهاتف</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for teacher in teachers %}
+                                <tr>
+                                    <td>
+                                        <input type="checkbox" class="form-check-input teacher-check"
+                                               name="teacher_ids" value="{{ teacher.id }}">
+                                    </td>
+                                    <td class="fw-semibold">{{ teacher.full_name }}</td>
+                                    <td>
+                                        {% if teacher.subject %}
+                                        <span class="badge bg-secondary">{{ teacher.subject }}</span>
+                                        {% else %}<span class="text-muted">—</span>{% endif %}
+                                    </td>
+                                    <td class="text-muted small font-monospace">{{ teacher.user.phone }}</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    {% else %}
+                    <div class="card-body text-center text-muted py-5">
+                        <i class="bi bi-person-badge display-4"></i>
+                        <p class="mt-2">لا يوجد معلمون مطابقون للبحث.</p>
+                    </div>
+                    {% endif %}
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+function selectAll() {
+    document.querySelectorAll('.teacher-check').forEach(cb => cb.checked = true);
+    document.getElementById('selectAllCheck').checked = true;
+}
+function deselectAll() {
+    document.querySelectorAll('.teacher-check').forEach(cb => cb.checked = false);
+    document.getElementById('selectAllCheck').checked = false;
+}
+function toggleAll(masterCb) {
+    document.querySelectorAll('.teacher-check').forEach(cb => cb.checked = masterCb.checked);
+}
+function validateSelection() {
+    const checked = document.querySelectorAll('.teacher-check:checked').length;
+    if (checked === 0) {
+        alert('يرجى تحديد معلم واحد على الأقل.');
+        return false;
+    }
+    return true;
+}
+</script>
+{% endblock %}

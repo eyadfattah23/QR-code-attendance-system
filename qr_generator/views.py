@@ -8,7 +8,7 @@ from django.contrib.auth.decorators import login_required
 from django.shortcuts import render, redirect
 from django.contrib import messages
 
-from core.models import Student
+from core.models import Student, Teacher
 
 # Columns to use for each "cards per page" count (portrait A4 optimised)
 CARDS_GRID_COLS = {
@@ -127,6 +127,81 @@ def qr_cards_print(request):
         pages.append({'cards': chunk, 'empty_range': range(padding)})
 
     return render(request, 'qr_generator/print.html', {
+        'pages': pages,
+        'cols': cols,
+        'rows': rows,
+        'cards_per_page': cards_per_page,
+        'total_cards': len(cards),
+    })
+
+
+@admin_required
+def teacher_qr_cards_config(request):
+    """Step 1 – choose teachers and cards-per-page, then go to the print page."""
+    if request.method == 'POST':
+        teacher_ids = request.POST.getlist('teacher_ids')
+        cards_per_page = request.POST.get('cards_per_page', '8')
+        if not teacher_ids:
+            messages.error(request, 'يرجى اختيار معلم واحد على الأقل.')
+        else:
+            from django.urls import reverse as _reverse
+            base = _reverse('qr_generator:teacher_qr_cards_print')
+            ids_qs = '&'.join(f'tid={tid}' for tid in teacher_ids)
+            return redirect(f'{base}?{ids_qs}&cpp={cards_per_page}')
+
+    name_filter = request.GET.get('name', '').strip()
+    subject_filter = request.GET.get('subject', '').strip()
+
+    teachers = Teacher.objects.select_related('user').order_by('full_name')
+    if name_filter:
+        teachers = teachers.filter(full_name__icontains=name_filter)
+    if subject_filter:
+        teachers = teachers.filter(subject__icontains=subject_filter)
+
+    subjects = (
+        Teacher.objects.exclude(subject__isnull=True)
+        .exclude(subject='')
+        .values_list('subject', flat=True)
+        .distinct()
+        .order_by('subject')
+    )
+
+    return render(request, 'qr_generator/teacher_config.html', {
+        'teachers': teachers,
+        'subjects': subjects,
+        'name_filter': name_filter,
+        'subject_filter': subject_filter,
+        'cards_per_page_range': range(1, 13),
+    })
+
+
+@admin_required
+def teacher_qr_cards_print(request):
+    """Step 2 – render a printable A4 page with teacher QR cards."""
+    teacher_ids = request.GET.getlist('tid')
+    try:
+        cards_per_page = max(1, min(12, int(request.GET.get('cpp', 8))))
+    except (ValueError, TypeError):
+        cards_per_page = 8
+
+    teachers = Teacher.objects.filter(id__in=teacher_ids).order_by('full_name')
+
+    cards = [
+        {'teacher': t, 'qr': _generate_qr_base64(str(t.id))}
+        for t in teachers
+    ]
+
+    cols = CARDS_GRID_COLS.get(cards_per_page, 3)
+    rows = math.ceil(cards_per_page / cols)
+
+    raw_pages = [cards[i: i + cards_per_page] for i in range(0, len(cards), cards_per_page)]
+    pages = []
+    total_slots = cols * rows
+    for chunk in raw_pages:
+        padding = total_slots - len(chunk)
+        pages.append({'cards': chunk, 'empty_range': range(padding)})
+
+    return render(request, 'qr_generator/teacher_print.html', {
         'pages': pages,
         'cols': cols,
         'rows': rows,
