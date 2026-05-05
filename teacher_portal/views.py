@@ -1,4 +1,4 @@
-from django.shortcuts import render, redirect
+from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
 from django.utils.timezone import localdate, localtime
@@ -172,3 +172,33 @@ def teacher_scan(request):
         messages.error(request, 'لم يتم ربط حسابك بملف معلم')
 
     return redirect('teacher_portal:dashboard')
+
+
+@teacher_required
+def student_history(request, pk):
+    """Full attendance history for a student linked to the requesting teacher."""
+    try:
+        teacher = Teacher.objects.get(user=request.user)
+    except Teacher.DoesNotExist:
+        messages.error(request, 'لم يتم ربط حسابك بملف معلم')
+        return redirect('teacher_portal:dashboard')
+
+    student = get_object_or_404(
+        Student,
+        pk=pk,
+        teacher_links__teacher=teacher,
+    )
+
+    records = (
+        StudentAttendanceRecord.objects
+        .filter(student=student)
+        .select_related('assigned_teacher', 'original_teacher')
+        .order_by('-date', '-check_in_time')
+    )
+    total_records = records.count()
+
+    return render(request, 'teacher_portal/student_history.html', {
+        'student': student,
+        'records': records,
+        'total_records': total_records,
+    })

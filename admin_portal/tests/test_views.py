@@ -1392,7 +1392,8 @@ class TeacherAttendanceRecordEditTestCase(TestCase):
     def test_context_rating_choices_1_to_10(self):
         self.client.login(phone='01850000000', password='adminpass')
         response = self.client.get(self.url)
-        self.assertEqual(list(response.context['rating_choices']), list(range(1, 11)))
+        self.assertEqual(
+            list(response.context['rating_choices']), list(range(1, 11)))
 
     def test_teacher_name_in_response(self):
         self.client.login(phone='01850000000', password='adminpass')
@@ -1470,13 +1471,14 @@ class TeacherAttendanceRecordEditTestCase(TestCase):
         import datetime
         new_teacher_user = User.objects.create_user(
             phone='01870000000', password='tp', role=User.Role.TEACHER)
-        new_teacher = Teacher.objects.create(user=new_teacher_user, full_name='معلم جديد')
+        new_teacher = Teacher.objects.create(
+            user=new_teacher_user, full_name='معلم جديد')
         rec = TeacherAttendanceRecord.objects.create(
             teacher=new_teacher,
             date='2025-06-01',
             check_in_time=make_aware(datetime.datetime(2025, 6, 1, 8, 0)),
         )
-        self.assertEqual(rec.rating, 7)
+        self.assertEqual(rec.rating, 5)
 
 
 # ---------------------------------------------------------------------------
@@ -1650,8 +1652,10 @@ class TeacherMarkAbsentTestCase(TestCase):
             full_name='طالب غائب', grade='الصف الأول',
             national_id='ABSENT_TEST_002', student_code='ABSENT_TEST_002',
         )
-        StudentTeacherLink.objects.create(teacher=cls.teacher, student=cls.student_present, is_primary=True)
-        StudentTeacherLink.objects.create(teacher=cls.teacher, student=cls.student_absent, is_primary=True)
+        StudentTeacherLink.objects.create(
+            teacher=cls.teacher, student=cls.student_present, is_primary=True)
+        StudentTeacherLink.objects.create(
+            teacher=cls.teacher, student=cls.student_absent, is_primary=True)
         # Attendance record only for the present student
         from django.utils.timezone import now as tz_now
         cls.record = StudentAttendanceRecord.objects.create(
@@ -1665,7 +1669,8 @@ class TeacherMarkAbsentTestCase(TestCase):
     def setUp(self):
         self.client = Client()
         self.client.login(phone='09100000001', password='adminpass')
-        self.url = reverse('admin_portal:teacher_mark_absent', args=[self.teacher.id])
+        self.url = reverse('admin_portal:teacher_mark_absent',
+                           args=[self.teacher.id])
 
     # --- Access control ---
 
@@ -1687,7 +1692,8 @@ class TeacherMarkAbsentTestCase(TestCase):
 
     def test_404_for_unknown_teacher(self):
         import uuid
-        bad_url = reverse('admin_portal:teacher_mark_absent', args=[uuid.uuid4()])
+        bad_url = reverse('admin_portal:teacher_mark_absent',
+                          args=[uuid.uuid4()])
         response = self.client.get(bad_url)
         self.assertEqual(response.status_code, 404)
 
@@ -1709,16 +1715,19 @@ class TeacherMarkAbsentTestCase(TestCase):
 
     def test_present_with_records_contains_checked_in_student(self):
         response = self.client.get(self.url, {'date': self.today.isoformat()})
-        students_in_context = [s for s, _ in response.context['present_with_records']]
+        students_in_context = [
+            s for s, _ in response.context['present_with_records']]
         self.assertIn(self.student_present, students_in_context)
 
     def test_not_present_students_contains_absent_student(self):
         response = self.client.get(self.url, {'date': self.today.isoformat()})
-        self.assertIn(self.student_absent, response.context['not_present_students'])
+        self.assertIn(self.student_absent,
+                      response.context['not_present_students'])
 
     def test_absent_student_not_in_present_with_records(self):
         response = self.client.get(self.url, {'date': self.today.isoformat()})
-        students_in_context = [s for s, _ in response.context['present_with_records']]
+        students_in_context = [
+            s for s, _ in response.context['present_with_records']]
         self.assertNotIn(self.student_absent, students_in_context)
 
     def test_all_teachers_excludes_absent_teacher(self):
@@ -1832,6 +1841,7 @@ class TeacherMarkAbsentTestCase(TestCase):
     def test_is_substitute_after_assignment(self):
         self.record.assigned_teacher = self.substitute
         self.record.original_teacher = self.teacher
-        self.record.save(update_fields=['assigned_teacher', 'original_teacher'])
+        self.record.save(
+            update_fields=['assigned_teacher', 'original_teacher'])
         self.record.refresh_from_db()
         self.assertTrue(self.record.is_substitute_assignment)

@@ -93,7 +93,8 @@
                                     <div class="avatar bg-primary bg-opacity-10 rounded-circle p-2 ms-2">
                                         <i class="bi bi-person text-primary"></i>
                                     </div>
-                                    {{ row.student.full_name }}
+                                    <a href="{% url 'teacher_portal:student_history' row.student.id %}"
+                                       class="text-decoration-none fw-semibold">{{ row.student.full_name }}</a>
                                 </div>
                             </td>
                             <td>{{ row.student.grade|default:"-" }}</td>
@@ -161,9 +162,10 @@
                                     <button class="btn btn-outline-primary" title="رفع صورة">
                                         <i class="bi bi-camera"></i>
                                     </button>
-                                    <button class="btn btn-outline-info" title="عرض السجل">
+                                    <a href="{% url 'teacher_portal:student_history' row.student.id %}"
+                                       class="btn btn-outline-info" title="عرض السجل">
                                         <i class="bi bi-clock-history"></i>
-                                    </button>
+                                    </a>
                                 </div>
                             </td>
                         </tr>
