@@ -109,7 +109,7 @@ class TeacherAttendanceRecord(models.Model):
         help_text='Admin user who recorded attendance',
     )
     rating = models.PositiveSmallIntegerField(
-        default=7,
+        default=5,
         help_text='Daily teacher rating from 1 to 10',
     )
     notes = models.TextField(
