@@ -91,11 +91,12 @@
                             <td class="d-none d-md-table-cell">{{ forloop.counter }}</td>
                             <td>
                                 <div class="d-flex align-items-center">
-                                    <div class="avatar bg-primary bg-opacity-10 rounded-circle p-2 ms-2 d-none d-md-flex">
+                                    <div
+                                        class="avatar bg-primary bg-opacity-10 rounded-circle p-2 ms-2 d-none d-md-flex">
                                         <i class="bi bi-person text-primary"></i>
                                     </div>
                                     <a href="{% url 'teacher_portal:student_history' row.student.id %}"
-                                       class="text-decoration-none fw-semibold">{{ row.student.full_name }}</a>
+                                        class="text-decoration-none fw-semibold">{{ row.student.full_name }}</a>
                                 </div>
                             </td>
                             <td class="d-none d-md-table-cell">{{ row.student.grade|default:"-" }}</td>
@@ -139,7 +140,7 @@
                                         {{ row.attendance.rating }}/10
                                     </span>
                                     <a href="{% url 'admin_portal:attendance_record_edit_rating' row.attendance.id %}"
-                                       class="btn btn-outline-secondary btn-sm p-1" title="تعديل التقييم">
+                                        class="btn btn-outline-secondary btn-sm p-1" title="تعديل التقييم">
                                         <i class="bi bi-pencil" style="font-size:.75rem;"></i>
                                     </a>
                                 </div>
@@ -162,15 +163,17 @@
                                 {% if row.attendance %}
                                 {% if row.attendance.teacher_note %}
                                 <div class="d-flex align-items-start gap-2">
-                                    <span class="small text-truncate" style="max-width:140px;" title="{{ row.attendance.teacher_note }}">{{ row.attendance.teacher_note }}</span>
+                                    <span class="small text-truncate" style="max-width:140px;"
+                                        title="{{ row.attendance.teacher_note }}">{{ row.attendance.teacher_note }}</span>
                                     <a href="{% url 'teacher_portal:edit_record_note' row.attendance.id %}"
-                                       class="btn btn-outline-secondary btn-sm p-1 flex-shrink-0" title="تعديل الملاحظة">
+                                        class="btn btn-outline-secondary btn-sm p-1 flex-shrink-0"
+                                        title="تعديل الملاحظة">
                                         <i class="bi bi-pencil" style="font-size:.75rem;"></i>
                                     </a>
                                 </div>
                                 {% else %}
                                 <a href="{% url 'teacher_portal:edit_record_note' row.attendance.id %}"
-                                   class="btn btn-outline-primary btn-sm" title="إضافة ملاحظة">
+                                    class="btn btn-outline-primary btn-sm" title="إضافة ملاحظة">
                                     <i class="bi bi-plus-lg me-1" style="font-size:.75rem;"></i>
                                     إضافة
                                 </a>
@@ -181,11 +184,26 @@
                             </td>
                             <td>
                                 <div class="btn-group btn-group-sm">
+                                    <button class="btn btn-outline-secondary d-md-none"
+                                        data-bs-toggle="modal"
+                                        data-bs-target="#student-detail-modal"
+                                        data-name="{{ row.student.full_name }}"
+                                        data-grade="{{ row.student.grade|default:'-' }}"
+                                        data-time="{% if row.attendance %}{{ row.attendance.check_in_time|time:'H:i' }}{% else %}-{% endif %}"
+                                        data-photo="{% if row.attendance and row.attendance.daily_photo %}مرفوعة{% else %}لا توجد{% endif %}"
+                                        data-rating="{% if row.attendance %}{{ row.attendance.rating }}/10{% else %}-{% endif %}"
+                                        data-transfer="{% if row.attendance and row.attendance.is_substitute_assignment %}بديل{% else %}-{% endif %}"
+                                        data-note="{{ row.attendance.teacher_note|default:'' }}"
+                                        data-note-url="{% if row.attendance %}{% url 'teacher_portal:edit_record_note' row.attendance.id %}{% endif %}"
+                                        data-history-url="{% url 'teacher_portal:student_history' row.student.id %}"
+                                        title="تفاصيل">
+                                        <i class="bi bi-info-circle"></i>
+                                    </button>
                                     <button class="btn btn-outline-primary" title="رفع صورة">
                                         <i class="bi bi-camera"></i>
                                     </button>
                                     <a href="{% url 'teacher_portal:student_history' row.student.id %}"
-                                       class="btn btn-outline-info" title="عرض السجل">
+                                        class="btn btn-outline-info" title="عرض السجل">
                                         <i class="bi bi-clock-history"></i>
                                     </a>
                                 </div>
@@ -205,6 +223,42 @@
     </div>
 </div>
 
+<!-- Student detail modal (mobile only) -->
+<div class="modal fade" id="student-detail-modal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title fw-bold" id="sdt-name"></h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <dl class="row g-2 mb-0">
+                    <dt class="col-5 text-muted small">الصف</dt>
+                    <dd class="col-7 mb-0" id="sdt-grade"></dd>
+                    <dt class="col-5 text-muted small">وقت الحضور</dt>
+                    <dd class="col-7 mb-0 font-monospace" id="sdt-time"></dd>
+                    <dt class="col-5 text-muted small">الصورة</dt>
+                    <dd class="col-7 mb-0" id="sdt-photo"></dd>
+                    <dt class="col-5 text-muted small">التقييم</dt>
+                    <dd class="col-7 mb-0" id="sdt-rating"></dd>
+                    <dt class="col-5 text-muted small">التحويل</dt>
+                    <dd class="col-7 mb-0" id="sdt-transfer"></dd>
+                    <dt class="col-5 text-muted small">ملاحظة</dt>
+                    <dd class="col-7 mb-0" id="sdt-note"></dd>
+                </dl>
+            </div>
+            <div class="modal-footer justify-content-start gap-2">
+                <a id="sdt-note-btn" href="#" class="btn btn-outline-primary btn-sm">
+                    <i class="bi bi-pencil me-1"></i><span id="sdt-note-label">ملاحظة</span>
+                </a>
+                <a id="sdt-history-btn" href="#" class="btn btn-outline-info btn-sm">
+                    <i class="bi bi-clock-history me-1"></i> السجل
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+
 {% block extra_js %}
 <script>
     // Auto-submit on Enter key for batch scanning
@@ -215,6 +269,27 @@
                 document.getElementById('attendance-form').submit();
             }
         }
+    });
+
+    // Populate student detail modal from row data attributes
+    document.getElementById('student-detail-modal').addEventListener('show.bs.modal', function (e) {
+        const btn = e.relatedTarget;
+        document.getElementById('sdt-name').textContent = btn.dataset.name;
+        document.getElementById('sdt-grade').textContent = btn.dataset.grade;
+        document.getElementById('sdt-time').textContent = btn.dataset.time;
+        document.getElementById('sdt-photo').textContent = btn.dataset.photo;
+        document.getElementById('sdt-rating').textContent = btn.dataset.rating;
+        document.getElementById('sdt-transfer').textContent = btn.dataset.transfer;
+        const note = btn.dataset.note;
+        document.getElementById('sdt-note').textContent = note || '—';
+        const noteUrl = btn.dataset.noteUrl;
+        const noteBtn = document.getElementById('sdt-note-btn');
+        noteBtn.classList.toggle('d-none', !noteUrl);
+        if (noteUrl) {
+            noteBtn.href = noteUrl;
+            document.getElementById('sdt-note-label').textContent = note ? 'تعديل الملاحظة' : 'إضافة ملاحظة';
+        }
+        document.getElementById('sdt-history-btn').href = btn.dataset.historyUrl;
     });
 </script>
 {% endblock %}
