@@ -202,3 +202,32 @@ def student_history(request, pk):
         'records': records,
         'total_records': total_records,
     })
+
+
+@teacher_required
+@require_http_methods(["GET", "POST"])
+def edit_record_note(request, pk):
+    """Add or edit the teacher note on a single attendance record."""
+    try:
+        teacher = Teacher.objects.get(user=request.user)
+    except Teacher.DoesNotExist:
+        messages.error(request, 'لم يتم ربط حسابك بملف معلم')
+        return redirect('teacher_portal:dashboard')
+
+    record = get_object_or_404(
+        StudentAttendanceRecord,
+        pk=pk,
+        student__teacher_links__teacher=teacher,
+    )
+
+    if request.method == 'POST':
+        note = request.POST.get('teacher_note', '').strip()
+        record.teacher_note = note
+        record.save(update_fields=['teacher_note'])
+        messages.success(request, 'تم حفظ الملاحظة بنجاح')
+        return redirect('teacher_portal:dashboard')
+
+    return render(request, 'teacher_portal/edit_record_note.html', {
+        'record': record,
+        'student': record.student,
+    })

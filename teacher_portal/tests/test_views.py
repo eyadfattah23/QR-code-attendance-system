@@ -163,3 +163,127 @@ class StudentHistoryTeacherPortalTestCase(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.context['total_records'], 0)
         self.assertContains(response, 'لا يوجد سجل حضور')
+
+
+class EditRecordNoteTestCase(TestCase):
+    """Tests for teacher_portal:edit_record_note view."""
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.teacher_user = User.objects.create_user(
+            phone='01800000001', email='teacher_note@test.com', password='pass',
+            role=User.Role.TEACHER,
+        )
+        cls.teacher = Teacher.objects.create(
+            user=cls.teacher_user, full_name='معلم الملاحظات',
+        )
+        cls.other_teacher_user = User.objects.create_user(
+            phone='01800000002', email='other_note@test.com', password='pass',
+            role=User.Role.TEACHER,
+        )
+        cls.other_teacher = Teacher.objects.create(
+            user=cls.other_teacher_user, full_name='معلم ثانٍ',
+        )
+        cls.admin_user = User.objects.create_user(
+            phone='01800000003', email='admin_note@test.com', password='pass',
+            role=User.Role.ADMIN,
+        )
+        cls.student = Student.objects.create(
+            full_name='طالب الملاحظة', national_id='40000000000001',
+            student_code='NT001',
+        )
+        StudentTeacherLink.objects.create(
+            teacher=cls.teacher, student=cls.student, is_primary=True,
+        )
+        cls.record = StudentAttendanceRecord.objects.create(
+            student=cls.student,
+            date='2025-04-01',
+            check_in_time='2025-04-01 08:00:00',
+            assigned_teacher=cls.teacher,
+            original_teacher=cls.teacher,
+            rating=7,
+        )
+
+    def setUp(self):
+        self.client = Client()
+        self.client.login(phone='01800000001', password='pass')
+        self.url = reverse('teacher_portal:edit_record_note', args=[self.record.id])
+
+    # --- access control ---
+
+    def test_linked_teacher_can_get(self):
+        response = self.client.get(self.url)
+        self.assertEqual(response.status_code, 200)
+
+    def test_unlinked_teacher_gets_404(self):
+        self.client.logout()
+        self.client.login(phone='01800000002', password='pass')
+        response = self.client.get(self.url)
+        self.assertEqual(response.status_code, 404)
+
+    def test_unauthenticated_redirected(self):
+        self.client.logout()
+        response = self.client.get(self.url)
+        self.assertEqual(response.status_code, 302)
+        self.assertIn('/login/', response.url)
+
+    def test_admin_cannot_access(self):
+        self.client.logout()
+        self.client.login(phone='01800000003', password='pass')
+        response = self.client.get(self.url)
+        self.assertEqual(response.status_code, 302)
+
+    def test_nonexistent_record_returns_404(self):
+        url = reverse('teacher_portal:edit_record_note', args=[uuid.uuid4()])
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, 404)
+
+    # --- GET ---
+
+    def test_get_shows_form_with_current_note(self):
+        self.record.teacher_note = 'ملاحظة قديمة'
+        self.record.save(update_fields=['teacher_note'])
+        response = self.client.get(self.url)
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'ملاحظة قديمة')
+
+    def test_context_contains_record_and_student(self):
+        response = self.client.get(self.url)
+        self.assertEqual(response.context['record'], self.record)
+        self.assertEqual(response.context['student'], self.student)
+
+    # --- POST save ---
+
+    def test_post_saves_note(self):
+        response = self.client.post(self.url, {'teacher_note': 'ملاحظة جديدة'})
+        self.assertEqual(response.status_code, 302)
+        self.record.refresh_from_db()
+        self.assertEqual(self.record.teacher_note, 'ملاحظة جديدة')
+
+    def test_post_redirects_to_dashboard(self):
+        response = self.client.post(self.url, {'teacher_note': 'ملاحظة'})
+        expected = reverse('teacher_portal:dashboard')
+        self.assertRedirects(response, expected)
+
+    def test_post_clears_note_when_empty(self):
+        self.record.teacher_note = 'ملاحظة موجودة'
+        self.record.save(update_fields=['teacher_note'])
+        self.client.post(self.url, {'teacher_note': '   '})
+        self.record.refresh_from_db()
+        self.assertEqual(self.record.teacher_note, '')
+
+    def test_post_unlinked_teacher_cannot_save(self):
+        self.client.logout()
+        self.client.login(phone='01800000002', password='pass')
+        response = self.client.post(self.url, {'teacher_note': 'اختراق'})
+        self.assertEqual(response.status_code, 404)
+        self.record.refresh_from_db()
+        self.assertNotEqual(self.record.teacher_note, 'اختراق')
+
+    # --- template rendering ---
+
+    def test_note_appears_in_history_after_save(self):
+        self.client.post(self.url, {'teacher_note': 'ملاحظة مرئية'})
+        history_url = reverse('teacher_portal:student_history', args=[self.student.id])
+        response = self.client.get(history_url)
+        self.assertContains(response, 'ملاحظة مرئية')

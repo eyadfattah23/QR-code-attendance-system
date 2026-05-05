@@ -27,13 +27,13 @@
         <div class="card-body">
             <form id="attendance-form" method="post" action="{% url 'teacher_portal:scan' %}">
                 {% csrf_token %}
-                <div class="row align-items-end">
+                <div class="row align-items-end g-2">
                     <div class="col-md-9">
                         <label for="scan-input" class="form-label">
                             امسح بطاقات الطلاب (يمكنك مسح عدة بطاقات)
                         </label>
                         <textarea id="scan-input" name="scanned_codes" class="form-control form-control-lg" rows="3"
-                            placeholder="امسح البطاقات هنا... اضغط Enter للتسجيل" autofocus></textarea>
+                            placeholder="امسح البطاقات هنا... اضغط Enter للتسجيل"></textarea>
                         <small class="text-muted">
                             امسح بطاقة واحدة أو أكثر، ثم اضغط Enter أو زر التسجيل
                         </small>
@@ -73,31 +73,32 @@
                 <table class="table table-hover align-middle mb-0">
                     <thead class="table-light">
                         <tr>
-                            <th scope="col">#</th>
+                            <th scope="col" class="d-none d-md-table-cell">#</th>
                             <th scope="col">اسم الطالب</th>
-                            <th scope="col">الصف</th>
+                            <th scope="col" class="d-none d-md-table-cell">الصف</th>
                             <th scope="col">حالة الحضور</th>
-                            <th scope="col">وقت الحضور</th>
-                            <th scope="col">الصورة</th>
-                            <th scope="col">التقييم</th>
-                            <th scope="col">التحويل</th>
+                            <th scope="col" class="d-none d-md-table-cell">وقت الحضور</th>
+                            <th scope="col" class="d-none d-md-table-cell">الصورة</th>
+                            <th scope="col" class="d-none d-md-table-cell">التقييم</th>
+                            <th scope="col" class="d-none d-md-table-cell">التحويل</th>
+                            <th scope="col">ملاحظة</th>
                             <th scope="col">إجراءات</th>
                         </tr>
                     </thead>
                     <tbody>
                         {% for row in student_rows %}
                         <tr>
-                            <td>{{ forloop.counter }}</td>
+                            <td class="d-none d-md-table-cell">{{ forloop.counter }}</td>
                             <td>
                                 <div class="d-flex align-items-center">
-                                    <div class="avatar bg-primary bg-opacity-10 rounded-circle p-2 ms-2">
+                                    <div class="avatar bg-primary bg-opacity-10 rounded-circle p-2 ms-2 d-none d-md-flex">
                                         <i class="bi bi-person text-primary"></i>
                                     </div>
                                     <a href="{% url 'teacher_portal:student_history' row.student.id %}"
                                        class="text-decoration-none fw-semibold">{{ row.student.full_name }}</a>
                                 </div>
                             </td>
-                            <td>{{ row.student.grade|default:"-" }}</td>
+                            <td class="d-none d-md-table-cell">{{ row.student.grade|default:"-" }}</td>
                             <td>
                                 {% if row.is_attended %}
                                 <span class="badge bg-success">
@@ -111,14 +112,14 @@
                                 </span>
                                 {% endif %}
                             </td>
-                            <td>
+                            <td class="d-none d-md-table-cell">
                                 {% if row.attendance %}
                                 {{ row.attendance.check_in_time|time:"H:i" }}
                                 {% else %}
                                 -
                                 {% endif %}
                             </td>
-                            <td>
+                            <td class="d-none d-md-table-cell">
                                 {% if row.attendance and row.attendance.daily_photo %}
                                 <span class="badge bg-success-subtle text-success-emphasis">
                                     <i class="bi bi-image me-1"></i>
@@ -131,7 +132,7 @@
                                 </span>
                                 {% endif %}
                             </td>
-                            <td>
+                            <td class="d-none d-md-table-cell">
                                 {% if row.attendance %}
                                 <div class="d-flex align-items-center gap-1">
                                     <span class="badge bg-info-subtle text-info-emphasis">
@@ -146,13 +147,34 @@
                                 -
                                 {% endif %}
                             </td>
-                            <td>
+                            <td class="d-none d-md-table-cell">
                                 {% if row.attendance and row.attendance.is_substitute_assignment %}
                                 <span class="badge bg-warning text-dark"
                                     title="{{ row.attendance.substitute_note|default:'تحويل ليوم واحد' }}">
                                     <i class="bi bi-arrow-left-right me-1"></i>
                                     بديل
                                 </span>
+                                {% else %}
+                                <span class="text-muted">-</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if row.attendance %}
+                                {% if row.attendance.teacher_note %}
+                                <div class="d-flex align-items-start gap-2">
+                                    <span class="small text-truncate" style="max-width:140px;" title="{{ row.attendance.teacher_note }}">{{ row.attendance.teacher_note }}</span>
+                                    <a href="{% url 'teacher_portal:edit_record_note' row.attendance.id %}"
+                                       class="btn btn-outline-secondary btn-sm p-1 flex-shrink-0" title="تعديل الملاحظة">
+                                        <i class="bi bi-pencil" style="font-size:.75rem;"></i>
+                                    </a>
+                                </div>
+                                {% else %}
+                                <a href="{% url 'teacher_portal:edit_record_note' row.attendance.id %}"
+                                   class="btn btn-outline-primary btn-sm" title="إضافة ملاحظة">
+                                    <i class="bi bi-plus-lg me-1" style="font-size:.75rem;"></i>
+                                    إضافة
+                                </a>
+                                {% endif %}
                                 {% else %}
                                 <span class="text-muted">-</span>
                                 {% endif %}

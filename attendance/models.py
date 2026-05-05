@@ -57,6 +57,11 @@ class StudentAttendanceRecord(models.Model):
         default=6,
         help_text='Daily student rating from 1 to 10',
     )
+    teacher_note = models.TextField(
+        blank=True,
+        default='',
+        help_text='Teacher note for this attendance record',
+    )
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
