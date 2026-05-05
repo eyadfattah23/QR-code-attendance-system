@@ -79,7 +79,7 @@
                             <th scope="col">حالة الحضور</th>
                             <th scope="col" class="d-none d-md-table-cell">وقت الحضور</th>
                             <th scope="col" class="d-none d-md-table-cell">الصورة</th>
-                            <th scope="col" class="d-none d-md-table-cell">التقييم</th>
+                            <th scope="col">التقييم</th>
                             <th scope="col" class="d-none d-md-table-cell">التحويل</th>
                             <th scope="col">ملاحظة</th>
                             <th scope="col">إجراءات</th>
@@ -133,7 +133,7 @@
                                 </span>
                                 {% endif %}
                             </td>
-                            <td class="d-none d-md-table-cell">
+                            <td>
                                 {% if row.attendance %}
                                 <div class="d-flex align-items-center gap-1">
                                     <span class="badge bg-info-subtle text-info-emphasis">
@@ -145,7 +145,7 @@
                                     </a>
                                 </div>
                                 {% else %}
-                                -
+                                <span class="text-muted">-</span>
                                 {% endif %}
                             </td>
                             <td class="d-none d-md-table-cell">
@@ -160,52 +160,63 @@
                                 {% endif %}
                             </td>
                             <td>
-                                {% if row.attendance %}
-                                {% if row.attendance.teacher_note %}
-                                <div class="d-flex align-items-start gap-2">
-                                    <span class="small text-truncate" style="max-width:140px;"
-                                        title="{{ row.attendance.teacher_note }}">{{ row.attendance.teacher_note }}</span>
-                                    <a href="{% url 'teacher_portal:edit_record_note' row.attendance.id %}"
-                                        class="btn btn-outline-secondary btn-sm p-1 flex-shrink-0"
-                                        title="تعديل الملاحظة">
-                                        <i class="bi bi-pencil" style="font-size:.75rem;"></i>
-                                    </a>
-                                </div>
-                                {% else %}
-                                <a href="{% url 'teacher_portal:edit_record_note' row.attendance.id %}"
-                                    class="btn btn-outline-primary btn-sm" title="إضافة ملاحظة">
-                                    <i class="bi bi-plus-lg me-1" style="font-size:.75rem;"></i>
-                                    إضافة
-                                </a>
-                                {% endif %}
-                                {% else %}
-                                <span class="text-muted">-</span>
+                                {% if row.attendance and row.attendance.teacher_note %}
+                                <span class="small">{{ row.attendance.teacher_note }}</span>
                                 {% endif %}
                             </td>
                             <td>
-                                <div class="btn-group btn-group-sm">
-                                    <button class="btn btn-outline-secondary d-md-none"
-                                        data-bs-toggle="modal"
-                                        data-bs-target="#student-detail-modal"
-                                        data-name="{{ row.student.full_name }}"
-                                        data-grade="{{ row.student.grade|default:'-' }}"
-                                        data-time="{% if row.attendance %}{{ row.attendance.check_in_time|time:'H:i' }}{% else %}-{% endif %}"
-                                        data-photo="{% if row.attendance and row.attendance.daily_photo %}مرفوعة{% else %}لا توجد{% endif %}"
-                                        data-rating="{% if row.attendance %}{{ row.attendance.rating }}/10{% else %}-{% endif %}"
-                                        data-transfer="{% if row.attendance and row.attendance.is_substitute_assignment %}بديل{% else %}-{% endif %}"
-                                        data-note="{{ row.attendance.teacher_note|default:'' }}"
-                                        data-note-url="{% if row.attendance %}{% url 'teacher_portal:edit_record_note' row.attendance.id %}{% endif %}"
-                                        data-history-url="{% url 'teacher_portal:student_history' row.student.id %}"
-                                        title="تفاصيل">
-                                        <i class="bi bi-info-circle"></i>
-                                    </button>
-                                    <button class="btn btn-outline-primary" title="رفع صورة">
+                                <div class="d-flex gap-1">
+                                    <button class="btn btn-outline-primary btn-sm" title="رفع صورة">
                                         <i class="bi bi-camera"></i>
                                     </button>
+                                    <!-- Desktop: individual buttons -->
                                     <a href="{% url 'teacher_portal:student_history' row.student.id %}"
-                                        class="btn btn-outline-info" title="عرض السجل">
+                                        class="btn btn-outline-info btn-sm d-none d-md-inline-flex" title="عرض السجل">
                                         <i class="bi bi-clock-history"></i>
                                     </a>
+                                    {% if row.attendance %}
+                                    <a href="{% url 'teacher_portal:edit_record_note' row.attendance.id %}"
+                                        class="btn btn-outline-secondary btn-sm d-none d-md-inline-flex" title="{% if row.attendance.teacher_note %}تعديل الملاحظة{% else %}إضافة ملاحظة{% endif %}">
+                                        <i class="bi bi-pencil"></i>
+                                    </a>
+                                    {% endif %}
+                                    <!-- Mobile: burger dropdown -->
+                                    <div class="dropdown d-md-none">
+                                        <button class="btn btn-outline-secondary btn-sm" data-bs-toggle="dropdown" title="المزيد">
+                                            <i class="bi bi-list"></i>
+                                        </button>
+                                        <ul class="dropdown-menu dropdown-menu-end">
+                                            <li>
+                                                <a class="dropdown-item" href="{% url 'teacher_portal:student_history' row.student.id %}">
+                                                    <i class="bi bi-clock-history me-2"></i>عرض السجل
+                                                </a>
+                                            </li>
+                                            {% if row.attendance %}
+                                            <li>
+                                                <a class="dropdown-item" href="{% url 'teacher_portal:edit_record_note' row.attendance.id %}">
+                                                    <i class="bi bi-pencil me-2"></i>{% if row.attendance.teacher_note %}تعديل الملاحظة{% else %}إضافة ملاحظة{% endif %}
+                                                </a>
+                                            </li>
+                                            {% endif %}
+                                            <li><hr class="dropdown-divider"></li>
+                                            <li>
+                                                <button class="dropdown-item"
+                                                    data-bs-toggle="modal"
+                                                    data-bs-target="#student-detail-modal"
+                                                    data-name="{{ row.student.full_name }}"
+                                                    data-grade="{{ row.student.grade|default:'-' }}"
+                                                    data-time="{% if row.attendance %}{{ row.attendance.check_in_time|time:'H:i' }}{% else %}-{% endif %}"
+                                                    data-photo="{% if row.attendance and row.attendance.daily_photo %}مرفوعة{% else %}لا توجد{% endif %}"
+                                                    data-rating="{% if row.attendance %}{{ row.attendance.rating }}/10{% else %}-{% endif %}"
+                                                    data-transfer="{% if row.attendance and row.attendance.is_substitute_assignment %}بديل{% else %}-{% endif %}"
+                                                    data-note="{{ row.attendance.teacher_note|default:'' }}"
+                                                    data-note-url="{% if row.attendance %}{% url 'teacher_portal:edit_record_note' row.attendance.id %}{% endif %}"
+                                                    data-history-url="{% url 'teacher_portal:student_history' row.student.id %}">
+                                                    <i class="bi bi-info-circle me-2"></i>تفاصيل
+                                                </button>
+                                            </li>
+                                        </ul>
+                                    </div>
                                 </div>
                             </td>
                         </tr>
