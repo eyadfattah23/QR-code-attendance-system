@@ -6,7 +6,7 @@ from django.contrib.auth.decorators import login_required
 from django.core.exceptions import ValidationError
 from django.core.paginator import Paginator
 from django.db import models
-from django.db.models import Q
+from django.db.models import Avg, Q
 from django.http import HttpResponse
 from django.shortcuts import get_object_or_404, render, redirect
 from django.urls import reverse
@@ -68,8 +68,9 @@ def student_list(request):
     """Paginated student list with search and grade filter."""
     q = request.GET.get('q', '').strip()
     grade_filter = request.GET.get('grade', '').strip()
+    sort = request.GET.get('sort', '').strip()
 
-    qs = Student.objects.all()
+    qs = Student.objects.annotate(avg_rating=Avg('attendance_records__rating'))
     if q:
         qs = qs.filter(
             Q(full_name__icontains=q)
@@ -78,6 +79,11 @@ def student_list(request):
         )
     if grade_filter:
         qs = qs.filter(grade=grade_filter)
+
+    if sort == 'avg_rating_desc':
+        qs = qs.order_by(models.F('avg_rating').desc(nulls_last=True))
+    elif sort == 'avg_rating_asc':
+        qs = qs.order_by(models.F('avg_rating').asc(nulls_last=True))
 
     grades = (
         Student.objects
@@ -97,6 +103,7 @@ def student_list(request):
         'grade_filter': grade_filter,
         'grades': grades,
         'total_count': qs.count(),
+        'sort': sort,
     })
 
 
@@ -472,6 +479,7 @@ def student_history(request, pk):
         .select_related('teacher')
     )
     total_records = records.count()
+    avg_rating = records.aggregate(avg=Avg('rating'))['avg']
     oldest_record = records.last() if total_records else None
     return render(request, 'admin_portal/student_history.html', {
         'student': student,
@@ -479,6 +487,7 @@ def student_history(request, pk):
         'total_records': total_records,
         'teachers': teachers,
         'oldest_record': oldest_record,
+        'avg_rating': avg_rating,
     })
 
 

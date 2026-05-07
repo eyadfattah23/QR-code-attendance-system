@@ -56,15 +56,25 @@
                 <i class="bi bi-list-ul me-2"></i>
                 قائمة الطلاب - {% now "l، j F Y" %}
             </h5>
-            <div class="btn-group">
-                <button class="btn btn-outline-secondary btn-sm">
-                    <i class="bi bi-funnel me-1"></i>
-                    تصفية
-                </button>
-                <button class="btn btn-outline-secondary btn-sm">
-                    <i class="bi bi-download me-1"></i>
-                    تصدير
-                </button>
+            <div class="d-flex gap-2 align-items-center">
+                <form method="get" class="d-flex gap-1 align-items-center">
+                    <select name="sort" class="form-select form-select-sm" style="width:auto;"
+                        onchange="this.form.submit()" title="ترتيب">
+                        <option value="" {% if not sort %}selected{% endif %}>ترتيب افتراضي</option>
+                        <option value="avg_rating_desc" {% if sort == 'avg_rating_desc' %}selected{% endif %}>متوسط تقييم (أعلى)</option>
+                        <option value="avg_rating_asc" {% if sort == 'avg_rating_asc' %}selected{% endif %}>متوسط تقييم (أدنى)</option>
+                    </select>
+                </form>
+                <div class="btn-group">
+                    <button class="btn btn-outline-secondary btn-sm">
+                        <i class="bi bi-funnel me-1"></i>
+                        تصفية
+                    </button>
+                    <button class="btn btn-outline-secondary btn-sm">
+                        <i class="bi bi-download me-1"></i>
+                        تصدير
+                    </button>
+                </div>
             </div>
         </div>
         <div class="card-body p-0">
@@ -80,6 +90,7 @@
                             <th scope="col" class="d-none d-md-table-cell">وقت الحضور</th>
                             <th scope="col" class="d-none d-md-table-cell">الصورة</th>
                             <th scope="col">التقييم</th>
+                            <th scope="col" class="d-none d-md-table-cell">متوسط التقييم</th>
                             <th scope="col" class="d-none d-md-table-cell">التحويل</th>
                             <th scope="col">ملاحظة</th>
                             <th scope="col">إجراءات</th>
@@ -146,6 +157,18 @@
                                 </div>
                                 {% else %}
                                 <span class="text-muted">-</span>
+                                {% endif %}
+                            </td>
+                            <td class="d-none d-md-table-cell">
+                                {% if row.avg_rating %}
+                                <span class="badge
+                                    {% if row.avg_rating >= 8 %}bg-success
+                                    {% elif row.avg_rating >= 5 %}bg-warning text-dark
+                                    {% else %}bg-danger{% endif %}">
+                                    {{ row.avg_rating|floatformat:1 }}/10
+                                </span>
+                                {% else %}
+                                <span class="text-muted">—</span>
                                 {% endif %}
                             </td>
                             <td class="d-none d-md-table-cell">

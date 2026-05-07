@@ -166,6 +166,17 @@
                         <div class="small text-muted">إجمالي أيام الحضور</div>
                         <span class="badge bg-info text-white">{{ total_records }}</span>
                     </div>
+                    {% if avg_rating %}
+                    <div class="mb-2">
+                        <div class="small text-muted">متوسط التقييم</div>
+                        <span class="badge
+                            {% if avg_rating >= 8 %}bg-success
+                            {% elif avg_rating >= 5 %}bg-warning text-dark
+                            {% else %}bg-danger{% endif %}">
+                            {{ avg_rating|floatformat:1 }}/10
+                        </span>
+                    </div>
+                    {% endif %}
                 </div>
             </div>
         </div>

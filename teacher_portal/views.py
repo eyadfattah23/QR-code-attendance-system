@@ -1,6 +1,7 @@
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
+from django.db.models import Avg
 from django.utils.timezone import localdate, localtime
 from django.views.decorators.http import require_http_methods
 from functools import wraps
@@ -26,6 +27,7 @@ def teacher_required(view_func):
 def dashboard(request):
     """Teacher dashboard showing their students."""
     today = localdate()
+    sort = request.GET.get('sort', '')
 
     try:
         teacher = Teacher.objects.get(user=request.user)
@@ -42,6 +44,17 @@ def dashboard(request):
             record.student_id: record for record in today_attendance
         }
 
+        student_ids = [s.id for s in students]
+        avg_ratings = {}
+        if student_ids:
+            avg_ratings = dict(
+                StudentAttendanceRecord.objects
+                .filter(student_id__in=student_ids)
+                .values('student_id')
+                .annotate(avg=Avg('rating'))
+                .values_list('student_id', 'avg')
+            )
+
         student_rows = []
         for student in students:
             attendance = attendance_by_student_id.get(student.id)
@@ -49,7 +62,13 @@ def dashboard(request):
                 'student': student,
                 'attendance': attendance,
                 'is_attended': attendance is not None,
+                'avg_rating': avg_ratings.get(student.id),
             })
+
+        if sort == 'avg_rating_desc':
+            student_rows.sort(key=lambda r: r['avg_rating'] or 0, reverse=True)
+        elif sort == 'avg_rating_asc':
+            student_rows.sort(key=lambda r: r['avg_rating'] or 0)
     except Teacher.DoesNotExist:
         students = []
         student_rows = []
@@ -63,6 +82,7 @@ def dashboard(request):
         'total_students': len(students),
         'attended_count': attended_count,
         'today': today,
+        'sort': sort,
     }
     return render(request, 'teacher_portal/dashboard.html', context)
 
@@ -196,11 +216,13 @@ def student_history(request, pk):
         .order_by('-date', '-check_in_time')
     )
     total_records = records.count()
+    avg_rating = records.aggregate(avg=Avg('rating'))['avg']
 
     return render(request, 'teacher_portal/student_history.html', {
         'student': student,
         'records': records,
         'total_records': total_records,
+        'avg_rating': avg_rating,
     })
 
 
