@@ -252,6 +252,26 @@ class StudentListTestCase(_StudentManagementBase):
         # 1 existing + 30 bulk + 1 grade_b = 32
         self.assertEqual(response.context['total_count'], 32)
 
+    def test_filter_by_gender_male(self):
+        Student.objects.create(
+            full_name='طالب ذكر', national_id='88888888888881', gender='M')
+        Student.objects.create(
+            full_name='طالبة أنثى', national_id='88888888888882', gender='F')
+        response = self.client.get(self.url, {'gender': 'M'})
+        students = list(response.context['page_obj'])
+        self.assertTrue(all(s.gender == 'M' for s in students))
+
+    def test_filter_by_gender_female(self):
+        Student.objects.create(
+            full_name='طالبة أنثى 2', national_id='88888888888883', gender='F')
+        response = self.client.get(self.url, {'gender': 'F'})
+        students = list(response.context['page_obj'])
+        self.assertTrue(all(s.gender == 'F' for s in students))
+
+    def test_gender_filter_in_context(self):
+        response = self.client.get(self.url, {'gender': 'M'})
+        self.assertEqual(response.context['gender_filter'], 'M')
+
 
 class StudentCreateTestCase(_StudentManagementBase):
     """Tests for student_create view."""
@@ -312,6 +332,17 @@ class StudentCreateTestCase(_StudentManagementBase):
         self.client.login(phone='01234567891', password='teacherpass123')
         response = self.client.get(self.url)
         self.assertEqual(response.status_code, 302)
+
+    def test_create_student_with_gender(self):
+        self.client.post(self.url, {
+            'full_name': 'طالبة جديدة',
+            'national_id': '91111111111111',
+            'student_code': '',
+            'grade': '',
+            'gender': 'F',
+        })
+        student = Student.objects.get(national_id='91111111111111')
+        self.assertEqual(student.gender, 'F')
 
 
 class StudentEditTestCase(_StudentManagementBase):
@@ -484,6 +515,24 @@ class StudentImportTestCase(_StudentManagementBase):
         self.assertIsNone(student.phone)
         self.assertIsNone(student.parent_phone)
 
+    def test_import_saves_gender(self):
+        upload = _make_excel_upload([
+            ('full_name', 'national_id', 'gender'),
+            ('طالب ذكر مستورد', '88888888888884', 'M'),
+        ])
+        self.client.post(self.url, {'excel_file': upload})
+        student = Student.objects.get(national_id='88888888888884')
+        self.assertEqual(student.gender, 'M')
+
+    def test_import_invalid_gender_stored_as_null(self):
+        upload = _make_excel_upload([
+            ('full_name', 'national_id', 'gender'),
+            ('طالب جنس غير معروف', '88888888888885', 'X'),
+        ])
+        self.client.post(self.url, {'excel_file': upload})
+        student = Student.objects.get(national_id='88888888888885')
+        self.assertIsNone(student.gender)
+
 
 # ---------------------------------------------------------------------------
 # Teacher management tests
@@ -554,6 +603,29 @@ class TeacherListTestCase(_TeacherManagementBase):
     def test_total_count_in_context(self):
         response = self.client.get(self.url)
         self.assertEqual(response.context['total_count'], 1)
+
+    def test_filter_by_gender_male(self):
+        male_user = User.objects.create_user(
+            phone='01300000001', password='pass', role=User.Role.TEACHER)
+        Teacher.objects.create(user=male_user, full_name='معلم ذكر', gender='M')
+        female_user = User.objects.create_user(
+            phone='01300000002', password='pass', role=User.Role.TEACHER)
+        Teacher.objects.create(user=female_user, full_name='معلمة أنثى', gender='F')
+        response = self.client.get(self.url, {'gender': 'M'})
+        teachers = list(response.context['page_obj'])
+        self.assertTrue(all(t.gender == 'M' for t in teachers))
+
+    def test_filter_by_gender_female(self):
+        female_user = User.objects.create_user(
+            phone='01300000003', password='pass', role=User.Role.TEACHER)
+        Teacher.objects.create(user=female_user, full_name='معلمة أنثى 2', gender='F')
+        response = self.client.get(self.url, {'gender': 'F'})
+        teachers = list(response.context['page_obj'])
+        self.assertTrue(all(t.gender == 'F' for t in teachers))
+
+    def test_gender_filter_in_context(self):
+        response = self.client.get(self.url, {'gender': 'F'})
+        self.assertEqual(response.context['gender_filter'], 'F')
 
 
 class TeacherCreateTestCase(_TeacherManagementBase):
@@ -744,6 +816,129 @@ class TeacherDeleteTestCase(_TeacherManagementBase):
         url = reverse('admin_portal:teacher_delete', args=[self.teacher.id])
         response = self.client.get(url)
         self.assertEqual(response.status_code, 405)
+
+
+class TeacherImportTestCase(_TeacherManagementBase):
+    """Tests for teacher_import and teacher_import_template views."""
+
+    def setUp(self):
+        super().setUp()
+        self.url = reverse('admin_portal:teacher_import')
+
+    def test_import_valid_excel_creates_teacher_and_user(self):
+        upload = _make_excel_upload([
+            ('full_name', 'phone', 'password', 'subject'),
+            ('معلم مستورد', '01022222222', 'pass1234', 'علوم'),
+        ])
+        self.client.post(self.url, {'excel_file': upload})
+        self.assertTrue(User.objects.filter(phone='01022222222').exists())
+        self.assertTrue(Teacher.objects.filter(full_name='معلم مستورد').exists())
+
+    def test_import_optional_columns_populated(self):
+        upload = _make_excel_upload([
+            ('full_name', 'phone', 'password', 'subject', 'first_name', 'last_name'),
+            ('معلم كامل', '01033333333', 'pass1234', 'لغة عربية', 'يوسف', 'علي'),
+        ])
+        self.client.post(self.url, {'excel_file': upload})
+        teacher = Teacher.objects.get(full_name='معلم كامل')
+        self.assertEqual(teacher.subject, 'لغة عربية')
+        self.assertEqual(teacher.user.first_name, 'يوسف')
+
+    def test_import_without_optional_columns_still_creates(self):
+        upload = _make_excel_upload([
+            ('full_name', 'phone', 'password'),
+            ('معلم بسيط', '01044444444', 'pass1234'),
+        ])
+        self.client.post(self.url, {'excel_file': upload})
+        self.assertTrue(Teacher.objects.filter(full_name='معلم بسيط').exists())
+
+    def test_import_duplicate_phone_skipped(self):
+        before = Teacher.objects.count()
+        upload = _make_excel_upload([
+            ('full_name', 'phone', 'password'),
+            ('مكرر', '01111111111', 'pass1234'),  # phone already exists
+        ])
+        self.client.post(self.url, {'excel_file': upload})
+        self.assertEqual(Teacher.objects.count(), before)
+
+    def test_import_missing_required_headers_rejected(self):
+        upload = _make_excel_upload([
+            ('name', 'mobile'),  # wrong headers
+            ('أحد', '01055555555'),
+        ])
+        response = self.client.post(self.url, {'excel_file': upload})
+        self.assertRedirects(response, reverse('admin_portal:teacher_list'))
+        self.assertFalse(User.objects.filter(phone='01055555555').exists())
+
+    def test_import_invalid_phone_format_rejected(self):
+        upload = _make_excel_upload([
+            ('full_name', 'phone', 'password'),
+            ('هاتف خاطئ', '123', 'pass1234'),
+        ])
+        self.client.post(self.url, {'excel_file': upload})
+        self.assertFalse(Teacher.objects.filter(full_name='هاتف خاطئ').exists())
+
+    def test_import_missing_password_produces_error(self):
+        upload = _make_excel_upload([
+            ('full_name', 'phone', 'password'),
+            ('بلا كلمة مرور', '01066666666', ''),
+        ])
+        response = self.client.post(self.url, {'excel_file': upload})
+        from django.contrib.messages import get_messages
+        msgs = [str(m) for m in get_messages(response.wsgi_request)]
+        self.assertTrue(any('خطأ' in m for m in msgs))
+        self.assertFalse(Teacher.objects.filter(full_name='بلا كلمة مرور').exists())
+
+    def test_import_no_file_redirects_with_error(self):
+        response = self.client.post(self.url, {})
+        self.assertRedirects(response, reverse('admin_portal:teacher_list'))
+
+    def test_teacher_cannot_import(self):
+        self.client.logout()
+        self.client.login(phone='01111111111', password='teacherpass')
+        upload = _make_excel_upload([
+            ('full_name', 'phone', 'password'),
+            ('محظور', '01077777777', 'pass1234'),
+        ])
+        self.client.post(self.url, {'excel_file': upload})
+        self.assertFalse(User.objects.filter(phone='01077777777').exists())
+
+    def test_import_template_download(self):
+        response = self.client.get(reverse('admin_portal:teacher_import_template'))
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(
+            response['Content-Type'],
+            'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        )
+        self.assertIn('attachment', response['Content-Disposition'])
+
+    def test_import_template_contains_required_headers(self):
+        import io as _io
+        response = self.client.get(reverse('admin_portal:teacher_import_template'))
+        import openpyxl as _openpyxl
+        wb = _openpyxl.load_workbook(_io.BytesIO(response.content))
+        ws = wb.active
+        headers = [ws.cell(row=1, column=c).value for c in range(1, ws.max_column + 1)]
+        for col in ('full_name', 'phone', 'password'):
+            self.assertIn(col, headers)
+
+    def test_import_saves_gender(self):
+        upload = _make_excel_upload([
+            ('full_name', 'phone', 'password', 'gender'),
+            ('معلمة مستوردة', '01088888888', 'pass1234', 'F'),
+        ])
+        self.client.post(self.url, {'excel_file': upload})
+        teacher = Teacher.objects.get(full_name='معلمة مستوردة')
+        self.assertEqual(teacher.gender, 'F')
+
+    def test_import_invalid_gender_stored_as_null(self):
+        upload = _make_excel_upload([
+            ('full_name', 'phone', 'password', 'gender'),
+            ('معلم جنس غير معروف', '01099999998', 'pass1234', 'X'),
+        ])
+        self.client.post(self.url, {'excel_file': upload})
+        teacher = Teacher.objects.get(full_name='معلم جنس غير معروف')
+        self.assertIsNone(teacher.gender)
 
 
 # ---------------------------------------------------------------------------

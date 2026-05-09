@@ -11,27 +11,41 @@
             <i class="bi bi-person-badge-fill me-2"></i>
             إدارة المعلمين
         </h1>
-        <a href="{% url 'admin_portal:teacher_create' %}" class="btn btn-primary">
-            <i class="bi bi-person-plus me-1"></i>
-            إضافة معلم
-        </a>
+        <div class="d-flex gap-2">
+            <button type="button" class="btn btn-outline-success" data-bs-toggle="modal" data-bs-target="#importModal">
+                <i class="bi bi-file-earmark-excel me-1"></i>
+                استيراد Excel
+            </button>
+            <a href="{% url 'admin_portal:teacher_create' %}" class="btn btn-primary">
+                <i class="bi bi-person-plus me-1"></i>
+                إضافة معلم
+            </a>
+        </div>
     </div>
 
     <!-- Search bar -->
     <div class="card border-0 shadow-sm mb-4">
         <div class="card-body py-3">
             <form method="get" class="row g-2 align-items-end">
-                <div class="col-md-6">
+                <div class="col-md-4">
                     <label class="form-label mb-1 small fw-semibold">بحث</label>
                     <input type="text" name="q" value="{{ q }}" class="form-control"
                         placeholder="الاسم، المجموعة، رقم الهاتف…">
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label mb-1 small fw-semibold">الجنس</label>
+                    <select name="gender" class="form-select">
+                        <option value="">— الكل —</option>
+                        <option value="M" {% if gender_filter == 'M' %}selected{% endif %}>ذكر</option>
+                        <option value="F" {% if gender_filter == 'F' %}selected{% endif %}>أنثى</option>
+                    </select>
                 </div>
                 <div class="col-md-2">
                     <button type="submit" class="btn btn-outline-primary w-100">
                         <i class="bi bi-search me-1"></i>بحث
                     </button>
                 </div>
-                {% if q %}
+                {% if q or gender_filter %}
                 <div class="col-md-2">
                     <a href="{% url 'admin_portal:teacher_list' %}" class="btn btn-outline-secondary w-100">
                         <i class="bi bi-x-lg me-1"></i>مسح
@@ -48,7 +62,7 @@
             <span class="fw-semibold">
                 <i class="bi bi-person-badge me-1 text-success"></i>
                 {{ total_count }} معلم
-                {% if q %}
+                {% if q or gender_filter %}
                 <small class="text-muted fw-normal ms-1">(نتائج مصفاة)</small>
                 {% endif %}
             </span>
@@ -63,6 +77,7 @@
                             <th>الاسم الكامل</th>
                             <th>رقم الهاتف</th>
                             <th>المجموعة</th>
+                            <th>الجنس</th>
                             <th>عدد الطلاب</th>
                             <th style="width:8rem">إجراءات</th>
                         </tr>
@@ -76,6 +91,11 @@
                             <td>
                                 {% if teacher.subject %}
                                 <span class="badge bg-light text-dark border">{{ teacher.subject }}</span>
+                                {% else %}—{% endif %}
+                            </td>
+                            <td>
+                                {% if teacher.gender == 'M' %}ذكر
+                                {% elif teacher.gender == 'F' %}أنثى
                                 {% else %}—{% endif %}
                             </td>
                             <td>
@@ -197,6 +217,44 @@
                     </button>
                 </form>
             </div>
+        </div>
+    </div>
+</div>
+
+<!-- Import Excel Modal -->
+<div class="modal fade" id="importModal" tabindex="-1" aria-labelledby="importModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="importModalLabel">
+                    <i class="bi bi-file-earmark-excel me-2 text-success"></i>
+                    استيراد معلمين من Excel
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form method="post" action="{% url 'admin_portal:teacher_import' %}" enctype="multipart/form-data">
+                {% csrf_token %}
+                <div class="modal-body">
+                    <p class="text-muted small mb-3">
+                        أعمدة <strong>مطلوبة</strong>: <code>full_name</code>، <code>phone</code>، <code>password</code><br>
+                        أعمدة <strong>اختيارية</strong>: <code>subject</code>، <code>first_name</code>، <code>last_name</code>
+                    </p>
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold">ملف Excel (.xlsx)</label>
+                        <input type="file" name="excel_file" class="form-control" accept=".xlsx,.xlsm,.xltx,.xltm"
+                            required>
+                    </div>
+                    <a href="{% url 'admin_portal:teacher_import_template' %}" class="text-decoration-none small">
+                        <i class="bi bi-download me-1"></i>تحميل قالب Excel
+                    </a>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">إلغاء</button>
+                    <button type="submit" class="btn btn-success">
+                        <i class="bi bi-upload me-1"></i>استيراد
+                    </button>
+                </div>
+            </form>
         </div>
     </div>
 </div>

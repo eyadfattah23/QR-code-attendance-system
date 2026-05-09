@@ -42,6 +42,14 @@
                     </select>
                 </div>
                 <div class="col-md-2">
+                    <label class="form-label mb-1 small fw-semibold">الجنس</label>
+                    <select name="gender" class="form-select">
+                        <option value="">— الكل —</option>
+                        <option value="M" {% if gender_filter == 'M' %}selected{% endif %}>ذكر</option>
+                        <option value="F" {% if gender_filter == 'F' %}selected{% endif %}>أنثى</option>
+                    </select>
+                </div>
+                <div class="col-md-2">
                     <label class="form-label mb-1 small fw-semibold">ترتيب</label>
                     <select name="sort" class="form-select">
                         <option value="" {% if not sort %}selected{% endif %}>— افتراضي —</option>
@@ -54,7 +62,7 @@
                         <i class="bi bi-search me-1"></i>بحث
                     </button>
                 </div>
-                {% if q or grade_filter or sort %}
+                {% if q or grade_filter or gender_filter or sort %}
                 <div class="col-md-2">
                     <a href="{% url 'admin_portal:student_list' %}" class="btn btn-outline-secondary w-100">
                         <i class="bi bi-x-lg me-1"></i>مسح
@@ -71,7 +79,7 @@
             <span class="fw-semibold">
                 <i class="bi bi-people me-1 text-primary"></i>
                 {{ total_count }} طالب
-                {% if q or grade_filter %}
+                {% if q or grade_filter or gender_filter %}
                 <small class="text-muted fw-normal ms-1">(نتائج مصفاة)</small>
                 {% endif %}
             </span>
@@ -87,6 +95,7 @@
                             <th>الرقم القومي</th>
                             <th>كود الطالب</th>
                             <th>الصف</th>
+                            <th>الجنس</th>
                             <th>هاتف الطالب</th>
                             <th>هاتف ولي الأمر</th>
                             <th>متوسط التقييم</th>
@@ -103,6 +112,11 @@
                             <td>
                                 {% if student.grade %}
                                 <span class="badge bg-light text-dark border">{{ student.grade }}</span>
+                                {% else %}—{% endif %}
+                            </td>
+                            <td>
+                                {% if student.gender == 'M' %}ذكر
+                                {% elif student.gender == 'F' %}أنثى
                                 {% else %}—{% endif %}
                             </td>
                             <td class="font-monospace small">{{ student.phone|default:"—" }}</td>

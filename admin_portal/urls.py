@@ -33,6 +33,9 @@ urlpatterns = [
     # Teacher management
     path('teachers/', views.teacher_list, name='teacher_list'),
     path('teachers/create/', views.teacher_create, name='teacher_create'),
+    path('teachers/import/template/', views.teacher_import_template,
+         name='teacher_import_template'),
+    path('teachers/import/', views.teacher_import, name='teacher_import'),
     path('teachers/<uuid:pk>/edit/', views.teacher_edit, name='teacher_edit'),
     path('teachers/<uuid:pk>/delete/',
          views.teacher_delete, name='teacher_delete'),

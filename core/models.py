@@ -159,6 +159,18 @@ class Student(models.Model):
         help_text="Grade or class (e.g., 'Grade 5', 'Year 2')"
     )
 
+    class Gender(models.TextChoices):
+        MALE = 'M', 'ذكر'
+        FEMALE = 'F', 'أنثى'
+
+    gender = models.CharField(
+        max_length=1,
+        choices=Gender.choices,
+        blank=True,
+        null=True,
+        help_text="Student gender",
+    )
+
     _egyptian_phone_validator = RegexValidator(
         regex=r'^01\d{9}$',
         message="رقم الهاتف يجب أن يتكون من 11 رقماً ويبدأ بـ 01",
@@ -228,6 +240,19 @@ class Teacher(models.Model):
         null=True,
         help_text="Primary subject taught"
     )
+
+    class Gender(models.TextChoices):
+        MALE = 'M', 'ذكر'
+        FEMALE = 'F', 'أنثى'
+
+    gender = models.CharField(
+        max_length=1,
+        choices=Gender.choices,
+        blank=True,
+        null=True,
+        help_text="Teacher gender",
+    )
+
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 

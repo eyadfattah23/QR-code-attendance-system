@@ -68,6 +68,7 @@ def student_list(request):
     """Paginated student list with search and grade filter."""
     q = request.GET.get('q', '').strip()
     grade_filter = request.GET.get('grade', '').strip()
+    gender_filter = request.GET.get('gender', '').strip()
     sort = request.GET.get('sort', '').strip()
 
     qs = Student.objects.annotate(avg_rating=Avg('attendance_records__rating'))
@@ -79,6 +80,8 @@ def student_list(request):
         )
     if grade_filter:
         qs = qs.filter(grade=grade_filter)
+    if gender_filter:
+        qs = qs.filter(gender=gender_filter)
 
     if sort == 'avg_rating_desc':
         qs = qs.order_by(models.F('avg_rating').desc(nulls_last=True))
@@ -101,6 +104,7 @@ def student_list(request):
         'page_obj': page_obj,
         'q': q,
         'grade_filter': grade_filter,
+        'gender_filter': gender_filter,
         'grades': grades,
         'total_count': qs.count(),
         'sort': sort,
@@ -228,6 +232,11 @@ def student_import(request):
         grade = _cell('grade') or None
         phone = _cell('phone') or None
         parent_phone = _cell('parent_phone') or None
+        gender_val = _cell('gender') or None
+        if gender_val and gender_val.upper() in ('M', 'F'):
+            gender_val = gender_val.upper()
+        else:
+            gender_val = None
 
         try:
             Student.objects.create(
@@ -237,6 +246,7 @@ def student_import(request):
                 grade=grade,
                 phone=phone,
                 parent_phone=parent_phone,
+                gender=gender_val,
             )
             created += 1
         except Exception as exc:
@@ -261,14 +271,154 @@ def student_import(request):
 
 
 @admin_required
+@require_http_methods(['POST'])
+def teacher_import(request):
+    """Bulk-import teachers from an uploaded Excel file."""
+    from django.db import transaction
+
+    excel_file = request.FILES.get('excel_file')
+    if not excel_file:
+        messages.error(request, 'الرجاء اختيار ملف Excel')
+        return redirect('admin_portal:teacher_list')
+
+    if not excel_file.name.lower().endswith(('.xlsx', '.xlsm', '.xltx', '.xltm')):
+        messages.error(request, 'الملف يجب أن يكون بصيغة Excel (.xlsx)')
+        return redirect('admin_portal:teacher_list')
+
+    try:
+        wb = openpyxl.load_workbook(excel_file, read_only=True, data_only=True)
+        ws = wb.active
+        rows = list(ws.iter_rows(values_only=True))
+    except Exception:
+        messages.error(request, 'تعذّر قراءة الملف. تأكد أنه ملف Excel صالح.')
+        return redirect('admin_portal:teacher_list')
+
+    if len(rows) < 2:
+        messages.warning(request, 'الملف لا يحتوي على بيانات')
+        return redirect('admin_portal:teacher_list')
+
+    headers = [str(h).strip().lower() if h is not None else '' for h in rows[0]]
+    required = {'full_name', 'phone', 'password'}
+    if not required.issubset(set(headers)):
+        missing = required - set(headers)
+        messages.error(
+            request,
+            f'يجب أن يحتوي الملف على الأعمدة: {", ".join(missing)}')
+        return redirect('admin_portal:teacher_list')
+
+    col = {h: i for i, h in enumerate(headers) if h}
+
+    created = skipped = 0
+    error_msgs = []
+
+    for row_num, row in enumerate(rows[1:], start=2):
+        def _cell(name, _row=row):
+            idx = col.get(name)
+            if idx is None or idx >= len(_row):
+                return ''
+            return str(_row[idx] or '').strip()
+
+        full_name = _cell('full_name')
+        phone = _cell('phone')
+        password = _cell('password')
+
+        if not full_name and not phone:
+            continue  # blank row
+
+        if not full_name:
+            error_msgs.append(f'الصف {row_num}: الاسم الكامل مطلوب')
+            continue
+        if not phone:
+            error_msgs.append(f'الصف {row_num}: رقم الهاتف مطلوب')
+            continue
+        if not password:
+            error_msgs.append(f'الصف {row_num}: كلمة المرور مطلوبة')
+            continue
+
+        import re as _re
+        if not _re.match(r'^0\d{10}$', phone):
+            error_msgs.append(f'الصف {row_num}: رقم الهاتف غير صالح ({phone})')
+            continue
+
+        if User.objects.filter(phone=phone).exists():
+            skipped += 1
+            continue
+
+        subject = _cell('subject') or None
+        first_name = _cell('first_name') or ''
+        last_name = _cell('last_name') or ''
+        gender_val = _cell('gender') or None
+        if gender_val and gender_val.upper() in ('M', 'F'):
+            gender_val = gender_val.upper()
+        else:
+            gender_val = None
+
+        try:
+            with transaction.atomic():
+                user = User.objects.create_user(
+                    phone=phone,
+                    password=password,
+                    role=User.Role.TEACHER,
+                    first_name=first_name,
+                    last_name=last_name,
+                )
+                Teacher.objects.create(
+                    user=user,
+                    full_name=full_name,
+                    subject=subject,
+                    gender=gender_val,
+                )
+            created += 1
+        except Exception as exc:
+            error_msgs.append(f'الصف {row_num}: {exc}')
+
+    if created:
+        messages.success(request, f'تمت إضافة {created} معلم بنجاح')
+    if skipped:
+        messages.warning(
+            request, f'تم تخطي {skipped} سجل مكرر (رقم الهاتف مستخدم مسبقاً)')
+    if error_msgs:
+        preview = ' | '.join(error_msgs[:5])
+        if len(error_msgs) > 5:
+            preview += f' ... (+{len(error_msgs) - 5} أخطاء أخرى)'
+        messages.error(request, f'{len(error_msgs)} خطأ أثناء الاستيراد: {preview}')
+    if not created and not skipped and not error_msgs:
+        messages.info(request, 'لم يتم العثور على بيانات جديدة للاستيراد')
+
+    return redirect('admin_portal:teacher_list')
+
+
+@admin_required
+@require_http_methods(['GET'])
+def teacher_import_template(request):
+    """Return a blank Excel template for bulk teacher import."""
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws.title = 'Teachers'
+    ws.append(['full_name', 'phone', 'password', 'subject', 'first_name', 'last_name', 'gender'])
+    ws.append(['أحمد محمد', '01012345678', 'password123', 'رياضيات', 'أحمد', 'محمد', 'M'])
+
+    buf = io.BytesIO()
+    wb.save(buf)
+    buf.seek(0)
+
+    response = HttpResponse(
+        buf.read(),
+        content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    )
+    response['Content-Disposition'] = 'attachment; filename="teachers_import_template.xlsx"'
+    return response
+
+
+@admin_required
 @require_http_methods(['GET'])
 def student_import_template(request):
     """Return a blank Excel template for bulk student import."""
     wb = openpyxl.Workbook()
     ws = wb.active
     ws.title = 'Students'
-    ws.append(['full_name', 'national_id', 'student_code', 'grade'])
-    ws.append(['أحمد محمد علي', '12345678901234', 'STU001', 'السنة الأولى'])
+    ws.append(['full_name', 'national_id', 'student_code', 'grade', 'phone', 'parent_phone', 'gender'])
+    ws.append(['أحمد محمد علي', '12345678901234', 'STU001', 'السنة الأولى', '', '', 'M'])
 
     buf = io.BytesIO()
     wb.save(buf)
@@ -290,6 +440,7 @@ def student_import_template(request):
 def teacher_list(request):
     """Paginated teacher list with name / phone / subject search."""
     q = request.GET.get('q', '').strip()
+    gender_filter = request.GET.get('gender', '').strip()
 
     qs = Teacher.objects.select_related('user').all()
     if q:
@@ -298,6 +449,8 @@ def teacher_list(request):
             | Q(subject__icontains=q)
             | Q(user__phone__icontains=q)
         )
+    if gender_filter:
+        qs = qs.filter(gender=gender_filter)
 
     paginator = Paginator(qs, 25)
     page_obj = paginator.get_page(request.GET.get('page'))
@@ -305,6 +458,7 @@ def teacher_list(request):
     return render(request, 'admin_portal/teachers.html', {
         'page_obj': page_obj,
         'q': q,
+        'gender_filter': gender_filter,
         'total_count': qs.count(),
     })
 

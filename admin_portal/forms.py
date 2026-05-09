@@ -5,16 +5,23 @@ from django.db import transaction
 
 from core.models import Student, Teacher, User
 
+GENDER_CHOICES = [
+    ('', '— الكل —'),
+    ('M', 'ذكر'),
+    ('F', 'أنثى'),
+]
+
 
 class StudentForm(forms.ModelForm):
     class Meta:
         model = Student
-        fields = ['full_name', 'national_id', 'student_code', 'grade', 'phone', 'parent_phone']
+        fields = ['full_name', 'national_id', 'student_code', 'grade', 'gender', 'phone', 'parent_phone']
         labels = {
             'full_name': 'الاسم الكامل',
             'national_id': 'الرقم القومي / رقم التسجيل',
             'student_code': 'كود الطالب',
             'grade': 'الصف / المستوى',
+            'gender': 'الجنس',
             'phone': 'هاتف الطالب',
             'parent_phone': 'هاتف ولي الأمر',
         }
@@ -29,6 +36,7 @@ class StudentForm(forms.ModelForm):
             'national_id': forms.TextInput(attrs={'class': 'form-control'}),
             'student_code': forms.TextInput(attrs={'class': 'form-control'}),
             'grade': forms.TextInput(attrs={'class': 'form-control'}),
+            'gender': forms.Select(attrs={'class': 'form-select'}),
             'phone': forms.TextInput(attrs={'class': 'form-control', 'dir': 'ltr', 'placeholder': '01XXXXXXXXX'}),
             'parent_phone': forms.TextInput(attrs={'class': 'form-control', 'dir': 'ltr', 'placeholder': '01XXXXXXXXX'}),
         }
@@ -50,6 +58,12 @@ class TeacherForm(forms.Form):
         label='المجموعة',
         widget=forms.TextInput(attrs={'class': 'form-control'}),
         help_text='اختياري',
+    )
+    gender = forms.ChoiceField(
+        choices=[('', '— غير محدد —'), ('M', 'ذكر'), ('F', 'أنثى')],
+        required=False,
+        label='الجنس',
+        widget=forms.Select(attrs={'class': 'form-select'}),
     )
 
     # --- User account ---
@@ -84,6 +98,8 @@ class TeacherForm(forms.Form):
         if instance is None:
             self.fields['password'].required = True
             self.fields['password'].help_text = ''
+        else:
+            self.fields['gender'].initial = instance.gender or ''
 
     def clean_phone(self):
         phone = self.cleaned_data['phone']
@@ -112,6 +128,7 @@ class TeacherForm(forms.Form):
                 user=user,
                 full_name=data['full_name'],
                 subject=data.get('subject') or None,
+                gender=data.get('gender') or None,
             )
         else:
             user = self.instance.user
@@ -124,6 +141,7 @@ class TeacherForm(forms.Form):
 
             self.instance.full_name = data['full_name']
             self.instance.subject = data.get('subject') or None
+            self.instance.gender = data.get('gender') or None
             self.instance.save()
             teacher = self.instance
         return teacher
