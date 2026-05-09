@@ -1,0 +1,316 @@
+{% extends 'base.html' %}
+
+{% block title %}رفع صورة - {{ student.full_name }}{% endblock %}
+
+{% block content %}
+<div class="container" style="max-width: 600px;">
+
+    <!-- Back button -->
+    <div class="mb-3">
+        <a href="{% url 'teacher_portal:dashboard' %}" class="btn btn-outline-secondary btn-sm">
+            <i class="bi bi-arrow-right me-1"></i>
+            العودة للوحة التحكم
+        </a>
+    </div>
+
+    <!-- Page header -->
+    <div class="card border-0 shadow-sm mb-4">
+        <div class="card-header bg-primary text-white">
+            <h5 class="mb-0">
+                <i class="bi bi-camera me-2"></i>
+                رفع صورة الدفتر
+            </h5>
+        </div>
+        <div class="card-body">
+            <dl class="row g-1 mb-0 small">
+                <dt class="col-4 text-muted">الطالب</dt>
+                <dd class="col-8 fw-semibold mb-0">{{ student.full_name }}</dd>
+                <dt class="col-4 text-muted">التاريخ</dt>
+                <dd class="col-8 mb-0">{{ record.date }}</dd>
+                <dt class="col-4 text-muted">وقت الحضور</dt>
+                <dd class="col-8 mb-0 font-monospace">{{ record.check_in_time|time:"H:i" }}</dd>
+            </dl>
+        </div>
+    </div>
+
+    <!-- Existing photo warning -->
+    {% if record.daily_photo %}
+    <div class="alert alert-warning d-flex align-items-center gap-2 mb-4">
+        <i class="bi bi-exclamation-triangle-fill fs-5"></i>
+        <div>
+            <strong>توجد صورة مرفوعة بالفعل.</strong>
+            سيتم استبدالها عند رفع صورة جديدة.
+        </div>
+    </div>
+    <div class="mb-4 text-center">
+        <img src="{{ record.daily_photo.url }}" alt="الصورة الحالية"
+            class="img-fluid rounded shadow-sm border" style="max-height: 260px; object-fit: contain;">
+        <p class="text-muted small mt-2">الصورة الحالية</p>
+    </div>
+    {% endif %}
+
+    <!-- Upload form -->
+    <div class="card border-0 shadow-sm">
+        <div class="card-body">
+            <form id="upload-form" method="post" enctype="multipart/form-data" novalidate>
+                {% csrf_token %}
+                <input type="hidden" name="photo" id="hidden-photo-input">
+
+                <!-- File picker (mobile: camera first, desktop: gallery) -->
+                <div class="mb-3">
+                    <label class="form-label fw-semibold">اختر صورة الدفتر</label>
+
+                    <!-- Mobile camera capture -->
+                    <div class="d-grid gap-2 mb-2">
+                        <button type="button" id="btn-camera" class="btn btn-primary btn-lg">
+                            <i class="bi bi-camera me-2"></i>
+                            التقاط صورة (كاميرا)
+                        </button>
+                        <button type="button" id="btn-gallery" class="btn btn-outline-secondary">
+                            <i class="bi bi-folder2-open me-2"></i>
+                            اختيار من الملفات
+                        </button>
+                    </div>
+
+                    <!-- Hidden real file inputs -->
+                    <input type="file" id="file-camera" accept="image/*" capture="environment" class="d-none">
+                    <input type="file" id="file-gallery" accept="image/jpeg,image/png,image/webp" class="d-none">
+                </div>
+
+                <!-- Preview area -->
+                <div id="preview-area" class="d-none mb-3">
+                    <div class="text-center">
+                        <img id="preview-img" src="" alt="معاينة"
+                            class="img-fluid rounded border shadow-sm" style="max-height: 300px; object-fit: contain;">
+                    </div>
+                    <div class="mt-2 d-flex justify-content-between align-items-center small text-muted">
+                        <span id="file-info"></span>
+                        <button type="button" id="btn-clear" class="btn btn-link btn-sm text-danger p-0">
+                            <i class="bi bi-x-circle me-1"></i>إلغاء
+                        </button>
+                    </div>
+                    <!-- Compression progress -->
+                    <div id="compress-progress" class="d-none mt-2">
+                        <div class="d-flex align-items-center gap-2 text-muted small">
+                            <div class="spinner-border spinner-border-sm" role="status"></div>
+                            جارٍ ضغط الصورة...
+                        </div>
+                    </div>
+                    <div id="compress-result" class="d-none mt-2 small"></div>
+                </div>
+
+                <!-- Submit -->
+                <div class="d-grid">
+                    <button type="submit" id="btn-submit" class="btn btn-success btn-lg" disabled>
+                        <i class="bi bi-cloud-upload me-2"></i>
+                        رفع الصورة
+                    </button>
+                </div>
+
+                {% if record.daily_photo %}
+                <div class="mt-2 text-center">
+                    <small class="text-muted">أو
+                        <a href="{% url 'teacher_portal:dashboard' %}" class="text-decoration-none">العودة بدون تغيير</a>
+                    </small>
+                </div>
+                {% endif %}
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+(function () {
+    'use strict';
+
+    const MAX_DIM = 1920;          // max pixel dimension (width or height)
+    const JPEG_QUALITY = 0.85;     // high quality preserves text sharpness
+    const FALLBACK_QUALITY = 0.70; // fallback if still > 1 MB at 0.85
+    const MAX_BYTES = 1024 * 1024; // 1 MB client-side target
+
+    const btnCamera  = document.getElementById('btn-camera');
+    const btnGallery = document.getElementById('btn-gallery');
+    const fileCamera = document.getElementById('file-camera');
+    const fileGallery = document.getElementById('file-gallery');
+    const previewArea = document.getElementById('preview-area');
+    const previewImg  = document.getElementById('preview-img');
+    const fileInfo    = document.getElementById('file-info');
+    const btnClear    = document.getElementById('btn-clear');
+    const btnSubmit   = document.getElementById('btn-submit');
+    const compressProgress = document.getElementById('compress-progress');
+    const compressResult   = document.getElementById('compress-result');
+    const hiddenInput = document.getElementById('hidden-photo-input');
+    const form = document.getElementById('upload-form');
+
+    let compressedBlob = null;
+
+    btnCamera.addEventListener('click', () => fileCamera.click());
+    btnGallery.addEventListener('click', () => fileGallery.click());
+
+    fileCamera.addEventListener('change', e => handleFile(e.target.files[0]));
+    fileGallery.addEventListener('change', e => handleFile(e.target.files[0]));
+
+    btnClear.addEventListener('click', resetState);
+
+    function handleFile(file) {
+        if (!file) return;
+        resetState(false);
+
+        // Show preview immediately from raw file
+        const rawUrl = URL.createObjectURL(file);
+        previewImg.src = rawUrl;
+        previewArea.classList.remove('d-none');
+        compressProgress.classList.remove('d-none');
+        compressResult.classList.add('d-none');
+        btnSubmit.disabled = true;
+        compressedBlob = null;
+
+        compressForNotebook(file, JPEG_QUALITY, function (blob) {
+            // If still over limit, try lower quality
+            if (blob.size > MAX_BYTES) {
+                compressForNotebook(file, FALLBACK_QUALITY, function (blob2) {
+                    finaliseCompression(file, blob2, rawUrl);
+                });
+            } else {
+                finaliseCompression(file, blob, rawUrl);
+            }
+        });
+    }
+
+    /**
+     * Compress an image for notebook/handwritten-text use.
+     * - Resize to MAX_DIM on longest side
+     * - Convert to grayscale (reduces size, keeps text crisp)
+     * - Boost contrast slightly to improve legibility
+     * - Output as JPEG at given quality
+     */
+    function compressForNotebook(file, quality, callback) {
+        const img = new Image();
+        const objUrl = URL.createObjectURL(file);
+
+        img.onload = function () {
+            let w = img.naturalWidth;
+            let h = img.naturalHeight;
+
+            // Scale down if larger than MAX_DIM
+            if (w > MAX_DIM || h > MAX_DIM) {
+                if (w >= h) {
+                    h = Math.round(h * MAX_DIM / w);
+                    w = MAX_DIM;
+                } else {
+                    w = Math.round(w * MAX_DIM / h);
+                    h = MAX_DIM;
+                }
+            }
+
+            const canvas = document.createElement('canvas');
+            canvas.width  = w;
+            canvas.height = h;
+            const ctx = canvas.getContext('2d');
+
+            // Grayscale + contrast boost — ideal for notebook text readability
+            ctx.filter = 'grayscale(100%) contrast(1.25)';
+            ctx.drawImage(img, 0, 0, w, h);
+
+            URL.revokeObjectURL(objUrl);
+
+            canvas.toBlob(callback, 'image/jpeg', quality);
+        };
+
+        img.onerror = function () {
+            URL.revokeObjectURL(objUrl);
+            compressProgress.classList.add('d-none');
+            showError('تعذّر قراءة الصورة. الرجاء اختيار ملف صالح.');
+        };
+
+        img.src = objUrl;
+    }
+
+    function finaliseCompression(originalFile, blob, rawPreviewUrl) {
+        compressedBlob = blob;
+        compressProgress.classList.add('d-none');
+
+        // Update preview to show compressed (grayscale) version
+        URL.revokeObjectURL(rawPreviewUrl);
+        previewImg.src = URL.createObjectURL(blob);
+
+        const origKB = (originalFile.size / 1024).toFixed(0);
+        const compKB = (blob.size / 1024).toFixed(0);
+        const saved  = Math.round((1 - blob.size / originalFile.size) * 100);
+
+        compressResult.classList.remove('d-none');
+
+        if (blob.size > MAX_BYTES) {
+            compressResult.innerHTML =
+                '<span class="text-warning"><i class="bi bi-exclamation-triangle me-1"></i>' +
+                'الصورة ' + compKB + ' KB — أكبر من المثالي لكن ستُرفع على أي حال.</span>';
+        } else {
+            compressResult.innerHTML =
+                '<span class="text-success"><i class="bi bi-check-circle me-1"></i>' +
+                'تم الضغط: ' + origKB + ' KB → ' + compKB + ' KB (وُفِّر ' + saved + '%)</span>';
+        }
+
+        fileInfo.textContent = originalFile.name;
+        btnSubmit.disabled = false;
+    }
+
+    function showError(msg) {
+        compressResult.classList.remove('d-none');
+        compressResult.innerHTML = '<span class="text-danger"><i class="bi bi-x-circle me-1"></i>' + msg + '</span>';
+    }
+
+    function resetState(hidePreview = true) {
+        compressedBlob = null;
+        btnSubmit.disabled = true;
+        fileCamera.value  = '';
+        fileGallery.value = '';
+        compressProgress.classList.add('d-none');
+        compressResult.classList.add('d-none');
+        fileInfo.textContent = '';
+        if (hidePreview) {
+            previewArea.classList.add('d-none');
+            previewImg.src = '';
+        }
+    }
+
+    // Intercept form submission — inject compressed blob as the actual file
+    form.addEventListener('submit', function (e) {
+        e.preventDefault();
+
+        {% if record.daily_photo %}
+        if (!confirm('سيتم استبدال الصورة الحالية. هل أنت متأكد؟')) {
+            return;
+        }
+        {% endif %}
+
+        if (!compressedBlob) {
+            showError('الرجاء اختيار صورة أولاً.');
+            return;
+        }
+
+        btnSubmit.disabled = true;
+        btnSubmit.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>جارٍ الرفع...';
+
+        // Build a real FormData with the compressed blob
+        const fd = new FormData(form);
+        fd.delete('photo');  // remove the hidden placeholder
+        fd.append('photo', compressedBlob, 'notebook.jpg');
+
+        fetch(form.action || window.location.href, {
+            method: 'POST',
+            body: fd,
+            headers: { 'X-Requested-With': 'XMLHttpRequest' },
+        }).then(function (resp) {
+            // Django will redirect — follow the redirect URL
+            window.location.href = resp.url;
+        }).catch(function () {
+            btnSubmit.disabled = false;
+            btnSubmit.innerHTML = '<i class="bi bi-cloud-upload me-2"></i>رفع الصورة';
+            showError('حدث خطأ أثناء الرفع. الرجاء المحاولة مجدداً.');
+        });
+    });
+})();
+</script>
+{% endblock %}

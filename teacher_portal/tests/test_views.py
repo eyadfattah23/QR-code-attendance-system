@@ -287,3 +287,273 @@ class EditRecordNoteTestCase(TestCase):
         history_url = reverse('teacher_portal:student_history', args=[self.student.id])
         response = self.client.get(history_url)
         self.assertContains(response, 'ملاحظة مرئية')
+
+
+class UploadPhotoTestCase(TestCase):
+    """Tests for teacher_portal:upload_photo view."""
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.teacher_user = User.objects.create_user(
+            phone='01900000001', email='teacher_photo@test.com', password='pass',
+            role=User.Role.TEACHER,
+        )
+        cls.teacher = Teacher.objects.create(
+            user=cls.teacher_user, full_name='معلم الصور',
+        )
+        cls.other_teacher_user = User.objects.create_user(
+            phone='01900000002', email='other_photo@test.com', password='pass',
+            role=User.Role.TEACHER,
+        )
+        cls.other_teacher = Teacher.objects.create(
+            user=cls.other_teacher_user, full_name='معلم آخر',
+        )
+        cls.admin_user = User.objects.create_user(
+            phone='01900000003', email='admin_photo@test.com', password='pass',
+            role=User.Role.ADMIN,
+        )
+        cls.student = Student.objects.create(
+            full_name='طالب الصورة', national_id='50000000000001',
+            student_code='PH001',
+        )
+        StudentTeacherLink.objects.create(
+            teacher=cls.teacher, student=cls.student, is_primary=True,
+        )
+        cls.record = StudentAttendanceRecord.objects.create(
+            student=cls.student,
+            date='2025-05-01',
+            check_in_time='2025-05-01 08:00:00',
+            assigned_teacher=cls.teacher,
+            original_teacher=cls.teacher,
+            rating=8,
+        )
+
+    def setUp(self):
+        self.client = Client()
+        self.client.login(phone='01900000001', password='pass')
+        self.url = reverse('teacher_portal:upload_photo', args=[self.record.id])
+
+    def _make_jpeg(self, name='test.jpg'):
+        """Return a minimal valid JPEG as SimpleUploadedFile."""
+        from django.core.files.uploadedfile import SimpleUploadedFile
+        # Smallest possible valid JPEG (1×1 white pixel)
+        jpeg_bytes = (
+            b'\xff\xd8\xff\xe0\x00\x10JFIF\x00\x01\x01\x00\x00\x01\x00\x01\x00\x00'
+            b'\xff\xdb\x00C\x00\x08\x06\x06\x07\x06\x05\x08\x07\x07\x07\t\t'
+            b'\x08\n\x0c\x14\r\x0c\x0b\x0b\x0c\x19\x12\x13\x0f\x14\x1d\x1a'
+            b'\x1f\x1e\x1d\x1a\x1c\x1c $.\' ",#\x1c\x1c(7),01444\x1f\'9=82<.342\x1e1='
+            b'<-6\xc0\x00\x0b\x08\x00\x01\x00\x01\x01\x01\x11\x00'
+            b'\xff\xc4\x00\x1f\x00\x00\x01\x05\x01\x01\x01\x01\x01\x01\x00'
+            b'\x00\x00\x00\x00\x00\x00\x00\x01\x02\x03\x04\x05\x06\x07\x08'
+            b'\t\n\x0b\xff\xda\x00\x08\x01\x01\x00\x00?\x00\xfb\xd3\xff\xd9'
+        )
+        return SimpleUploadedFile(name, jpeg_bytes, content_type='image/jpeg')
+
+    # --- access control ---
+
+    def test_linked_teacher_can_get(self):
+        response = self.client.get(self.url)
+        self.assertEqual(response.status_code, 200)
+
+    def test_unlinked_teacher_gets_404(self):
+        self.client.logout()
+        self.client.login(phone='01900000002', password='pass')
+        response = self.client.get(self.url)
+        self.assertEqual(response.status_code, 404)
+
+    def test_unauthenticated_redirected(self):
+        self.client.logout()
+        response = self.client.get(self.url)
+        self.assertEqual(response.status_code, 302)
+        self.assertIn('/login/', response.url)
+
+    def test_admin_cannot_access(self):
+        self.client.logout()
+        self.client.login(phone='01900000003', password='pass')
+        response = self.client.get(self.url)
+        self.assertEqual(response.status_code, 302)
+
+    def test_nonexistent_record_returns_404(self):
+        url = reverse('teacher_portal:upload_photo', args=[uuid.uuid4()])
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, 404)
+
+    # --- GET ---
+
+    def test_get_shows_upload_form(self):
+        response = self.client.get(self.url)
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'طالب الصورة')
+
+    def test_context_contains_record_and_student(self):
+        response = self.client.get(self.url)
+        self.assertEqual(response.context['record'], self.record)
+        self.assertEqual(response.context['student'], self.student)
+
+    # --- POST ---
+
+    def test_post_no_file_shows_error(self):
+        response = self.client.post(self.url, {})
+        self.assertEqual(response.status_code, 302)
+        self.record.refresh_from_db()
+        self.assertFalse(bool(self.record.daily_photo))
+
+    def test_post_invalid_type_rejected(self):
+        from django.core.files.uploadedfile import SimpleUploadedFile
+        fake_pdf = SimpleUploadedFile('doc.pdf', b'%PDF-1.4', content_type='application/pdf')
+        self.client.post(self.url, {'photo': fake_pdf})
+        self.record.refresh_from_db()
+        self.assertFalse(bool(self.record.daily_photo))
+
+    def test_post_valid_jpeg_saves_photo(self):
+        photo = self._make_jpeg()
+        response = self.client.post(self.url, {'photo': photo})
+        self.assertEqual(response.status_code, 302)
+        self.record.refresh_from_db()
+        self.assertTrue(bool(self.record.daily_photo))
+
+    def test_post_redirects_to_dashboard(self):
+        photo = self._make_jpeg()
+        response = self.client.post(self.url, {'photo': photo})
+        self.assertRedirects(response, reverse('teacher_portal:dashboard'))
+
+    def test_post_unlinked_teacher_cannot_upload(self):
+        self.client.logout()
+        self.client.login(phone='01900000002', password='pass')
+        photo = self._make_jpeg()
+        response = self.client.post(self.url, {'photo': photo})
+        self.assertEqual(response.status_code, 404)
+        self.record.refresh_from_db()
+        self.assertFalse(bool(self.record.daily_photo))
+
+    def tearDown(self):
+        # Clean up any uploaded files to avoid leaving test artifacts
+        self.record.refresh_from_db()
+        if self.record.daily_photo:
+            self.record.daily_photo.delete(save=True)
+
+
+class ExportAttendanceTestCase(TestCase):
+    """Tests for teacher_portal:export_attendance view."""
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.teacher_user = User.objects.create_user(
+            phone='01110000001', email='export_teacher@test.com', password='pass',
+            role=User.Role.TEACHER,
+        )
+        cls.teacher = Teacher.objects.create(
+            user=cls.teacher_user, full_name='معلم التصدير',
+        )
+
+        cls.other_teacher_user = User.objects.create_user(
+            phone='01110000002', email='export_other@test.com', password='pass',
+            role=User.Role.TEACHER,
+        )
+        # Deliberately no Teacher profile for cls.other_teacher_user
+
+        cls.admin_user = User.objects.create_user(
+            phone='01110000003', email='export_admin@test.com', password='pass',
+            role=User.Role.ADMIN,
+        )
+
+        cls.student = Student.objects.create(
+            full_name='طالب التصدير', national_id='40000000000001',
+            student_code='EX001', grade='الصف الثاني',
+        )
+        StudentTeacherLink.objects.create(
+            teacher=cls.teacher, student=cls.student, is_primary=True,
+        )
+
+        cls.url = reverse('teacher_portal:export_attendance')
+
+    def setUp(self):
+        self.client = Client()
+        self.client.login(phone='01110000001', password='pass')
+
+    def test_unauthenticated_redirects(self):
+        self.client.logout()
+        response = self.client.get(self.url)
+        self.assertEqual(response.status_code, 302)
+
+    def test_admin_cannot_access(self):
+        self.client.logout()
+        self.client.login(phone='01110000003', password='pass')
+        response = self.client.get(self.url)
+        self.assertEqual(response.status_code, 302)
+
+    def test_returns_excel_content_type(self):
+        response = self.client.get(self.url)
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(
+            response['Content-Type'],
+            'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        )
+
+    def test_content_disposition_attachment(self):
+        response = self.client.get(self.url)
+        self.assertIn('attachment', response['Content-Disposition'])
+        self.assertIn('.xlsx', response['Content-Disposition'])
+
+    def test_response_is_valid_xlsx(self):
+        import io
+        import openpyxl
+        response = self.client.get(self.url)
+        wb = openpyxl.load_workbook(io.BytesIO(response.content))
+        self.assertIsNotNone(wb)
+
+    def test_student_name_in_workbook(self):
+        import io
+        import openpyxl
+        response = self.client.get(self.url)
+        wb = openpyxl.load_workbook(io.BytesIO(response.content))
+        ws = wb.active
+        cell_values = [ws.cell(row=r, column=1).value for r in range(1, ws.max_row + 1)]
+        self.assertIn('طالب التصدير', cell_values)
+
+    def test_attended_student_shows_present(self):
+        import io
+        import openpyxl
+        from django.utils.timezone import localdate, now
+        record = StudentAttendanceRecord.objects.create(
+            student=self.student,
+            date=localdate(),
+            check_in_time=now(),
+            recorded_by=self.teacher_user,
+            original_teacher=self.teacher,
+            assigned_teacher=self.teacher,
+        )
+        response = self.client.get(self.url)
+        wb = openpyxl.load_workbook(io.BytesIO(response.content))
+        ws = wb.active
+        # Row 2 is the first data row (row 1 is header)
+        status_value = ws.cell(row=2, column=3).value
+        self.assertEqual(status_value, 'حضر')
+        record.delete()
+
+    def test_absent_student_shows_not_recorded(self):
+        import io
+        import openpyxl
+        response = self.client.get(self.url)
+        wb = openpyxl.load_workbook(io.BytesIO(response.content))
+        ws = wb.active
+        status_value = ws.cell(row=2, column=3).value
+        self.assertEqual(status_value, 'لم يسجل')
+
+    def test_teacher_with_no_profile_redirects(self):
+        self.client.logout()
+        self.client.login(phone='01110000002', password='pass')
+        response = self.client.get(self.url)
+        self.assertRedirects(response, reverse('teacher_portal:dashboard'))
+
+    def test_header_row_columns(self):
+        import io
+        import openpyxl
+        response = self.client.get(self.url)
+        wb = openpyxl.load_workbook(io.BytesIO(response.content))
+        ws = wb.active
+        headers = [ws.cell(row=1, column=c).value for c in range(1, 8)]
+        self.assertIn('اسم الطالب', headers)
+        self.assertIn('حالة الحضور', headers)
+        self.assertIn('التقييم', headers)
+

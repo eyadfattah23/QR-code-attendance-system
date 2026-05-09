@@ -61,6 +61,10 @@
                     <select name="sort" class="form-select form-select-sm" style="width:auto;"
                         onchange="this.form.submit()" title="ترتيب">
                         <option value="" {% if not sort %}selected{% endif %}>ترتيب افتراضي</option>
+                        <option value="name_asc" {% if sort == 'name_asc' %}selected{% endif %}>الاسم (أ-ي)</option>
+                        <option value="name_desc" {% if sort == 'name_desc' %}selected{% endif %}>الاسم (ي-أ)</option>
+                        <option value="attended_first" {% if sort == 'attended_first' %}selected{% endif %}>الحاضرون أولاً</option>
+                        <option value="absent_first" {% if sort == 'absent_first' %}selected{% endif %}>الغائبون أولاً</option>
                         <option value="avg_rating_desc" {% if sort == 'avg_rating_desc' %}selected{% endif %}>متوسط تقييم (أعلى)</option>
                         <option value="avg_rating_asc" {% if sort == 'avg_rating_asc' %}selected{% endif %}>متوسط تقييم (أدنى)</option>
                     </select>
@@ -70,10 +74,10 @@
                         <i class="bi bi-funnel me-1"></i>
                         تصفية
                     </button>
-                    <button class="btn btn-outline-secondary btn-sm">
+                    <a href="{% url 'teacher_portal:export_attendance' %}" class="btn btn-outline-success btn-sm">
                         <i class="bi bi-download me-1"></i>
                         تصدير
-                    </button>
+                    </a>
                 </div>
             </div>
         </div>
@@ -189,9 +193,18 @@
                             </td>
                             <td>
                                 <div class="d-flex gap-1">
-                                    <button class="btn btn-outline-primary btn-sm" title="رفع صورة">
+                                    {% if row.attendance %}
+                                    <a href="{% url 'teacher_portal:upload_photo' row.attendance.id %}"
+                                        class="btn btn-sm {% if row.attendance.daily_photo %}btn-warning{% else %}btn-outline-primary{% endif %}"
+                                        title="{% if row.attendance.daily_photo %}تغيير الصورة{% else %}رفع صورة{% endif %}">
+                                        <i class="bi bi-camera"></i>
+                                    </a>
+                                    {% else %}
+                                    <button class="btn btn-outline-secondary btn-sm" disabled
+                                        title="يجب تسجيل الحضور أولاً لرفع صورة">
                                         <i class="bi bi-camera"></i>
                                     </button>
+                                    {% endif %}
                                     <!-- Desktop: individual buttons -->
                                     <a href="{% url 'teacher_portal:student_history' row.student.id %}"
                                         class="btn btn-outline-info btn-sm d-none d-md-inline-flex" title="عرض السجل">
@@ -215,6 +228,11 @@
                                                 </a>
                                             </li>
                                             {% if row.attendance %}
+                                            <li>
+                                                <a class="dropdown-item" href="{% url 'teacher_portal:upload_photo' row.attendance.id %}">
+                                                    <i class="bi bi-camera me-2"></i>{% if row.attendance.daily_photo %}تغيير الصورة{% else %}رفع صورة{% endif %}
+                                                </a>
+                                            </li>
                                             <li>
                                                 <a class="dropdown-item" href="{% url 'teacher_portal:edit_record_note' row.attendance.id %}">
                                                     <i class="bi bi-pencil me-2"></i>{% if row.attendance.teacher_note %}تعديل الملاحظة{% else %}إضافة ملاحظة{% endif %}

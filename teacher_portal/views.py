@@ -2,10 +2,12 @@ from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
 from django.db.models import Avg
+from django.http import HttpResponse
 from django.utils.timezone import localdate, localtime
 from django.views.decorators.http import require_http_methods
 from functools import wraps
 import uuid
+import openpyxl
 
 from core.models import Student, Teacher, StudentTeacherLink
 from attendance.models import StudentAttendanceRecord
@@ -69,6 +71,14 @@ def dashboard(request):
             student_rows.sort(key=lambda r: r['avg_rating'] or 0, reverse=True)
         elif sort == 'avg_rating_asc':
             student_rows.sort(key=lambda r: r['avg_rating'] or 0)
+        elif sort == 'name_asc':
+            student_rows.sort(key=lambda r: r['student'].full_name)
+        elif sort == 'name_desc':
+            student_rows.sort(key=lambda r: r['student'].full_name, reverse=True)
+        elif sort == 'attended_first':
+            student_rows.sort(key=lambda r: not r['is_attended'])
+        elif sort == 'absent_first':
+            student_rows.sort(key=lambda r: r['is_attended'])
     except Teacher.DoesNotExist:
         students = []
         student_rows = []
@@ -228,6 +238,52 @@ def student_history(request, pk):
 
 @teacher_required
 @require_http_methods(["GET", "POST"])
+def upload_photo(request, pk):
+    """Upload or replace the daily notebook photo for an attendance record."""
+    try:
+        teacher = Teacher.objects.get(user=request.user)
+    except Teacher.DoesNotExist:
+        messages.error(request, 'لم يتم ربط حسابك بملف معلم')
+        return redirect('teacher_portal:dashboard')
+
+    record = get_object_or_404(
+        StudentAttendanceRecord,
+        pk=pk,
+        student__teacher_links__teacher=teacher,
+    )
+
+    if request.method == 'POST':
+        photo = request.FILES.get('photo')
+        if not photo:
+            messages.error(request, 'الرجاء اختيار صورة')
+            return redirect('teacher_portal:upload_photo', pk=pk)
+
+        allowed_types = {'image/jpeg', 'image/png', 'image/webp'}
+        if photo.content_type not in allowed_types:
+            messages.error(request, 'نوع الملف غير مدعوم. يُقبل JPEG أو PNG أو WebP فقط')
+            return redirect('teacher_portal:upload_photo', pk=pk)
+
+        if photo.size > 2 * 1024 * 1024:  # 2MB hard server-side cap
+            messages.error(request, 'حجم الملف كبير جداً. الحد الأقصى 2MB (يُرجى الضغط من المتصفح)')
+            return redirect('teacher_portal:upload_photo', pk=pk)
+
+        # Delete old file from storage before replacing
+        if record.daily_photo:
+            record.daily_photo.delete(save=False)
+
+        record.daily_photo = photo
+        record.save(update_fields=['daily_photo'])
+        messages.success(request, 'تم رفع الصورة بنجاح')
+        return redirect('teacher_portal:dashboard')
+
+    return render(request, 'teacher_portal/upload_photo.html', {
+        'record': record,
+        'student': record.student,
+    })
+
+
+@teacher_required
+@require_http_methods(["GET", "POST"])
 def edit_record_note(request, pk):
     """Add or edit the teacher note on a single attendance record."""
     try:
@@ -253,3 +309,60 @@ def edit_record_note(request, pk):
         'record': record,
         'student': record.student,
     })
+
+
+@teacher_required
+def export_attendance(request):
+    """Export today's attendance list for the teacher's linked students as Excel."""
+    today = localdate()
+    try:
+        teacher = Teacher.objects.get(user=request.user)
+    except Teacher.DoesNotExist:
+        messages.error(request, 'لم يتم ربط حسابك بملف معلم')
+        return redirect('teacher_portal:dashboard')
+
+    student_links = StudentTeacherLink.objects.filter(
+        teacher=teacher
+    ).select_related('student')
+    students = [link.student for link in student_links]
+
+    today_attendance = StudentAttendanceRecord.objects.filter(
+        student__in=students, date=today
+    )
+    attendance_by_id = {r.student_id: r for r in today_attendance}
+
+    student_ids = [s.id for s in students]
+    avg_ratings = {}
+    if student_ids:
+        avg_ratings = dict(
+            StudentAttendanceRecord.objects
+            .filter(student_id__in=student_ids)
+            .values('student_id')
+            .annotate(avg=Avg('rating'))
+            .values_list('student_id', 'avg')
+        )
+
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws.title = str(today)
+    ws.append(['اسم الطالب', 'الصف', 'حالة الحضور', 'وقت الحضور', 'التقييم', 'متوسط التقييم', 'الملاحظة'])
+
+    for student in students:
+        att = attendance_by_id.get(student.id)
+        avg = avg_ratings.get(student.id)
+        ws.append([
+            student.full_name,
+            student.grade or '',
+            'حضر' if att else 'لم يسجل',
+            localtime(att.check_in_time).strftime('%H:%M') if att and att.check_in_time else '',
+            att.rating if att else '',
+            round(avg, 1) if avg is not None else '',
+            att.teacher_note if att else '',
+        ])
+
+    response = HttpResponse(
+        content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+    )
+    response['Content-Disposition'] = f'attachment; filename="attendance_{today}.xlsx"'
+    wb.save(response)
+    return response
