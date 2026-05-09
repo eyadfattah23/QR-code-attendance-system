@@ -140,12 +140,13 @@
                             </span>
                             {% else %}—{% endif %}
                         </td>
-                        <td class="text-center">
+                        <td>
                             {% if rec.is_substitute_assignment %}
-                            <span class="badge bg-warning text-dark" title="{{ rec.substitute_note|default:'نيابة' }}">
-                                <i class="bi bi-arrow-left-right"></i>
-                            </span>
-                            {% else %}—{% endif %}
+                            <div class="d-flex align-items-center gap-1 p-1 rounded border border-danger bg-danger-subtle" style="font-size:.78rem;">
+                                <i class="bi bi-person-x-fill text-danger flex-shrink-0"></i>
+                                <span class="text-danger">غاب: <strong>{{ rec.original_teacher.full_name }}</strong></span>
+                            </div>
+                            {% else %}<span class="text-muted">—</span>{% endif %}
                         </td>
                         <td class="text-center">
                             {% if rec.daily_photo %}

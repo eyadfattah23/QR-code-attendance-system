@@ -65,11 +65,10 @@
                                         {{ record.assigned_teacher.full_name }}
                                     </span>
                                     {% if record.is_substitute_assignment %}
-                                    <br>
-                                    <small class="text-warning-emphasis">
-                                        <i class="bi bi-arrow-left-right"></i>
-                                        بدلاً عن: {{ record.original_teacher.full_name }}
-                                    </small>
+                                    <div class="d-flex align-items-center gap-1 mt-1 p-1 rounded border border-danger bg-danger-subtle" style="font-size:.78rem;">
+                                        <i class="bi bi-person-x-fill text-danger flex-shrink-0"></i>
+                                        <span class="text-danger">المعلم الأصلي <strong>{{ record.original_teacher.full_name }}</strong> كان غائباً</span>
+                                    </div>
                                     {% endif %}
                                     {% else %}
                                     <span class="text-muted">—</span>

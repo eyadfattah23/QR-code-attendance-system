@@ -181,11 +181,10 @@
                             </td>
                             <td class="d-none d-md-table-cell">
                                 {% if row.attendance and row.attendance.is_substitute_assignment %}
-                                <span class="badge bg-warning text-dark"
-                                    title="{{ row.attendance.substitute_note|default:'تحويل ليوم واحد' }}">
-                                    <i class="bi bi-arrow-left-right me-1"></i>
-                                    بديل
-                                </span>
+                                <div class="d-flex align-items-center gap-1 p-1 rounded border border-danger bg-danger-subtle" style="font-size:.78rem;">
+                                    <i class="bi bi-person-x-fill text-danger flex-shrink-0"></i>
+                                    <span class="text-danger">غاب: <strong>{{ row.attendance.original_teacher.full_name }}</strong></span>
+                                </div>
                                 {% else %}
                                 <span class="text-muted">-</span>
                                 {% endif %}
@@ -255,7 +254,8 @@
                                                     data-time="{% if row.attendance %}{{ row.attendance.check_in_time|time:'H:i' }}{% else %}-{% endif %}"
                                                     data-photo="{% if row.attendance and row.attendance.daily_photo %}مرفوعة{% else %}لا توجد{% endif %}"
                                                     data-rating="{% if row.attendance %}{{ row.attendance.rating }}/10{% else %}-{% endif %}"
-                                                    data-transfer="{% if row.attendance and row.attendance.is_substitute_assignment %}بديل{% else %}-{% endif %}"
+                                                    data-transfer="{% if row.attendance and row.attendance.is_substitute_assignment %}غاب المعلم الأصلي: {{ row.attendance.original_teacher.full_name }}{% else %}-{% endif %}"
+                                    data-is-substitute="{% if row.attendance and row.attendance.is_substitute_assignment %}1{% else %}0{% endif %}"
                                                     data-note="{{ row.attendance.teacher_note|default:'' }}"
                                                     data-note-url="{% if row.attendance %}{% url 'teacher_portal:edit_record_note' row.attendance.id %}{% endif %}"
                                                     data-history-url="{% url 'teacher_portal:student_history' row.student.id %}">
@@ -343,7 +343,12 @@
         document.getElementById('sdt-time').textContent = btn.dataset.time;
         document.getElementById('sdt-photo').textContent = btn.dataset.photo;
         document.getElementById('sdt-rating').textContent = btn.dataset.rating;
-        document.getElementById('sdt-transfer').textContent = btn.dataset.transfer;
+        const transferEl = document.getElementById('sdt-transfer');
+        if (btn.dataset.isSubstitute === '1') {
+            transferEl.innerHTML = '<span class="badge bg-danger"><i class="bi bi-person-x-fill me-1"></i>' + btn.dataset.transfer + '</span>';
+        } else {
+            transferEl.textContent = btn.dataset.transfer;
+        }
         const note = btn.dataset.note;
         document.getElementById('sdt-note').textContent = note || '—';
         const noteUrl = btn.dataset.noteUrl;
