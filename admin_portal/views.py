@@ -226,6 +226,8 @@ def student_import(request):
 
         student_code = _cell('student_code') or None
         grade = _cell('grade') or None
+        phone = _cell('phone') or None
+        parent_phone = _cell('parent_phone') or None
 
         try:
             Student.objects.create(
@@ -233,6 +235,8 @@ def student_import(request):
                 national_id=national_id,
                 student_code=student_code,
                 grade=grade,
+                phone=phone,
+                parent_phone=parent_phone,
             )
             created += 1
         except Exception as exc:

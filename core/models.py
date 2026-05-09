@@ -158,6 +158,26 @@ class Student(models.Model):
         null=True,
         help_text="Grade or class (e.g., 'Grade 5', 'Year 2')"
     )
+
+    _egyptian_phone_validator = RegexValidator(
+        regex=r'^01\d{9}$',
+        message="رقم الهاتف يجب أن يتكون من 11 رقماً ويبدأ بـ 01",
+    )
+
+    phone = models.CharField(
+        max_length=11,
+        blank=True,
+        null=True,
+        validators=[_egyptian_phone_validator],
+        help_text="Student phone number (11 digits starting with 01)",
+    )
+    parent_phone = models.CharField(
+        max_length=11,
+        blank=True,
+        null=True,
+        validators=[_egyptian_phone_validator],
+        help_text="Parent phone number (11 digits starting with 01)",
+    )
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 

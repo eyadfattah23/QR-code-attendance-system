@@ -454,6 +454,36 @@ class StudentImportTestCase(_StudentManagementBase):
         self.assertFalse(Student.objects.filter(
             national_id='44444444444444').exists())
 
+    def test_import_saves_phone_and_parent_phone(self):
+        upload = _make_excel_upload([
+            ('full_name', 'national_id', 'student_code', 'grade', 'phone', 'parent_phone'),
+            ('طالب هاتف', '55555555555555', 'PH001', 'الصف الأول', '01012345678', '01098765432'),
+        ])
+        self.client.post(self.url, {'excel_file': upload})
+        student = Student.objects.get(national_id='55555555555555')
+        self.assertEqual(student.phone, '01012345678')
+        self.assertEqual(student.parent_phone, '01098765432')
+
+    def test_import_without_phone_columns_still_creates_student(self):
+        upload = _make_excel_upload([
+            ('full_name', 'national_id'),
+            ('بلا هاتف', '66666666666666'),
+        ])
+        self.client.post(self.url, {'excel_file': upload})
+        student = Student.objects.get(national_id='66666666666666')
+        self.assertIsNone(student.phone)
+        self.assertIsNone(student.parent_phone)
+
+    def test_import_blank_phone_cells_stored_as_null(self):
+        upload = _make_excel_upload([
+            ('full_name', 'national_id', 'phone', 'parent_phone'),
+            ('خلايا فارغة', '77777777777777', '', ''),
+        ])
+        self.client.post(self.url, {'excel_file': upload})
+        student = Student.objects.get(national_id='77777777777777')
+        self.assertIsNone(student.phone)
+        self.assertIsNone(student.parent_phone)
+
 
 # ---------------------------------------------------------------------------
 # Teacher management tests

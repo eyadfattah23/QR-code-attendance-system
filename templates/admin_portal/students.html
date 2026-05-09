@@ -87,6 +87,8 @@
                             <th>الرقم القومي</th>
                             <th>كود الطالب</th>
                             <th>الصف</th>
+                            <th>هاتف الطالب</th>
+                            <th>هاتف ولي الأمر</th>
                             <th>متوسط التقييم</th>
                             <th style="width:8rem">إجراءات</th>
                         </tr>
@@ -103,6 +105,8 @@
                                 <span class="badge bg-light text-dark border">{{ student.grade }}</span>
                                 {% else %}—{% endif %}
                             </td>
+                            <td class="font-monospace small">{{ student.phone|default:"—" }}</td>
+                            <td class="font-monospace small">{{ student.parent_phone|default:"—" }}</td>
                             <td>
                                 {% if student.avg_rating %}
                                 <span class="badge
@@ -222,7 +226,7 @@
                 <div class="modal-body">
                     <p class="text-muted small mb-3">
                         أعمدة <strong>مطلوبة</strong>: <code>full_name</code>، <code>national_id</code><br>
-                        أعمدة <strong>اختيارية</strong>: <code>student_code</code>، <code>grade</code>
+                        أعمدة <strong>اختيارية</strong>: <code>student_code</code>، <code>grade</code>، <code>phone</code>، <code>parent_phone</code>
                     </p>
                     <div class="mb-3">
                         <label class="form-label fw-semibold">ملف Excel (.xlsx)</label>

@@ -90,6 +90,8 @@
                             <th scope="col" class="d-none d-md-table-cell">#</th>
                             <th scope="col">اسم الطالب</th>
                             <th scope="col" class="d-none d-md-table-cell">الصف</th>
+                            <th scope="col" class="d-none d-md-table-cell">هاتف الطالب</th>
+                            <th scope="col" class="d-none d-md-table-cell">هاتف ولي الأمر</th>
                             <th scope="col">حالة الحضور</th>
                             <th scope="col" class="d-none d-md-table-cell">وقت الحضور</th>
                             <th scope="col" class="d-none d-md-table-cell">الصورة</th>
@@ -115,6 +117,8 @@
                                 </div>
                             </td>
                             <td class="d-none d-md-table-cell">{{ row.student.grade|default:"-" }}</td>
+                            <td class="d-none d-md-table-cell">{{ row.student.phone|default:"-" }}</td>
+                            <td class="d-none d-md-table-cell">{{ row.student.parent_phone|default:"-" }}</td>
                             <td>
                                 {% if row.is_attended %}
                                 <span class="badge bg-success">
@@ -246,6 +250,8 @@
                                                     data-bs-target="#student-detail-modal"
                                                     data-name="{{ row.student.full_name }}"
                                                     data-grade="{{ row.student.grade|default:'-' }}"
+                                                    data-phone="{{ row.student.phone|default:'-' }}"
+                                                    data-parent-phone="{{ row.student.parent_phone|default:'-' }}"
                                                     data-time="{% if row.attendance %}{{ row.attendance.check_in_time|time:'H:i' }}{% else %}-{% endif %}"
                                                     data-photo="{% if row.attendance and row.attendance.daily_photo %}مرفوعة{% else %}لا توجد{% endif %}"
                                                     data-rating="{% if row.attendance %}{{ row.attendance.rating }}/10{% else %}-{% endif %}"
@@ -287,6 +293,10 @@
                 <dl class="row g-2 mb-0">
                     <dt class="col-5 text-muted small">الصف</dt>
                     <dd class="col-7 mb-0" id="sdt-grade"></dd>
+                    <dt class="col-5 text-muted small">هاتف الطالب</dt>
+                    <dd class="col-7 mb-0 font-monospace" id="sdt-phone"></dd>
+                    <dt class="col-5 text-muted small">هاتف ولي الأمر</dt>
+                    <dd class="col-7 mb-0 font-monospace" id="sdt-parent-phone"></dd>
                     <dt class="col-5 text-muted small">وقت الحضور</dt>
                     <dd class="col-7 mb-0 font-monospace" id="sdt-time"></dd>
                     <dt class="col-5 text-muted small">الصورة</dt>
@@ -328,6 +338,8 @@
         const btn = e.relatedTarget;
         document.getElementById('sdt-name').textContent = btn.dataset.name;
         document.getElementById('sdt-grade').textContent = btn.dataset.grade;
+        document.getElementById('sdt-phone').textContent = btn.dataset.phone;
+        document.getElementById('sdt-parent-phone').textContent = btn.dataset.parentPhone;
         document.getElementById('sdt-time').textContent = btn.dataset.time;
         document.getElementById('sdt-photo').textContent = btn.dataset.photo;
         document.getElementById('sdt-rating').textContent = btn.dataset.rating;
