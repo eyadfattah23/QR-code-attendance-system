@@ -4,6 +4,14 @@
 
 {% block extra_css %}
 <style>
+    /* Override base body styles for full-screen login */
+    body {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%) !important;
+        min-height: 100vh;
+        padding: 0;
+        margin: 0;
+    }
+
     /* Login Page Responsive Styles */
     .login-wrapper {
         min-height: 100vh;
@@ -11,7 +19,6 @@
         align-items: center;
         justify-content: center;
         padding: 1rem;
-        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
     }
 
     .login-card-container {
