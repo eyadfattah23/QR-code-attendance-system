@@ -5,6 +5,7 @@ Use this for production deployment on the local server.
 Set DJANGO_SETTINGS_MODULE=qr_attendance.settings.production
 """
 
+import os
 from .base import *
 from decouple import config, Csv
 
@@ -45,6 +46,8 @@ SESSION_COOKIE_SECURE = False  # Set to True if using HTTPS
 # - SESSION_COOKIE_SECURE
 
 # Logging
+os.makedirs(BASE_DIR / 'logs', exist_ok=True)
+
 LOGGING = {
     'version': 1,
     'disable_existing_loggers': False,
