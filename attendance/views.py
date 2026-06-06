@@ -108,38 +108,71 @@ def station_view(request):
                     continue
 
                 if teacher is not None:
-                    teacher_record, created = TeacherAttendanceRecord.objects.get_or_create(
-                        teacher=teacher,
-                        date=today,
-                        defaults={
-                            "check_in_time": localtime(),
-                            "recorded_by": request.user,
-                        },
-                    )
-
-                    if created:
-                        results.append(
-                            {
+                    from django.db import transaction as _tx
+                    with _tx.atomic():
+                        try:
+                            teacher_record = TeacherAttendanceRecord.objects.select_for_update().get(
+                                teacher=teacher,
+                                date=today,
+                            )
+                            # Record exists — second scan = check-out
+                            if teacher_record.check_out_time is not None:
+                                # Already checked out
+                                results.append({
+                                    "status": "warning",
+                                    "icon": "bi-exclamation-circle-fill",
+                                    "label": "مغادرة مسجلة مسبقاً",
+                                    "message": (
+                                        f"{teacher.full_name} (معلم) - غادر مسبقاً الساعة "
+                                        f"{teacher_record.check_out_time.strftime('%H:%M')}"
+                                    ),
+                                    "row_class": "warning",
+                                })
+                            else:
+                                # First checkout scan
+                                now = localtime()
+                                if now < teacher_record.check_in_time:
+                                    # Clock skew — reject
+                                    results.append({
+                                        "status": "warning",
+                                        "icon": "bi-exclamation-circle-fill",
+                                        "label": "خطأ في التوقيت",
+                                        "message": (
+                                            f"{teacher.full_name} (معلم) - وقت المغادرة "
+                                            f"({now.strftime('%H:%M')}) قبل وقت الحضور "
+                                            f"({teacher_record.check_in_time.strftime('%H:%M')})"
+                                        ),
+                                        "row_class": "warning",
+                                    })
+                                else:
+                                    teacher_record.check_out_time = now
+                                    teacher_record.save(update_fields=['check_out_time'])
+                                    results.append({
+                                        "status": "checkout",
+                                        "icon": "bi-door-open-fill",
+                                        "label": "تم تسجيل المغادرة",
+                                        "message": (
+                                            f"{teacher.full_name} (معلم) - غادر الساعة "
+                                            f"{now.strftime('%H:%M')} | "
+                                            f"مدة الحضور: {teacher_record.duration_display}"
+                                        ),
+                                        "row_class": "info",
+                                    })
+                        except TeacherAttendanceRecord.DoesNotExist:
+                            # No record today — first scan = check-in
+                            TeacherAttendanceRecord.objects.create(
+                                teacher=teacher,
+                                date=today,
+                                check_in_time=localtime(),
+                                recorded_by=request.user,
+                            )
+                            results.append({
                                 "status": "success",
                                 "icon": "bi-check-circle-fill",
-                                        "label": "تم التسجيل",
-                                        "message": f"{teacher.full_name} (معلم) - تم تسجيل الحضور بنجاح",
-                                        "row_class": "success",
-                            }
-                        )
-                    else:
-                        results.append(
-                            {
-                                "status": "warning",
-                                "icon": "bi-exclamation-circle-fill",
-                                        "label": "مسجل مسبقاً",
-                                        "message": (
-                                            f"{teacher.full_name} (معلم) - مسجل مسبقاً الساعة "
-                                            f"{teacher_record.check_in_time.strftime('%H:%M')}"
-                                        ),
-                                "row_class": "warning",
-                            }
-                        )
+                                "label": "تم التسجيل",
+                                "message": f"{teacher.full_name} (معلم) - تم تسجيل الحضور بنجاح",
+                                "row_class": "success",
+                            })
                     continue
 
                 results.append(
@@ -155,7 +188,7 @@ def station_view(request):
                     }
                 )
 
-    success_count = sum(1 for item in results if item["status"] == "success")
+    success_count = sum(1 for item in results if item["status"] in ("success", "checkout"))
     warning_count = sum(1 for item in results if item["status"] == "warning")
     error_count = sum(1 for item in results if item["status"] == "error")
 
@@ -187,8 +220,9 @@ def station_view(request):
         {
             "kind": "teacher",
             "name": record.teacher.full_name,
-                    "code": "Teacher",
-                    "time": record.check_in_time,
+            "code": "Teacher",
+            "time": record.check_out_time if record.check_out_time else record.check_in_time,
+            "is_checkout": record.check_out_time is not None,
         }
         for record in recent_teacher_scans
     ]

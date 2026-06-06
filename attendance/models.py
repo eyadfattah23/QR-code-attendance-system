@@ -105,6 +105,11 @@ class TeacherAttendanceRecord(models.Model):
     )
     date = models.DateField(db_index=True)
     check_in_time = models.DateTimeField()
+    check_out_time = models.DateTimeField(
+        null=True,
+        blank=True,
+        help_text='Time the teacher left (set on second scan)',
+    )
     recorded_by = models.ForeignKey(
         User,
         on_delete=models.SET_NULL,
@@ -139,6 +144,35 @@ class TeacherAttendanceRecord(models.Model):
                 name='teacher_attendance_rating_range_1_to_10',
             ),
         ]
+
+    def __str__(self) -> str:
+        return f"{self.teacher.full_name} - {self.date}"
+
+    @property
+    def is_checked_out(self) -> bool:
+        """True when the teacher has a recorded check-out time."""
+        return self.check_out_time is not None
+
+    @property
+    def duration(self):
+        """Return timedelta of teacher's presence, or None if not checked out."""
+        if self.check_in_time and self.check_out_time:
+            return self.check_out_time - self.check_in_time
+        return None
+
+    @property
+    def duration_display(self) -> str:
+        """Human-readable duration string, e.g. '2س 30د'."""
+        delta = self.duration
+        if delta is None:
+            return '—'
+        total_minutes = int(delta.total_seconds() // 60)
+        hours, minutes = divmod(total_minutes, 60)
+        if hours and minutes:
+            return f'{hours}س {minutes}د'
+        if hours:
+            return f'{hours}س'
+        return f'{minutes}د'
 
     def __str__(self) -> str:
         return f"{self.teacher.full_name} - {self.date}"

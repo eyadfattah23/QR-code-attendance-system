@@ -480,13 +480,48 @@ class ScanStationAdminScansTestCase(TestCase):
         self.assertEqual(results[0]['status'], 'warning')
 
     def test_admin_scan_already_scanned_teacher_shows_warning(self):
-        """Test scanning an already-scanned teacher shows warning result."""
+        """Second teacher scan (checkout) shows checkout status, not warning."""
         self.client.post(
             self.scan_url, {'scanned_codes': str(self.teacher_for_scan.id)})
         response = self.client.post(
             self.scan_url, {'scanned_codes': str(self.teacher_for_scan.id)})
         results = response.context['results']
+        self.assertEqual(results[0]['status'], 'checkout')
+
+    def test_teacher_second_scan_sets_check_out_time(self):
+        """Second teacher scan sets check_out_time on the record."""
+        self.client.post(self.scan_url, {'scanned_codes': str(self.teacher_for_scan.id)})
+        self.client.post(self.scan_url, {'scanned_codes': str(self.teacher_for_scan.id)})
+        record = TeacherAttendanceRecord.objects.get(
+            teacher=self.teacher_for_scan, date=localdate())
+        self.assertIsNotNone(record.check_out_time)
+
+    def test_teacher_third_scan_shows_already_checked_out_warning(self):
+        """Third teacher scan (already checked out) shows a warning."""
+        self.client.post(self.scan_url, {'scanned_codes': str(self.teacher_for_scan.id)})
+        self.client.post(self.scan_url, {'scanned_codes': str(self.teacher_for_scan.id)})
+        response = self.client.post(
+            self.scan_url, {'scanned_codes': str(self.teacher_for_scan.id)})
+        results = response.context['results']
         self.assertEqual(results[0]['status'], 'warning')
+        self.assertIn('مغادرة مسجلة مسبقاً', results[0]['label'])
+
+    def test_teacher_checkout_does_not_create_duplicate_record(self):
+        """Check-out scan must not create a second attendance record."""
+        self.client.post(self.scan_url, {'scanned_codes': str(self.teacher_for_scan.id)})
+        self.client.post(self.scan_url, {'scanned_codes': str(self.teacher_for_scan.id)})
+        count = TeacherAttendanceRecord.objects.filter(
+            teacher=self.teacher_for_scan, date=localdate()).count()
+        self.assertEqual(count, 1)
+
+    def test_teacher_duration_display_after_checkout(self):
+        """duration_display returns a non-empty string after checkout."""
+        self.client.post(self.scan_url, {'scanned_codes': str(self.teacher_for_scan.id)})
+        self.client.post(self.scan_url, {'scanned_codes': str(self.teacher_for_scan.id)})
+        record = TeacherAttendanceRecord.objects.get(
+            teacher=self.teacher_for_scan, date=localdate())
+        self.assertIsNotNone(record.duration)
+        self.assertNotEqual(record.duration_display, '—')
 
     def test_admin_scan_unknown_code_shows_error(self):
         """Test scanning an unknown non-UUID code shows error result."""
@@ -515,19 +550,19 @@ class ScanStationAdminScansTestCase(TestCase):
         self.assertEqual(len(results), 0)
 
     def test_admin_scan_result_context_counts(self):
-        """Test mixed batch: success + warning (duplicate) + error gives correct counts."""
-        # Pre-scan teacher to force a warning on second attempt
+        """Test mixed batch: success + checkout + error gives correct counts."""
+        # Pre-scan teacher so batch scan triggers checkout (status='checkout' → success_count)
         self.client.post(
             self.scan_url, {'scanned_codes': str(self.teacher_for_scan.id)})
 
         batch = '\n'.join([
             str(self.student.id),           # success
-            str(self.teacher_for_scan.id),  # warning (already scanned)
+            str(self.teacher_for_scan.id),  # checkout (counted as success)
             'TOTALLY-UNKNOWN-CODE',          # error
         ])
         response = self.client.post(self.scan_url, {'scanned_codes': batch})
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(response.context['success_count'], 1)
-        self.assertEqual(response.context['warning_count'], 1)
+        self.assertEqual(response.context['success_count'], 2)  # student + teacher checkout
+        self.assertEqual(response.context['warning_count'], 0)
         self.assertEqual(response.context['error_count'], 1)
         self.assertEqual(response.context['total_count'], 3)

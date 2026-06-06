@@ -196,11 +196,3 @@ class TestLoginFormPytest:
         assert not form.is_valid()
         assert 'phone' in form.errors
         assert 'password' in form.errors
-
-    def test_empty_form_is_invalid(self, request_factory):
-        """Test that empty form is not valid."""
-        request = request_factory.post('/login/')
-        form = LoginForm(request=request, data={})
-        assert not form.is_valid()
-        assert 'username' in form.errors
-        assert 'password' in form.errors

@@ -247,6 +247,8 @@
                         <th>التاريخ</th>
                         <th>المعلم</th>
                         <th>وقت الحضور</th>
+                        <th>وقت المغادرة</th>
+                        <th>مدة الحضور</th>
                         <th>التقييم</th>
                         <th>ملاحظات</th>
                         <th></th>
@@ -259,6 +261,20 @@
                         <td class="fw-semibold">{{ rec.date|date:"Y/m/d" }}</td>
                         <td class="fw-semibold">{{ rec.teacher.full_name }}</td>
                         <td class="font-monospace small text-muted">{{ rec.check_in_time|time:"H:i" }}</td>
+                        <td class="font-monospace small text-muted">
+                            {% if rec.check_out_time %}
+                            {{ rec.check_out_time|time:"H:i" }}
+                            {% else %}
+                            <span class="text-muted">—</span>
+                            {% endif %}
+                        </td>
+                        <td class="small">
+                            {% if rec.check_out_time %}
+                            <span class="badge bg-light text-dark border">{{ rec.duration_display }}</span>
+                            {% else %}
+                            <span class="text-muted">—</span>
+                            {% endif %}
+                        </td>
                         <td>
                             <span class="badge
                                 {% if rec.rating >= 8 %}bg-success
