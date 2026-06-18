@@ -15,30 +15,52 @@ GENDER_CHOICES = [
 class StudentForm(forms.ModelForm):
     class Meta:
         model = Student
-        fields = ['full_name', 'national_id', 'student_code', 'grade', 'gender', 'phone', 'parent_phone']
+        fields = [
+            'full_name', 'nickname', 'national_id', 'student_code',
+            'grade', 'gender', 'phone', 'parent_phone',
+            'date_of_birth', 'joining_date', 'hall_name', 'notes',
+        ]
         labels = {
             'full_name': 'الاسم الكامل',
+            'nickname': 'اللقب / الاسم المختصر',
             'national_id': 'الرقم القومي / رقم التسجيل',
             'student_code': 'كود الطالب',
             'grade': 'الصف / المستوى',
             'gender': 'الجنس',
             'phone': 'هاتف الطالب',
             'parent_phone': 'هاتف ولي الأمر',
+            'date_of_birth': 'تاريخ الميلاد',
+            'joining_date': 'تاريخ الانضمام',
+            'hall_name': 'اسم القاعة',
+            'notes': 'ملاحظات',
         }
         help_texts = {
             'student_code': 'اختياري — يُملأ تلقائياً من الرقم القومي إن تُرك فارغاً',
             'grade': 'مثال: السنة الأولى، المستوى 5',
             'phone': 'اختياري — 11 رقماً يبدأ بـ 01',
             'parent_phone': 'اختياري — 11 رقماً يبدأ بـ 01',
+            'nickname': 'اختياري',
+            'hall_name': 'اختياري',
+            'notes': 'اختياري',
         }
         widgets = {
             'full_name': forms.TextInput(attrs={'class': 'form-control', 'autofocus': True}),
+            'nickname': forms.TextInput(attrs={'class': 'form-control'}),
             'national_id': forms.TextInput(attrs={'class': 'form-control'}),
             'student_code': forms.TextInput(attrs={'class': 'form-control'}),
             'grade': forms.TextInput(attrs={'class': 'form-control'}),
             'gender': forms.Select(attrs={'class': 'form-select'}),
             'phone': forms.TextInput(attrs={'class': 'form-control', 'dir': 'ltr', 'placeholder': '01XXXXXXXXX'}),
             'parent_phone': forms.TextInput(attrs={'class': 'form-control', 'dir': 'ltr', 'placeholder': '01XXXXXXXXX'}),
+            'date_of_birth': forms.DateInput(attrs={'class': 'form-control', 'type': 'date'}),
+            'joining_date': forms.DateInput(attrs={'class': 'form-control', 'type': 'date'}),
+            'hall_name': forms.TextInput(attrs={'class': 'form-control'}),
+            'notes': forms.Textarea(attrs={'class': 'form-control', 'rows': 3}),
+        }
+        error_messages = {
+            'full_name': {
+                'unique': 'يوجد طالب مسجل بهذا الاسم بالفعل. يرجى التحقق من الاسم.',
+            },
         }
 
 

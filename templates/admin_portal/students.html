@@ -27,10 +27,10 @@
     <div class="card border-0 shadow-sm mb-4">
         <div class="card-body py-3">
             <form method="get" class="row g-2 align-items-end">
-                <div class="col-md-4">
+                <div class="col-md-3">
                     <label class="form-label mb-1 small fw-semibold">بحث</label>
                     <input type="text" name="q" value="{{ q }}" class="form-control"
-                        placeholder="الاسم، الرقم القومي، كود الطالب…">
+                        placeholder="الاسم، اللقب، الرقم القومي، الهاتف…">
                 </div>
                 <div class="col-md-2">
                     <label class="form-label mb-1 small fw-semibold">الصف</label>
@@ -50,21 +50,32 @@
                     </select>
                 </div>
                 <div class="col-md-2">
+                    <label class="form-label mb-1 small fw-semibold">سنة الميلاد</label>
+                    <select name="birth_year" class="form-select">
+                        <option value="">— الكل —</option>
+                        {% for yr in birth_years %}
+                        <option value="{{ yr }}" {% if yr|stringformat:"s" == birth_year_filter %}selected{% endif %}>{{ yr }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-2">
                     <label class="form-label mb-1 small fw-semibold">ترتيب</label>
                     <select name="sort" class="form-select">
                         <option value="" {% if not sort %}selected{% endif %}>— افتراضي —</option>
+                        <option value="name_asc" {% if sort == 'name_asc' %}selected{% endif %}>الاسم (أ → ي)</option>
+                        <option value="name_desc" {% if sort == 'name_desc' %}selected{% endif %}>الاسم (ي → أ)</option>
                         <option value="avg_rating_desc" {% if sort == 'avg_rating_desc' %}selected{% endif %}>متوسط التقييم (الأعلى)</option>
                         <option value="avg_rating_asc" {% if sort == 'avg_rating_asc' %}selected{% endif %}>متوسط التقييم (الأدنى)</option>
                     </select>
                 </div>
-                <div class="col-md-2">
+                <div class="col-md-1">
                     <button type="submit" class="btn btn-outline-primary w-100">
-                        <i class="bi bi-search me-1"></i>بحث
+                        <i class="bi bi-search"></i>
                     </button>
                 </div>
-                {% if q or grade_filter or gender_filter or sort %}
-                <div class="col-md-2">
-                    <a href="{% url 'admin_portal:student_list' %}" class="btn btn-outline-secondary w-100">
+                {% if q or grade_filter or gender_filter or birth_year_filter or sort %}
+                <div class="col-md-auto">
+                    <a href="{% url 'admin_portal:student_list' %}" class="btn btn-outline-secondary">
                         <i class="bi bi-x-lg me-1"></i>مسح
                     </a>
                 </div>
@@ -92,14 +103,15 @@
                         <tr>
                             <th style="width:3rem">#</th>
                             <th>الاسم الكامل</th>
+                            <th>اللقب</th>
                             <th>الرقم القومي</th>
-                            <th>كود الطالب</th>
                             <th>الصف</th>
                             <th>الجنس</th>
+                            <th>السن</th>
                             <th>هاتف الطالب</th>
                             <th>هاتف ولي الأمر</th>
                             <th>متوسط التقييم</th>
-                            <th style="width:8rem">إجراءات</th>
+                            <th style="width:10rem">إجراءات</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -107,8 +119,8 @@
                         <tr>
                             <td class="text-muted small">{{ forloop.counter|add:page_obj.start_index|add:"-1" }}</td>
                             <td class="fw-semibold">{{ student.full_name }}</td>
+                            <td class="text-muted small">{{ student.nickname|default:"—" }}</td>
                             <td class="font-monospace small text-muted">{{ student.national_id }}</td>
-                            <td class="font-monospace small">{{ student.student_code|default:"—" }}</td>
                             <td>
                                 {% if student.grade %}
                                 <span class="badge bg-light text-dark border">{{ student.grade }}</span>
@@ -117,6 +129,10 @@
                             <td>
                                 {% if student.gender == 'M' %}ذكر
                                 {% elif student.gender == 'F' %}أنثى
+                                {% else %}—{% endif %}
+                            </td>
+                            <td class="small">
+                                {% if student.age is not None %}{{ student.age }}
                                 {% else %}—{% endif %}
                             </td>
                             <td class="font-monospace small">{{ student.phone|default:"—" }}</td>
@@ -135,6 +151,10 @@
                             </td>
                             <td>
                                 <div class="btn-group btn-group-sm">
+                                    <a href="{% url 'admin_portal:student_detail' student.id %}"
+                                        class="btn btn-outline-secondary" title="التفاصيل">
+                                        <i class="bi bi-eye"></i>
+                                    </a>
                                     <a href="{% url 'admin_portal:student_history' student.id %}"
                                         class="btn btn-outline-info" title="سجل الحضور">
                                         <i class="bi bi-clock-history"></i>
@@ -165,7 +185,7 @@
                         {% if page_obj.has_previous %}
                         <li class="page-item">
                             <a class="page-link"
-                                href="?page={{ page_obj.previous_page_number }}{% if q %}&q={{ q }}{% endif %}{% if grade_filter %}&grade={{ grade_filter }}{% endif %}{% if sort %}&sort={{ sort }}{% endif %}">
+                                href="?page={{ page_obj.previous_page_number }}{% if q %}&q={{ q }}{% endif %}{% if grade_filter %}&grade={{ grade_filter }}{% endif %}{% if gender_filter %}&gender={{ gender_filter }}{% endif %}{% if birth_year_filter %}&birth_year={{ birth_year_filter }}{% endif %}{% if sort %}&sort={{ sort }}{% endif %}">
                                 &laquo;
                             </a>
                         </li>
@@ -179,7 +199,7 @@
                         {% elif num >= page_obj.number|add:"-2" and num <= page_obj.number|add:"2" %} <li
                             class="page-item">
                             <a class="page-link"
-                                href="?page={{ num }}{% if q %}&q={{ q }}{% endif %}{% if grade_filter %}&grade={{ grade_filter }}{% endif %}{% if sort %}&sort={{ sort }}{% endif %}">
+                                href="?page={{ num }}{% if q %}&q={{ q }}{% endif %}{% if grade_filter %}&grade={{ grade_filter }}{% endif %}{% if gender_filter %}&gender={{ gender_filter }}{% endif %}{% if birth_year_filter %}&birth_year={{ birth_year_filter }}{% endif %}{% if sort %}&sort={{ sort }}{% endif %}">
                                 {{ num }}
                             </a>
                             </li>
@@ -189,7 +209,7 @@
                             {% if page_obj.has_next %}
                             <li class="page-item">
                                 <a class="page-link"
-                                    href="?page={{ page_obj.next_page_number }}{% if q %}&q={{ q }}{% endif %}{% if grade_filter %}&grade={{ grade_filter }}{% endif %}{% if sort %}&sort={{ sort }}{% endif %}">
+                                    href="?page={{ page_obj.next_page_number }}{% if q %}&q={{ q }}{% endif %}{% if grade_filter %}&grade={{ grade_filter }}{% endif %}{% if gender_filter %}&gender={{ gender_filter }}{% endif %}{% if birth_year_filter %}&birth_year={{ birth_year_filter }}{% endif %}{% if sort %}&sort={{ sort }}{% endif %}">
                                     &raquo;
                                 </a>
                             </li>

@@ -150,7 +150,14 @@ class Student(models.Model):
     )
     full_name = models.CharField(
         max_length=255,
+        unique=True,
         help_text="Student's full name"
+    )
+    nickname = models.CharField(
+        max_length=100,
+        blank=True,
+        default='',
+        help_text="Nickname or short name (اللقب / الاسم المختصر)",
     )
     grade = models.CharField(
         max_length=50,
@@ -190,6 +197,27 @@ class Student(models.Model):
         validators=[_egyptian_phone_validator],
         help_text="Parent phone number (11 digits starting with 01)",
     )
+    date_of_birth = models.DateField(
+        blank=True,
+        null=True,
+        help_text="تاريخ الميلاد",
+    )
+    joining_date = models.DateField(
+        blank=True,
+        null=True,
+        help_text="تاريخ الانضمام (يُدخله المشرف)",
+    )
+    hall_name = models.CharField(
+        max_length=100,
+        blank=True,
+        default='',
+        help_text="اسم القاعة / المجموعة",
+    )
+    notes = models.TextField(
+        blank=True,
+        default='',
+        help_text="ملاحظات إضافية",
+    )
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -208,6 +236,18 @@ class Student(models.Model):
         if not self.student_code and self.national_id:
             self.student_code = self.national_id.strip().upper()
         super().save(*args, **kwargs)
+
+    @property
+    def age(self):
+        """Return current age in years, or None if date_of_birth is not set."""
+        if not self.date_of_birth:
+            return None
+        from datetime import date
+        today = date.today()
+        return (
+            today.year - self.date_of_birth.year
+            - ((today.month, today.day) < (self.date_of_birth.month, self.date_of_birth.day))
+        )
 
 
 class Teacher(models.Model):

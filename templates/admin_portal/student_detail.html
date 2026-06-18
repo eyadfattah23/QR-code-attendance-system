@@ -1,0 +1,201 @@
+{% extends 'base.html' %}
+
+{% block title %}{{ student.full_name }} - تفاصيل الطالب{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+
+    <!-- Header -->
+    <div class="d-flex align-items-center mb-4 mt-2 gap-3">
+        <a href="{% url 'admin_portal:student_list' %}" class="btn btn-outline-secondary btn-sm" title="رجوع">
+            <i class="bi bi-arrow-right"></i>
+        </a>
+        <div class="flex-grow-1">
+            <h1 class="h3 mb-0">
+                <i class="bi bi-person-lines-fill me-2 text-primary"></i>
+                {{ student.full_name }}
+                {% if student.nickname %}
+                <span class="text-muted fs-5 fw-normal">({{ student.nickname }})</span>
+                {% endif %}
+            </h1>
+            <div class="text-muted small mt-1">
+                {% if student.grade %}<span class="badge bg-light text-dark border me-1">{{ student.grade }}</span>{% endif %}
+                {% if student.gender == 'M' %}<span class="badge bg-info bg-opacity-25 text-info-emphasis border">ذكر</span>
+                {% elif student.gender == 'F' %}<span class="badge bg-warning bg-opacity-25 text-warning-emphasis border">أنثى</span>{% endif %}
+            </div>
+        </div>
+        <div class="d-flex gap-2">
+            <a href="{% url 'admin_portal:student_history' student.id %}" class="btn btn-outline-info btn-sm">
+                <i class="bi bi-clock-history me-1"></i>سجل الحضور
+            </a>
+            <a href="{% url 'admin_portal:student_edit' student.id %}" class="btn btn-outline-primary btn-sm">
+                <i class="bi bi-pencil me-1"></i>تعديل
+            </a>
+        </div>
+    </div>
+
+    <div class="row g-4">
+
+        <!-- Basic info card -->
+        <div class="col-lg-6">
+            <div class="card border-0 shadow-sm h-100">
+                <div class="card-header bg-transparent fw-semibold">
+                    <i class="bi bi-person-badge me-2 text-primary"></i>البيانات الأساسية
+                </div>
+                <div class="card-body">
+                    <dl class="row mb-0">
+                        <dt class="col-sm-5 text-muted fw-normal">الاسم الكامل</dt>
+                        <dd class="col-sm-7 fw-semibold">{{ student.full_name }}</dd>
+
+                        <dt class="col-sm-5 text-muted fw-normal">اللقب</dt>
+                        <dd class="col-sm-7">{{ student.nickname|default:"—" }}</dd>
+
+                        <dt class="col-sm-5 text-muted fw-normal">الرقم القومي</dt>
+                        <dd class="col-sm-7 font-monospace small">{{ student.national_id }}</dd>
+
+                        <dt class="col-sm-5 text-muted fw-normal">كود الطالب</dt>
+                        <dd class="col-sm-7 font-monospace small">{{ student.student_code|default:"—" }}</dd>
+
+                        <dt class="col-sm-5 text-muted fw-normal">الصف / المستوى</dt>
+                        <dd class="col-sm-7">
+                            {% if student.grade %}
+                            <span class="badge bg-light text-dark border">{{ student.grade }}</span>
+                            {% else %}—{% endif %}
+                        </dd>
+
+                        <dt class="col-sm-5 text-muted fw-normal">الجنس</dt>
+                        <dd class="col-sm-7">
+                            {% if student.gender == 'M' %}ذكر
+                            {% elif student.gender == 'F' %}أنثى
+                            {% else %}—{% endif %}
+                        </dd>
+
+                        <dt class="col-sm-5 text-muted fw-normal">اسم القاعة</dt>
+                        <dd class="col-sm-7">{{ student.hall_name|default:"—" }}</dd>
+                    </dl>
+                </div>
+            </div>
+        </div>
+
+        <!-- Personal & contact info card -->
+        <div class="col-lg-6">
+            <div class="card border-0 shadow-sm h-100">
+                <div class="card-header bg-transparent fw-semibold">
+                    <i class="bi bi-calendar2-heart me-2 text-danger"></i>البيانات الشخصية والتواصل
+                </div>
+                <div class="card-body">
+                    <dl class="row mb-0">
+                        <dt class="col-sm-5 text-muted fw-normal">تاريخ الميلاد</dt>
+                        <dd class="col-sm-7">
+                            {% if student.date_of_birth %}
+                            {{ student.date_of_birth|date:"Y/m/d" }}
+                            {% if student.age is not None %}
+                            <span class="text-muted small ms-2">({{ student.age }} سنة)</span>
+                            {% endif %}
+                            {% else %}—{% endif %}
+                        </dd>
+
+                        <dt class="col-sm-5 text-muted fw-normal">تاريخ الانضمام</dt>
+                        <dd class="col-sm-7">{{ student.joining_date|date:"Y/m/d"|default:"—" }}</dd>
+
+                        <dt class="col-sm-5 text-muted fw-normal">هاتف الطالب</dt>
+                        <dd class="col-sm-7 font-monospace small">{{ student.phone|default:"—" }}</dd>
+
+                        <dt class="col-sm-5 text-muted fw-normal">هاتف ولي الأمر</dt>
+                        <dd class="col-sm-7 font-monospace small">{{ student.parent_phone|default:"—" }}</dd>
+
+                        <dt class="col-sm-5 text-muted fw-normal">تاريخ الإضافة</dt>
+                        <dd class="col-sm-7 small text-muted">{{ student.created_at|date:"Y/m/d H:i" }}</dd>
+
+                        <dt class="col-sm-5 text-muted fw-normal">آخر تحديث</dt>
+                        <dd class="col-sm-7 small text-muted">{{ student.updated_at|date:"Y/m/d H:i" }}</dd>
+                    </dl>
+                </div>
+            </div>
+        </div>
+
+        <!-- Notes card -->
+        {% if student.notes %}
+        <div class="col-12">
+            <div class="card border-0 shadow-sm">
+                <div class="card-header bg-transparent fw-semibold">
+                    <i class="bi bi-journal-text me-2 text-secondary"></i>ملاحظات
+                </div>
+                <div class="card-body">
+                    <p class="mb-0" style="white-space: pre-wrap;">{{ student.notes }}</p>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- Teachers card -->
+        {% if teachers %}
+        <div class="col-lg-6">
+            <div class="card border-0 shadow-sm">
+                <div class="card-header bg-transparent fw-semibold">
+                    <i class="bi bi-person-workspace me-2 text-success"></i>المعلمون المرتبطون
+                </div>
+                <div class="card-body p-0">
+                    <ul class="list-group list-group-flush">
+                        {% for link in teachers %}
+                        <li class="list-group-item d-flex justify-content-between align-items-center">
+                            <span>
+                                <i class="bi bi-person me-2 text-muted"></i>
+                                {{ link.teacher.full_name }}
+                                {% if link.teacher.subject %}
+                                <small class="text-muted ms-1">— {{ link.teacher.subject }}</small>
+                                {% endif %}
+                            </span>
+                            {% if link.is_primary %}
+                            <span class="badge bg-primary bg-opacity-10 text-primary border border-primary-subtle">رئيسي</span>
+                            {% endif %}
+                        </li>
+                        {% endfor %}
+                    </ul>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- Attendance summary card -->
+        <div class="col-lg-6">
+            <div class="card border-0 shadow-sm">
+                <div class="card-header bg-transparent fw-semibold d-flex justify-content-between align-items-center">
+                    <span><i class="bi bi-bar-chart-line me-2 text-info"></i>ملخص الحضور</span>
+                    <a href="{% url 'admin_portal:student_history' student.id %}" class="btn btn-outline-info btn-sm">
+                        عرض الكل
+                    </a>
+                </div>
+                <div class="card-body">
+                    <div class="text-center mb-3">
+                        <span class="display-6 fw-bold text-primary">{{ total_records }}</span>
+                        <div class="text-muted small">إجمالي جلسات الحضور</div>
+                    </div>
+                    {% if recent_records %}
+                    <p class="small fw-semibold text-muted mb-2">آخر الجلسات:</p>
+                    <ul class="list-unstyled mb-0">
+                        {% for rec in recent_records %}
+                        <li class="d-flex justify-content-between small py-1 border-bottom border-light">
+                            <span class="text-muted">{{ rec.date|date:"Y/m/d" }}</span>
+                            <span>
+                                {% if rec.assigned_teacher %}{{ rec.assigned_teacher.full_name }}{% else %}—{% endif %}
+                            </span>
+                            <span class="badge
+                                {% if rec.rating >= 8 %}bg-success
+                                {% elif rec.rating >= 5 %}bg-warning text-dark
+                                {% else %}bg-danger{% endif %}">
+                                {{ rec.rating }}/10
+                            </span>
+                        </li>
+                        {% endfor %}
+                    </ul>
+                    {% else %}
+                    <p class="text-muted small text-center mb-0">لا توجد سجلات حضور بعد</p>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+    </div>
+</div>
+{% endblock %}

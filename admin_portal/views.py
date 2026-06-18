@@ -69,6 +69,7 @@ def student_list(request):
     q = request.GET.get('q', '').strip()
     grade_filter = request.GET.get('grade', '').strip()
     gender_filter = request.GET.get('gender', '').strip()
+    birth_year_filter = request.GET.get('birth_year', '').strip()
     sort = request.GET.get('sort', '').strip()
 
     qs = Student.objects.annotate(avg_rating=Avg('attendance_records__rating'))
@@ -77,16 +78,25 @@ def student_list(request):
             Q(full_name__icontains=q)
             | Q(national_id__icontains=q)
             | Q(student_code__icontains=q)
+            | Q(nickname__icontains=q)
+            | Q(phone__icontains=q)
+            | Q(parent_phone__icontains=q)
         )
     if grade_filter:
         qs = qs.filter(grade=grade_filter)
     if gender_filter:
         qs = qs.filter(gender=gender_filter)
+    if birth_year_filter:
+        qs = qs.filter(date_of_birth__year=birth_year_filter)
 
     if sort == 'avg_rating_desc':
         qs = qs.order_by(models.F('avg_rating').desc(nulls_last=True))
     elif sort == 'avg_rating_asc':
         qs = qs.order_by(models.F('avg_rating').asc(nulls_last=True))
+    elif sort == 'name_asc':
+        qs = qs.order_by('full_name')
+    elif sort == 'name_desc':
+        qs = qs.order_by('-full_name')
 
     grades = (
         Student.objects
@@ -97,6 +107,14 @@ def student_list(request):
         .order_by('grade')
     )
 
+    birth_years = (
+        Student.objects
+        .exclude(date_of_birth__isnull=True)
+        .values_list('date_of_birth__year', flat=True)
+        .distinct()
+        .order_by('-date_of_birth__year')
+    )
+
     paginator = Paginator(qs, 25)
     page_obj = paginator.get_page(request.GET.get('page'))
 
@@ -105,7 +123,9 @@ def student_list(request):
         'q': q,
         'grade_filter': grade_filter,
         'gender_filter': gender_filter,
+        'birth_year_filter': birth_year_filter,
         'grades': grades,
+        'birth_years': birth_years,
         'total_count': qs.count(),
         'sort': sort,
     })
@@ -163,6 +183,31 @@ def student_delete(request, pk):
     student.delete()
     messages.success(request, f'تم حذف الطالب "{name}" بنجاح')
     return redirect('admin_portal:student_list')
+
+
+@admin_required
+def student_detail(request, pk):
+    """Full profile page for a single student."""
+    student = get_object_or_404(Student, pk=pk)
+    teachers = (
+        StudentTeacherLink.objects
+        .filter(student=student)
+        .select_related('teacher')
+    )
+    from attendance.models import StudentAttendanceRecord
+    recent_records = (
+        StudentAttendanceRecord.objects
+        .filter(student=student)
+        .select_related('assigned_teacher')
+        .order_by('-date')[:10]
+    )
+    total_records = StudentAttendanceRecord.objects.filter(student=student).count()
+    return render(request, 'admin_portal/student_detail.html', {
+        'student': student,
+        'teachers': teachers,
+        'recent_records': recent_records,
+        'total_records': total_records,
+    })
 
 
 @admin_required
