@@ -14,53 +14,73 @@
     </div>
 
     <div class="row justify-content-center">
-        <div class="col-lg-6 col-md-8">
-            <div class="card border-0 shadow-sm">
-                <div class="card-body p-4">
-                    <form method="post" novalidate>
-                        {% csrf_token %}
+        <div class="col-lg-7 col-md-9">
 
-                        {% for field in form %}
-                        <div class="mb-3">
-                            <label for="{{ field.id_for_label }}" class="form-label fw-semibold">
-                                {{ field.label }}
-                                {% if field.field.required %}
-                                <span class="text-danger" title="مطلوب">*</span>
-                                {% endif %}
-                            </label>
-                            {{ field }}
-                            {% if field.help_text %}
-                            <div class="form-text text-muted">{{ field.help_text }}</div>
-                            {% endif %}
-                            {% for error in field.errors %}
-                            <div class="invalid-feedback d-block">
-                                <i class="bi bi-exclamation-circle me-1"></i>{{ error }}
-                            </div>
-                            {% endfor %}
-                        </div>
-                        {% endfor %}
-
-                        {% if form.non_field_errors %}
-                        <div class="alert alert-danger">
-                            {% for error in form.non_field_errors %}
-                            <div>{{ error }}</div>
-                            {% endfor %}
-                        </div>
-                        {% endif %}
-
-                        <div class="d-flex gap-2 mt-4">
-                            <button type="submit" class="btn btn-primary">
-                                <i class="bi bi-check-lg me-1"></i>{{ submit_label }}
-                            </button>
-                            <a href="{% url 'admin_portal:student_list' %}" class="btn btn-outline-secondary">إلغاء</a>
-                        </div>
-                    </form>
-                </div>
+            {% if form.non_field_errors %}
+            <div class="alert alert-danger mb-3">
+                {% for error in form.non_field_errors %}<div>{{ error }}</div>{% endfor %}
             </div>
+            {% endif %}
+
+            <form method="post" novalidate>
+                {% csrf_token %}
+
+                {% with fc=form %}
+
+                <!-- ── بيانات الطالب الأساسية ───────────────────── -->
+                <div class="card border-0 shadow-sm mb-4">
+                    <div class="card-header bg-primary bg-opacity-10 fw-semibold">
+                        <i class="bi bi-person-badge me-2 text-primary"></i>بيانات الطالب
+                    </div>
+                    <div class="card-body p-4">
+                        <div class="row g-3">
+                            {% include "admin_portal/_form_field.html" with field=fc.full_name col="col-md-8" %}
+                            {% include "admin_portal/_form_field.html" with field=fc.nickname col="col-md-4" %}
+                            {% include "admin_portal/_form_field.html" with field=fc.national_id col="col-md-6" %}
+                            {% include "admin_portal/_form_field.html" with field=fc.student_code col="col-md-6" %}
+                            {% include "admin_portal/_form_field.html" with field=fc.grade col="col-md-6" %}
+                            {% include "admin_portal/_form_field.html" with field=fc.gender col="col-md-6" %}
+                            {% include "admin_portal/_form_field.html" with field=fc.phone col="col-md-6" %}
+                            {% include "admin_portal/_form_field.html" with field=fc.date_of_birth col="col-md-6" %}
+                            {% include "admin_portal/_form_field.html" with field=fc.joining_date col="col-md-6" %}
+                            {% include "admin_portal/_form_field.html" with field=fc.hall_name col="col-md-6" %}
+                            {% include "admin_portal/_form_field.html" with field=fc.notes col="col-12" %}
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ── بيانات ولي الأمر ─────────────────────────── -->
+                <div class="card border-0 shadow-sm mb-4">
+                    <div class="card-header bg-warning bg-opacity-10 fw-semibold">
+                        <i class="bi bi-people me-2 text-warning-emphasis"></i>بيانات ولي الأمر
+                    </div>
+                    <div class="card-body p-4">
+                        <div class="row g-3">
+                            {% include "admin_portal/_form_field.html" with field=fc.parent_full_name col="col-md-8" %}
+                            {% include "admin_portal/_form_field.html" with field=fc.parent_marital_status col="col-md-4" %}
+                            {% include "admin_portal/_form_field.html" with field=fc.parent_qualification col="col-md-6" %}
+                            {% include "admin_portal/_form_field.html" with field=fc.parent_job col="col-md-6" %}
+                            {% include "admin_portal/_form_field.html" with field=fc.parent_spouse_job col="col-md-6" %}
+                            {% include "admin_portal/_form_field.html" with field=fc.parent_phone col="col-md-6" %}
+                            {% include "admin_portal/_form_field.html" with field=fc.parent_calls_phone col="col-md-6" %}
+                            {% include "admin_portal/_form_field.html" with field=fc.child_pickup_person col="col-md-6" %}
+                            {% include "admin_portal/_form_field.html" with field=fc.parent_address col="col-12" %}
+                        </div>
+                    </div>
+                </div>
+
+                {% endwith %}
+
+                <div class="d-flex gap-2 mb-4">
+                    <button type="submit" class="btn btn-primary">
+                        <i class="bi bi-check-lg me-1"></i>{{ submit_label }}
+                    </button>
+                    <a href="{% url 'admin_portal:student_list' %}" class="btn btn-outline-secondary">إلغاء</a>
+                </div>
+            </form>
 
             {% if student %}
-            <!-- Metadata card for edit mode -->
-            <div class="card border-0 shadow-sm mt-3">
+            <div class="card border-0 shadow-sm mb-4">
                 <div class="card-body py-2 px-4">
                     <small class="text-muted">
                         <i class="bi bi-qr-code me-1"></i>UUID: <code>{{ student.id }}</code>
@@ -73,6 +93,7 @@
                 </div>
             </div>
             {% endif %}
+
         </div>
     </div>
 </div>

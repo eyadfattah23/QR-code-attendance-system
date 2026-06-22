@@ -101,15 +101,58 @@
                         <dt class="col-sm-5 text-muted fw-normal">هاتف الطالب</dt>
                         <dd class="col-sm-7 font-monospace small">{{ student.phone|default:"—" }}</dd>
 
-                        <dt class="col-sm-5 text-muted fw-normal">هاتف ولي الأمر</dt>
-                        <dd class="col-sm-7 font-monospace small">{{ student.parent_phone|default:"—" }}</dd>
-
                         <dt class="col-sm-5 text-muted fw-normal">تاريخ الإضافة</dt>
                         <dd class="col-sm-7 small text-muted">{{ student.created_at|date:"Y/m/d H:i" }}</dd>
 
                         <dt class="col-sm-5 text-muted fw-normal">آخر تحديث</dt>
                         <dd class="col-sm-7 small text-muted">{{ student.updated_at|date:"Y/m/d H:i" }}</dd>
                     </dl>
+                </div>
+            </div>
+        </div>
+
+        <!-- Parent / Guardian card -->
+        <div class="col-12">
+            <div class="card border-0 shadow-sm">
+                <div class="card-header bg-warning bg-opacity-10 fw-semibold">
+                    <i class="bi bi-people me-2 text-warning-emphasis"></i>بيانات ولي الأمر
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <dl class="row mb-0">
+                                <dt class="col-sm-5 text-muted fw-normal">الاسم الرباعي</dt>
+                                <dd class="col-sm-7 fw-semibold">{{ student.parent_full_name|default:"—" }}</dd>
+
+                                <dt class="col-sm-5 text-muted fw-normal">المؤهل الدراسي</dt>
+                                <dd class="col-sm-7">{{ student.parent_qualification|default:"—" }}</dd>
+
+                                <dt class="col-sm-5 text-muted fw-normal">الوظيفة</dt>
+                                <dd class="col-sm-7">{{ student.parent_job|default:"—" }}</dd>
+
+                                <dt class="col-sm-5 text-muted fw-normal">الحالة الاجتماعية</dt>
+                                <dd class="col-sm-7">{{ student.get_parent_marital_status_display|default:"—" }}</dd>
+
+                                <dt class="col-sm-5 text-muted fw-normal">وظيفة الزوج / الزوجة</dt>
+                                <dd class="col-sm-7">{{ student.parent_spouse_job|default:"—" }}</dd>
+                            </dl>
+                        </div>
+                        <div class="col-md-6">
+                            <dl class="row mb-0">
+                                <dt class="col-sm-5 text-muted fw-normal">واتساب ولي الأمر</dt>
+                                <dd class="col-sm-7 font-monospace small">{{ student.parent_phone|default:"—" }}</dd>
+
+                                <dt class="col-sm-5 text-muted fw-normal">رقم المكالمات</dt>
+                                <dd class="col-sm-7 font-monospace small">{{ student.parent_calls_phone|default:"—" }}</dd>
+
+                                <dt class="col-sm-5 text-muted fw-normal">من يستلم الطفل</dt>
+                                <dd class="col-sm-7">{{ student.child_pickup_person|default:"—" }}</dd>
+
+                                <dt class="col-sm-5 text-muted fw-normal">العنوان</dt>
+                                <dd class="col-sm-7" style="white-space:pre-wrap;">{{ student.parent_address|default:"—" }}</dd>
+                            </dl>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>

@@ -19,6 +19,10 @@ class StudentForm(forms.ModelForm):
             'full_name', 'nickname', 'national_id', 'student_code',
             'grade', 'gender', 'phone', 'parent_phone',
             'date_of_birth', 'joining_date', 'hall_name', 'notes',
+            # Parent / Guardian
+            'parent_full_name', 'parent_qualification', 'parent_job',
+            'parent_calls_phone', 'parent_marital_status', 'parent_spouse_job',
+            'parent_address', 'child_pickup_person',
         ]
         labels = {
             'full_name': 'الاسم الكامل',
@@ -28,20 +32,31 @@ class StudentForm(forms.ModelForm):
             'grade': 'الصف / المستوى',
             'gender': 'الجنس',
             'phone': 'هاتف الطالب',
-            'parent_phone': 'هاتف ولي الأمر',
+            'parent_phone': 'واتساب ولي الأمر',
             'date_of_birth': 'تاريخ الميلاد',
             'joining_date': 'تاريخ الانضمام',
             'hall_name': 'اسم القاعة',
             'notes': 'ملاحظات',
+            'parent_full_name': 'الاسم الرباعي لولي الأمر',
+            'parent_qualification': 'المؤهل الدراسي',
+            'parent_job': 'الوظيفة الحالية',
+            'parent_calls_phone': 'رقم المكالمات',
+            'parent_marital_status': 'الحالة الاجتماعية',
+            'parent_spouse_job': 'وظيفة الزوج / الزوجة',
+            'parent_address': 'العنوان',
+            'child_pickup_person': 'من يستلم الطفل',
         }
         help_texts = {
             'student_code': 'اختياري — يُملأ تلقائياً من الرقم القومي إن تُرك فارغاً',
             'grade': 'مثال: السنة الأولى، المستوى 5',
             'phone': 'اختياري — 11 رقماً يبدأ بـ 01',
             'parent_phone': 'اختياري — 11 رقماً يبدأ بـ 01',
+            'parent_calls_phone': 'اختياري — 11 رقماً يبدأ بـ 01 (يمكن أن يكون نفس الواتساب)',
             'nickname': 'اختياري',
             'hall_name': 'اختياري',
             'notes': 'اختياري',
+            'parent_spouse_job': 'اختياري',
+            'child_pickup_person': 'اختياري',
         }
         widgets = {
             'full_name': forms.TextInput(attrs={'class': 'form-control', 'autofocus': True}),
@@ -56,6 +71,14 @@ class StudentForm(forms.ModelForm):
             'joining_date': forms.DateInput(attrs={'class': 'form-control', 'type': 'date'}),
             'hall_name': forms.TextInput(attrs={'class': 'form-control'}),
             'notes': forms.Textarea(attrs={'class': 'form-control', 'rows': 3}),
+            'parent_full_name': forms.TextInput(attrs={'class': 'form-control'}),
+            'parent_qualification': forms.TextInput(attrs={'class': 'form-control'}),
+            'parent_job': forms.TextInput(attrs={'class': 'form-control'}),
+            'parent_calls_phone': forms.TextInput(attrs={'class': 'form-control', 'dir': 'ltr', 'placeholder': '01XXXXXXXXX'}),
+            'parent_marital_status': forms.Select(attrs={'class': 'form-select'}),
+            'parent_spouse_job': forms.TextInput(attrs={'class': 'form-control'}),
+            'parent_address': forms.Textarea(attrs={'class': 'form-control', 'rows': 2}),
+            'child_pickup_person': forms.TextInput(attrs={'class': 'form-control'}),
         }
         error_messages = {
             'full_name': {

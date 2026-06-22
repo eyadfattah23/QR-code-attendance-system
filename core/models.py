@@ -195,8 +195,66 @@ class Student(models.Model):
         blank=True,
         null=True,
         validators=[_egyptian_phone_validator],
-        help_text="Parent phone number (11 digits starting with 01)",
+        help_text="Parent WhatsApp number (11 digits starting with 01)",
     )
+    # --------------- Parent / Guardian information ---------------
+    parent_full_name = models.CharField(
+        max_length=255,
+        blank=True,
+        default='',
+        help_text="الاسم الرباعي لولي الأمر",
+    )
+    parent_qualification = models.CharField(
+        max_length=200,
+        blank=True,
+        default='',
+        help_text="المؤهل الدراسي لولي الأمر",
+    )
+    parent_job = models.CharField(
+        max_length=200,
+        blank=True,
+        default='',
+        help_text="الوظيفة الحالية لولي الأمر",
+    )
+    parent_calls_phone = models.CharField(
+        max_length=11,
+        blank=True,
+        null=True,
+        validators=[_egyptian_phone_validator],
+        help_text="رقم هاتف المكالمات لولي الأمر (11 رقماً يبدأ بـ 01)",
+    )
+
+    class MaritalStatus(models.TextChoices):
+        MARRIED = 'married', 'متزوج'
+        DIVORCED = 'divorced', 'مطلق'
+        WIDOWED = 'widowed', 'أرمل'
+        SEPARATED = 'separated', 'منفصل'
+
+    parent_marital_status = models.CharField(
+        max_length=20,
+        choices=MaritalStatus.choices,
+        blank=True,
+        default='',
+        help_text="الحالة الاجتماعية لولي الأمر",
+    )
+    parent_spouse_job = models.CharField(
+        max_length=200,
+        blank=True,
+        default='',
+        help_text="وظيفة الزوج / الزوجة (إن وُجدت)",
+    )
+    parent_address = models.TextField(
+        blank=True,
+        default='',
+        help_text="عنوان السكن",
+    )
+    child_pickup_person = models.CharField(
+        max_length=255,
+        blank=True,
+        default='',
+        help_text="من يستلم الطفل بعد الانتهاء",
+    )
+    # --------------- Dates & extra ---------------
     date_of_birth = models.DateField(
         blank=True,
         null=True,
@@ -246,7 +304,8 @@ class Student(models.Model):
         today = date.today()
         return (
             today.year - self.date_of_birth.year
-            - ((today.month, today.day) < (self.date_of_birth.month, self.date_of_birth.day))
+            - ((today.month, today.day) <
+               (self.date_of_birth.month, self.date_of_birth.day))
         )
 
 
