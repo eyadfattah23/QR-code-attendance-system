@@ -144,9 +144,26 @@ def station_view(request):
                                         ),
                                         "row_class": "warning",
                                     })
+                                elif (now - teacher_record.check_in_time).total_seconds() < 300:
+                                    # Less than 5 minutes since check-in — reject
+                                    elapsed = int(
+                                        (now - teacher_record.check_in_time).total_seconds() // 60)
+                                    remaining = 5 - elapsed
+                                    results.append({
+                                        "status": "warning",
+                                        "icon": "bi-clock-fill",
+                                        "label": "مبكر جداً",
+                                        "message": (
+                                            f"{teacher.full_name} (معلم) - لا يمكن تسجيل المغادرة "
+                                            f"قبل مرور 5 دقائق من الحضور "
+                                            f"(باقي {remaining} دقيقة)"
+                                        ),
+                                        "row_class": "warning",
+                                    })
                                 else:
                                     teacher_record.check_out_time = now
-                                    teacher_record.save(update_fields=['check_out_time'])
+                                    teacher_record.save(
+                                        update_fields=['check_out_time'])
                                     results.append({
                                         "status": "checkout",
                                         "icon": "bi-door-open-fill",
@@ -188,7 +205,8 @@ def station_view(request):
                     }
                 )
 
-    success_count = sum(1 for item in results if item["status"] in ("success", "checkout"))
+    success_count = sum(
+        1 for item in results if item["status"] in ("success", "checkout"))
     warning_count = sum(1 for item in results if item["status"] == "warning")
     error_count = sum(1 for item in results if item["status"] == "error")
 
