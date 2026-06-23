@@ -16,6 +16,10 @@
                 <i class="bi bi-file-earmark-excel me-1"></i>
                 استيراد Excel
             </button>
+            <a href="{% url 'admin_portal:student_export' %}{% if q or grade_filter or gender_filter %}?{% if q %}q={{ q }}{% endif %}{% if grade_filter %}&grade={{ grade_filter }}{% endif %}{% if gender_filter %}&gender={{ gender_filter }}{% endif %}{% endif %}" class="btn btn-outline-secondary">
+                <i class="bi bi-download me-1"></i>
+                تصدير Excel
+            </a>
             <a href="{% url 'admin_portal:student_create' %}" class="btn btn-primary">
                 <i class="bi bi-person-plus me-1"></i>
                 إضافة طالب
@@ -260,7 +264,7 @@
                 <div class="modal-body">
                     <p class="text-muted small mb-3">
                         أعمدة <strong>مطلوبة</strong>: <code>full_name</code>، <code>national_id</code><br>
-                        أعمدة <strong>اختيارية</strong>: <code>student_code</code>، <code>grade</code>، <code>phone</code>، <code>parent_phone</code>
+                        أعمدة <strong>اختيارية</strong>: <code>student_code</code>، <code>grade</code>، <code>gender</code>، <code>phone</code>، <code>nickname</code>، <code>date_of_birth</code>، <code>joining_date</code>، <code>hall_name</code>، <code>notes</code>، <code>parent_phone</code>، <code>parent_full_name</code>، <code>parent_qualification</code>، <code>parent_job</code>، <code>parent_calls_phone</code>، <code>parent_marital_status</code>، <code>parent_spouse_job</code>، <code>parent_address</code>، <code>child_pickup_person</code>
                     </p>
                     <div class="mb-3">
                         <label class="form-label fw-semibold">ملف Excel (.xlsx)</label>

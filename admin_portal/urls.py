@@ -13,6 +13,7 @@ urlpatterns = [
     path('students/import/template/', views.student_import_template,
          name='student_import_template'),
     path('students/import/', views.student_import, name='student_import'),
+    path('students/export/', views.student_export, name='student_export'),
     path('students/<uuid:pk>/history/',
          views.student_history, name='student_history'),
     path('students/<uuid:pk>/detail/', views.student_detail, name='student_detail'),

@@ -283,6 +283,41 @@ def student_import(request):
         else:
             gender_val = None
 
+        # New fields
+        nickname = _cell('nickname') or ''
+        hall_name = _cell('hall_name') or ''
+        notes = _cell('notes') or ''
+        parent_full_name = _cell('parent_full_name') or ''
+        parent_qualification = _cell('parent_qualification') or ''
+        parent_job = _cell('parent_job') or ''
+        parent_calls_phone = _cell('parent_calls_phone') or None
+        parent_spouse_job = _cell('parent_spouse_job') or ''
+        parent_address = _cell('parent_address') or ''
+        child_pickup_person = _cell('child_pickup_person') or ''
+
+        marital_raw = _cell('parent_marital_status').lower()
+        valid_marital = {'married', 'divorced', 'widowed', 'separated'}
+        parent_marital_status = marital_raw if marital_raw in valid_marital else ''
+
+        def _parse_date(val):
+            if not val:
+                return None
+            from datetime import date as _date, datetime as _dt
+            if isinstance(val, _dt):
+                return val.date()
+            if isinstance(val, _date):
+                return val
+            s = str(val).strip()
+            for fmt in ('%Y-%m-%d', '%d/%m/%Y', '%d-%m-%Y'):
+                try:
+                    return _dt.strptime(s, fmt).date()
+                except ValueError:
+                    pass
+            return None
+
+        date_of_birth = _parse_date(row[col['date_of_birth']] if 'date_of_birth' in col else None)
+        joining_date = _parse_date(row[col['joining_date']] if 'joining_date' in col else None)
+
         try:
             Student.objects.create(
                 full_name=full_name,
@@ -292,6 +327,19 @@ def student_import(request):
                 phone=phone,
                 parent_phone=parent_phone,
                 gender=gender_val,
+                nickname=nickname,
+                hall_name=hall_name,
+                notes=notes,
+                date_of_birth=date_of_birth,
+                joining_date=joining_date,
+                parent_full_name=parent_full_name,
+                parent_qualification=parent_qualification,
+                parent_job=parent_job,
+                parent_calls_phone=parent_calls_phone,
+                parent_marital_status=parent_marital_status,
+                parent_spouse_job=parent_spouse_job,
+                parent_address=parent_address,
+                child_pickup_person=child_pickup_person,
             )
             created += 1
         except Exception as exc:
@@ -462,8 +510,22 @@ def student_import_template(request):
     wb = openpyxl.Workbook()
     ws = wb.active
     ws.title = 'Students'
-    ws.append(['full_name', 'national_id', 'student_code', 'grade', 'phone', 'parent_phone', 'gender'])
-    ws.append(['أحمد محمد علي', '12345678901234', 'STU001', 'السنة الأولى', '', '', 'M'])
+    ws.append([
+        'full_name', 'national_id', 'student_code', 'grade', 'gender', 'phone',
+        'nickname', 'date_of_birth', 'joining_date', 'hall_name', 'notes',
+        'parent_phone', 'parent_full_name', 'parent_qualification', 'parent_job',
+        'parent_calls_phone', 'parent_marital_status', 'parent_spouse_job',
+        'parent_address', 'child_pickup_person',
+    ])
+    ws.append([
+        'أحمد محمد علي', '12345678901234', 'STU001', 'السنة الأولى', 'M', '',
+        'أحمد', '2010-05-15', '2024-09-01', 'قاعة 1', '',
+        '01012345678', 'محمد علي حسن سالم', 'بكالوريوس', 'مهندس',
+        '01098765432', 'married', '', 'القاهرة', '',
+    ])
+    # Add a note row explaining parent_marital_status valid values
+    ws.append([])
+    ws.append(['# parent_marital_status القيم المقبولة: married / divorced / widowed / separated'])
 
     buf = io.BytesIO()
     wb.save(buf)
@@ -474,6 +536,72 @@ def student_import_template(request):
         content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
     )
     response['Content-Disposition'] = 'attachment; filename="students_import_template.xlsx"'
+    return response
+
+
+@admin_required
+@require_http_methods(['GET'])
+def student_export(request):
+    """Export all student records (with parent data) to Excel."""
+    q = request.GET.get('q', '').strip()
+    grade_filter = request.GET.get('grade', '').strip()
+    gender_filter = request.GET.get('gender', '').strip()
+
+    qs = Student.objects.all().order_by('full_name')
+    if q:
+        qs = qs.filter(
+            Q(full_name__icontains=q)
+            | Q(national_id__icontains=q)
+            | Q(student_code__icontains=q)
+            | Q(nickname__icontains=q)
+        )
+    if grade_filter:
+        qs = qs.filter(grade=grade_filter)
+    if gender_filter:
+        qs = qs.filter(gender=gender_filter)
+
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws.title = 'Students'
+    ws.append([
+        'full_name', 'national_id', 'student_code', 'grade', 'gender', 'phone',
+        'nickname', 'date_of_birth', 'joining_date', 'hall_name', 'notes',
+        'parent_phone', 'parent_full_name', 'parent_qualification', 'parent_job',
+        'parent_calls_phone', 'parent_marital_status', 'parent_spouse_job',
+        'parent_address', 'child_pickup_person',
+    ])
+    for s in qs:
+        ws.append([
+            s.full_name,
+            s.national_id,
+            s.student_code or '',
+            s.grade or '',
+            s.gender or '',
+            s.phone or '',
+            s.nickname,
+            s.date_of_birth.isoformat() if s.date_of_birth else '',
+            s.joining_date.isoformat() if s.joining_date else '',
+            s.hall_name,
+            s.notes,
+            s.parent_phone or '',
+            s.parent_full_name,
+            s.parent_qualification,
+            s.parent_job,
+            s.parent_calls_phone or '',
+            s.parent_marital_status,
+            s.parent_spouse_job,
+            s.parent_address,
+            s.child_pickup_person,
+        ])
+
+    buf = io.BytesIO()
+    wb.save(buf)
+    buf.seek(0)
+    response = HttpResponse(
+        buf.read(),
+        content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    )
+    response['Content-Disposition'] = 'attachment; filename="students_export.xlsx"'
     return response
 
 
