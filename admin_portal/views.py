@@ -70,6 +70,7 @@ def student_list(request):
     grade_filter = request.GET.get('grade', '').strip()
     gender_filter = request.GET.get('gender', '').strip()
     birth_year_filter = request.GET.get('birth_year', '').strip()
+    hall_filter = request.GET.get('hall', '').strip()
     sort = request.GET.get('sort', '').strip()
 
     qs = Student.objects.annotate(avg_rating=Avg('attendance_records__rating'))
@@ -88,6 +89,8 @@ def student_list(request):
         qs = qs.filter(gender=gender_filter)
     if birth_year_filter:
         qs = qs.filter(date_of_birth__year=birth_year_filter)
+    if hall_filter:
+        qs = qs.filter(hall_name=hall_filter)
 
     if sort == 'avg_rating_desc':
         qs = qs.order_by(models.F('avg_rating').desc(nulls_last=True))
@@ -115,6 +118,14 @@ def student_list(request):
         .order_by('-date_of_birth__year')
     )
 
+    halls = (
+        Student.objects
+        .exclude(hall_name='').exclude(hall_name__isnull=True)
+        .values_list('hall_name', flat=True)
+        .distinct()
+        .order_by('hall_name')
+    )
+
     paginator = Paginator(qs, 25)
     page_obj = paginator.get_page(request.GET.get('page'))
 
@@ -124,8 +135,10 @@ def student_list(request):
         'grade_filter': grade_filter,
         'gender_filter': gender_filter,
         'birth_year_filter': birth_year_filter,
+        'hall_filter': hall_filter,
         'grades': grades,
         'birth_years': birth_years,
+        'halls': halls,
         'total_count': qs.count(),
         'sort': sort,
     })
@@ -201,7 +214,8 @@ def student_detail(request, pk):
         .select_related('assigned_teacher')
         .order_by('-date')[:10]
     )
-    total_records = StudentAttendanceRecord.objects.filter(student=student).count()
+    total_records = StudentAttendanceRecord.objects.filter(
+        student=student).count()
     return render(request, 'admin_portal/student_detail.html', {
         'student': student,
         'teachers': teachers,
@@ -315,8 +329,10 @@ def student_import(request):
                     pass
             return None
 
-        date_of_birth = _parse_date(row[col['date_of_birth']] if 'date_of_birth' in col else None)
-        joining_date = _parse_date(row[col['joining_date']] if 'joining_date' in col else None)
+        date_of_birth = _parse_date(
+            row[col['date_of_birth']] if 'date_of_birth' in col else None)
+        joining_date = _parse_date(
+            row[col['joining_date']] if 'joining_date' in col else None)
 
         try:
             Student.objects.create(
@@ -390,7 +406,8 @@ def teacher_import(request):
         messages.warning(request, 'الملف لا يحتوي على بيانات')
         return redirect('admin_portal:teacher_list')
 
-    headers = [str(h).strip().lower() if h is not None else '' for h in rows[0]]
+    headers = [str(h).strip().lower()
+               if h is not None else '' for h in rows[0]]
     required = {'full_name', 'phone', 'password'}
     if not required.issubset(set(headers)):
         missing = required - set(headers)
@@ -474,7 +491,8 @@ def teacher_import(request):
         preview = ' | '.join(error_msgs[:5])
         if len(error_msgs) > 5:
             preview += f' ... (+{len(error_msgs) - 5} أخطاء أخرى)'
-        messages.error(request, f'{len(error_msgs)} خطأ أثناء الاستيراد: {preview}')
+        messages.error(
+            request, f'{len(error_msgs)} خطأ أثناء الاستيراد: {preview}')
     if not created and not skipped and not error_msgs:
         messages.info(request, 'لم يتم العثور على بيانات جديدة للاستيراد')
 
@@ -488,8 +506,10 @@ def teacher_import_template(request):
     wb = openpyxl.Workbook()
     ws = wb.active
     ws.title = 'Teachers'
-    ws.append(['full_name', 'phone', 'password', 'subject', 'first_name', 'last_name', 'gender'])
-    ws.append(['أحمد محمد', '01012345678', 'password123', 'رياضيات', 'أحمد', 'محمد', 'M'])
+    ws.append(['full_name', 'phone', 'password', 'subject',
+              'first_name', 'last_name', 'gender'])
+    ws.append(['أحمد محمد', '01012345678', 'password123',
+              'رياضيات', 'أحمد', 'محمد', 'M'])
 
     buf = io.BytesIO()
     wb.save(buf)
@@ -525,7 +545,8 @@ def student_import_template(request):
     ])
     # Add a note row explaining parent_marital_status valid values
     ws.append([])
-    ws.append(['# parent_marital_status القيم المقبولة: married / divorced / widowed / separated'])
+    ws.append(
+        ['# parent_marital_status القيم المقبولة: married / divorced / widowed / separated'])
 
     buf = io.BytesIO()
     wb.save(buf)
@@ -1150,10 +1171,12 @@ def teacher_mark_absent(request, pk):
     teacher = get_object_or_404(
         Teacher.objects.prefetch_related('student_links__student'), pk=pk
     )
-    all_teachers = Teacher.objects.select_related('user').exclude(pk=pk).order_by('full_name')
+    all_teachers = Teacher.objects.select_related(
+        'user').exclude(pk=pk).order_by('full_name')
 
     # --- resolve date ---
-    date_str = (request.POST.get('date') or request.GET.get('date', '')).strip()
+    date_str = (request.POST.get('date')
+                or request.GET.get('date', '')).strip()
     try:
         absence_date = date_type.fromisoformat(date_str)
     except ValueError:
@@ -1161,7 +1184,8 @@ def teacher_mark_absent(request, pk):
 
     # --- students linked to this teacher ---
     linked_students = list(
-        Student.objects.filter(teacher_links__teacher=teacher).order_by('full_name')
+        Student.objects.filter(
+            teacher_links__teacher=teacher).order_by('full_name')
     )
 
     # attendance records for the selected date keyed by student UUID string
@@ -1172,8 +1196,10 @@ def teacher_mark_absent(request, pk):
     )
     record_by_student = {str(r.student_id): r for r in records_qs}
 
-    present_students = [s for s in linked_students if str(s.id) in record_by_student]
-    not_present_students = [s for s in linked_students if str(s.id) not in record_by_student]
+    present_students = [s for s in linked_students if str(
+        s.id) in record_by_student]
+    not_present_students = [s for s in linked_students if str(
+        s.id) not in record_by_student]
 
     if request.method == 'POST':
         updated = 0
@@ -1193,7 +1219,8 @@ def teacher_mark_absent(request, pk):
             rec.assigned_teacher = substitute
             if not rec.substitute_note:
                 rec.substitute_note = f'غياب المعلم {teacher.full_name}'
-            rec.save(update_fields=['original_teacher', 'assigned_teacher', 'substitute_note'])
+            rec.save(update_fields=['original_teacher',
+                     'assigned_teacher', 'substitute_note'])
             updated += 1
 
         if updated:

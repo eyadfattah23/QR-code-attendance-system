@@ -16,7 +16,8 @@
                 <i class="bi bi-file-earmark-excel me-1"></i>
                 استيراد Excel
             </button>
-            <a href="{% url 'admin_portal:student_export' %}{% if q or grade_filter or gender_filter %}?{% if q %}q={{ q }}{% endif %}{% if grade_filter %}&grade={{ grade_filter }}{% endif %}{% if gender_filter %}&gender={{ gender_filter }}{% endif %}{% endif %}" class="btn btn-outline-secondary">
+            <a href="{% url 'admin_portal:student_export' %}{% if q or grade_filter or gender_filter %}?{% if q %}q={{ q }}{% endif %}{% if grade_filter %}&grade={{ grade_filter }}{% endif %}{% if gender_filter %}&gender={{ gender_filter }}{% endif %}{% endif %}"
+                class="btn btn-outline-secondary">
                 <i class="bi bi-download me-1"></i>
                 تصدير Excel
             </a>
@@ -58,7 +59,17 @@
                     <select name="birth_year" class="form-select">
                         <option value="">— الكل —</option>
                         {% for yr in birth_years %}
-                        <option value="{{ yr }}" {% if yr|stringformat:"s" == birth_year_filter %}selected{% endif %}>{{ yr }}</option>
+                        <option value="{{ yr }}" {% if yr|stringformat:"s" == birth_year_filter %}selected{% endif %}>{{
+                            yr }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label mb-1 small fw-semibold">القاعة</label>
+                    <select name="hall" class="form-select">
+                        <option value="">— الكل —</option>
+                        {% for h in halls %}
+                        <option value="{{ h }}" {% if h == hall_filter %}selected{% endif %}>{{ h }}</option>
                         {% endfor %}
                     </select>
                 </div>
@@ -68,8 +79,10 @@
                         <option value="" {% if not sort %}selected{% endif %}>— افتراضي —</option>
                         <option value="name_asc" {% if sort == 'name_asc' %}selected{% endif %}>الاسم (أ → ي)</option>
                         <option value="name_desc" {% if sort == 'name_desc' %}selected{% endif %}>الاسم (ي → أ)</option>
-                        <option value="avg_rating_desc" {% if sort == 'avg_rating_desc' %}selected{% endif %}>متوسط التقييم (الأعلى)</option>
-                        <option value="avg_rating_asc" {% if sort == 'avg_rating_asc' %}selected{% endif %}>متوسط التقييم (الأدنى)</option>
+                        <option value="avg_rating_desc" {% if sort == 'avg_rating_desc' %}selected{% endif %}>متوسط
+                            التقييم (الأعلى)</option>
+                        <option value="avg_rating_asc" {% if sort == 'avg_rating_asc' %}selected{% endif %}>متوسط التقييم
+                            (الأدنى)</option>
                     </select>
                 </div>
                 <div class="col-md-1">
@@ -77,7 +90,7 @@
                         <i class="bi bi-search"></i>
                     </button>
                 </div>
-                {% if q or grade_filter or gender_filter or birth_year_filter or sort %}
+                {% if q or grade_filter or gender_filter or birth_year_filter or hall_filter or sort %}
                 <div class="col-md-auto">
                     <a href="{% url 'admin_portal:student_list' %}" class="btn btn-outline-secondary">
                         <i class="bi bi-x-lg me-1"></i>مسح
@@ -189,7 +202,7 @@
                         {% if page_obj.has_previous %}
                         <li class="page-item">
                             <a class="page-link"
-                                href="?page={{ page_obj.previous_page_number }}{% if q %}&q={{ q }}{% endif %}{% if grade_filter %}&grade={{ grade_filter }}{% endif %}{% if gender_filter %}&gender={{ gender_filter }}{% endif %}{% if birth_year_filter %}&birth_year={{ birth_year_filter }}{% endif %}{% if sort %}&sort={{ sort }}{% endif %}">
+                                href="?page={{ page_obj.previous_page_number }}{% if q %}&q={{ q }}{% endif %}{% if grade_filter %}&grade={{ grade_filter }}{% endif %}{% if gender_filter %}&gender={{ gender_filter }}{% endif %}{% if birth_year_filter %}&birth_year={{ birth_year_filter }}{% endif %}{% if hall_filter %}&hall={{ hall_filter }}{% endif %}{% if sort %}&sort={{ sort }}{% endif %}">
                                 &laquo;
                             </a>
                         </li>
@@ -203,7 +216,7 @@
                         {% elif num >= page_obj.number|add:"-2" and num <= page_obj.number|add:"2" %} <li
                             class="page-item">
                             <a class="page-link"
-                                href="?page={{ num }}{% if q %}&q={{ q }}{% endif %}{% if grade_filter %}&grade={{ grade_filter }}{% endif %}{% if gender_filter %}&gender={{ gender_filter }}{% endif %}{% if birth_year_filter %}&birth_year={{ birth_year_filter }}{% endif %}{% if sort %}&sort={{ sort }}{% endif %}">
+                                href="?page={{ num }}{% if q %}&q={{ q }}{% endif %}{% if grade_filter %}&grade={{ grade_filter }}{% endif %}{% if gender_filter %}&gender={{ gender_filter }}{% endif %}{% if birth_year_filter %}&birth_year={{ birth_year_filter }}{% endif %}{% if hall_filter %}&hall={{ hall_filter }}{% endif %}{% if sort %}&sort={{ sort }}{% endif %}">
                                 {{ num }}
                             </a>
                             </li>
@@ -213,7 +226,7 @@
                             {% if page_obj.has_next %}
                             <li class="page-item">
                                 <a class="page-link"
-                                    href="?page={{ page_obj.next_page_number }}{% if q %}&q={{ q }}{% endif %}{% if grade_filter %}&grade={{ grade_filter }}{% endif %}{% if gender_filter %}&gender={{ gender_filter }}{% endif %}{% if birth_year_filter %}&birth_year={{ birth_year_filter }}{% endif %}{% if sort %}&sort={{ sort }}{% endif %}">
+                                    href="?page={{ page_obj.next_page_number }}{% if q %}&q={{ q }}{% endif %}{% if grade_filter %}&grade={{ grade_filter }}{% endif %}{% if gender_filter %}&gender={{ gender_filter }}{% endif %}{% if birth_year_filter %}&birth_year={{ birth_year_filter }}{% endif %}{% if hall_filter %}&hall={{ hall_filter }}{% endif %}{% if sort %}&sort={{ sort }}{% endif %}">
                                     &raquo;
                                 </a>
                             </li>
@@ -264,7 +277,12 @@
                 <div class="modal-body">
                     <p class="text-muted small mb-3">
                         أعمدة <strong>مطلوبة</strong>: <code>full_name</code>، <code>national_id</code><br>
-                        أعمدة <strong>اختيارية</strong>: <code>student_code</code>، <code>grade</code>، <code>gender</code>، <code>phone</code>، <code>nickname</code>، <code>date_of_birth</code>، <code>joining_date</code>، <code>hall_name</code>، <code>notes</code>، <code>parent_phone</code>، <code>parent_full_name</code>، <code>parent_qualification</code>، <code>parent_job</code>، <code>parent_calls_phone</code>، <code>parent_marital_status</code>، <code>parent_spouse_job</code>، <code>parent_address</code>، <code>child_pickup_person</code>
+                        أعمدة <strong>اختيارية</strong>: <code>student_code</code>، <code>grade</code>،
+                        <code>gender</code>، <code>phone</code>، <code>nickname</code>، <code>date_of_birth</code>،
+                        <code>joining_date</code>، <code>hall_name</code>، <code>notes</code>،
+                        <code>parent_phone</code>، <code>parent_full_name</code>، <code>parent_qualification</code>،
+                        <code>parent_job</code>، <code>parent_calls_phone</code>، <code>parent_marital_status</code>،
+                        <code>parent_spouse_job</code>، <code>parent_address</code>، <code>child_pickup_person</code>
                     </p>
                     <div class="mb-3">
                         <label class="form-label fw-semibold">ملف Excel (.xlsx)</label>
