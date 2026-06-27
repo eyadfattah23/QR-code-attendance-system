@@ -7,13 +7,14 @@ This module contains tests for:
 """
 
 import uuid
+from datetime import timedelta
 from django.contrib.messages import get_messages
 from django.test import TestCase, Client
 from django.urls import reverse
 
 from core.models import User, Student, Teacher, StudentTeacherLink
 from attendance.models import StudentAttendanceRecord, TeacherAttendanceRecord
-from django.utils.timezone import localdate
+from django.utils.timezone import localdate, localtime
 
 
 class ScanStationPermissionTestCase(TestCase):
@@ -404,6 +405,18 @@ class ScanStationAdminScansTestCase(TestCase):
         self.scan_url = reverse('attendance:station')
         self.client.login(phone='01234567890', password='adminpass123')
 
+    def _backdate_student_checkin(self, minutes=6):
+        """Move a student's check_in_time back so the 5-min guard passes."""
+        StudentAttendanceRecord.objects.filter(
+            student=self.student, date=localdate()
+        ).update(check_in_time=localtime() - timedelta(minutes=minutes))
+
+    def _backdate_teacher_checkin(self, minutes=6):
+        """Move a teacher's check_in_time back so the 5-min guard passes."""
+        TeacherAttendanceRecord.objects.filter(
+            teacher=self.teacher_for_scan, date=localdate()
+        ).update(check_in_time=localtime() - timedelta(minutes=minutes))
+
     def test_admin_scan_by_uuid(self):
         """Test admin can scan by student UUID."""
         response = self.client.post(self.scan_url, {
@@ -471,18 +484,59 @@ class ScanStationAdminScansTestCase(TestCase):
         self.assertIn(self.teacher_for_scan.full_name, results[0]['message'])
 
     def test_admin_scan_already_scanned_student_shows_warning(self):
-        """Test scanning an already-scanned student shows warning result."""
+        """Second student scan (checkout) shows checkout status, not warning."""
         self.client.post(
             self.scan_url, {'scanned_codes': str(self.student.id)})
+        self._backdate_student_checkin()
+        response = self.client.post(
+            self.scan_url, {'scanned_codes': str(self.student.id)})
+        results = response.context['results']
+        self.assertEqual(results[0]['status'], 'checkout')
+
+    def test_student_second_scan_sets_check_out_time(self):
+        """Second student scan sets check_out_time on the record."""
+        self.client.post(self.scan_url, {'scanned_codes': str(self.student.id)})
+        self._backdate_student_checkin()
+        self.client.post(self.scan_url, {'scanned_codes': str(self.student.id)})
+        record = StudentAttendanceRecord.objects.get(
+            student=self.student, date=localdate())
+        self.assertIsNotNone(record.check_out_time)
+
+    def test_student_third_scan_shows_already_checked_out_warning(self):
+        """Third student scan (already checked out) shows a warning."""
+        self.client.post(self.scan_url, {'scanned_codes': str(self.student.id)})
+        self._backdate_student_checkin()
+        self.client.post(self.scan_url, {'scanned_codes': str(self.student.id)})
         response = self.client.post(
             self.scan_url, {'scanned_codes': str(self.student.id)})
         results = response.context['results']
         self.assertEqual(results[0]['status'], 'warning')
+        self.assertIn('مغادرة مسجلة مسبقاً', results[0]['label'])
+
+    def test_student_checkout_does_not_create_duplicate_record(self):
+        """Check-out scan must not create a second attendance record."""
+        self.client.post(self.scan_url, {'scanned_codes': str(self.student.id)})
+        self._backdate_student_checkin()
+        self.client.post(self.scan_url, {'scanned_codes': str(self.student.id)})
+        count = StudentAttendanceRecord.objects.filter(
+            student=self.student, date=localdate()).count()
+        self.assertEqual(count, 1)
+
+    def test_student_duration_display_after_checkout(self):
+        """duration_display returns a non-empty string after student checkout."""
+        self.client.post(self.scan_url, {'scanned_codes': str(self.student.id)})
+        self._backdate_student_checkin()
+        self.client.post(self.scan_url, {'scanned_codes': str(self.student.id)})
+        record = StudentAttendanceRecord.objects.get(
+            student=self.student, date=localdate())
+        self.assertIsNotNone(record.duration)
+        self.assertNotEqual(record.duration_display, '—')
 
     def test_admin_scan_already_scanned_teacher_shows_warning(self):
         """Second teacher scan (checkout) shows checkout status, not warning."""
         self.client.post(
             self.scan_url, {'scanned_codes': str(self.teacher_for_scan.id)})
+        self._backdate_teacher_checkin()
         response = self.client.post(
             self.scan_url, {'scanned_codes': str(self.teacher_for_scan.id)})
         results = response.context['results']
@@ -491,6 +545,7 @@ class ScanStationAdminScansTestCase(TestCase):
     def test_teacher_second_scan_sets_check_out_time(self):
         """Second teacher scan sets check_out_time on the record."""
         self.client.post(self.scan_url, {'scanned_codes': str(self.teacher_for_scan.id)})
+        self._backdate_teacher_checkin()
         self.client.post(self.scan_url, {'scanned_codes': str(self.teacher_for_scan.id)})
         record = TeacherAttendanceRecord.objects.get(
             teacher=self.teacher_for_scan, date=localdate())
@@ -499,6 +554,7 @@ class ScanStationAdminScansTestCase(TestCase):
     def test_teacher_third_scan_shows_already_checked_out_warning(self):
         """Third teacher scan (already checked out) shows a warning."""
         self.client.post(self.scan_url, {'scanned_codes': str(self.teacher_for_scan.id)})
+        self._backdate_teacher_checkin()
         self.client.post(self.scan_url, {'scanned_codes': str(self.teacher_for_scan.id)})
         response = self.client.post(
             self.scan_url, {'scanned_codes': str(self.teacher_for_scan.id)})
@@ -517,6 +573,7 @@ class ScanStationAdminScansTestCase(TestCase):
     def test_teacher_duration_display_after_checkout(self):
         """duration_display returns a non-empty string after checkout."""
         self.client.post(self.scan_url, {'scanned_codes': str(self.teacher_for_scan.id)})
+        self._backdate_teacher_checkin()
         self.client.post(self.scan_url, {'scanned_codes': str(self.teacher_for_scan.id)})
         record = TeacherAttendanceRecord.objects.get(
             teacher=self.teacher_for_scan, date=localdate())
@@ -551,12 +608,13 @@ class ScanStationAdminScansTestCase(TestCase):
 
     def test_admin_scan_result_context_counts(self):
         """Test mixed batch: success + checkout + error gives correct counts."""
-        # Pre-scan teacher so batch scan triggers checkout (status='checkout' → success_count)
+        # Pre-scan teacher then backdate so batch triggers checkout
         self.client.post(
             self.scan_url, {'scanned_codes': str(self.teacher_for_scan.id)})
+        self._backdate_teacher_checkin()
 
         batch = '\n'.join([
-            str(self.student.id),           # success
+            str(self.student.id),           # success (fresh check-in)
             str(self.teacher_for_scan.id),  # checkout (counted as success)
             'TOTALLY-UNKNOWN-CODE',          # error
         ])

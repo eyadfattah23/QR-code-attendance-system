@@ -61,50 +61,95 @@ def station_view(request):
                             national_id__iexact=lookup).first()
 
                 if student is not None:
-                    primary_link = (
-                        StudentTeacherLink.objects.filter(student=student)
-                        .order_by("-is_primary", "created_at")
-                        .select_related("teacher")
-                        .first()
-                    )
-                    original_teacher = primary_link.teacher if primary_link else None
-
-                    student_record, created = StudentAttendanceRecord.objects.get_or_create(
-                        student=student,
-                        date=today,
-                        defaults={
-                            "check_in_time": localtime(),
-                            "recorded_by": request.user,
-                            "original_teacher": original_teacher,
-                            "assigned_teacher": original_teacher,
-                            "substitute_note": "",
-                            "rating": 6,
-                        },
-                    )
-
-                    if created:
-                        results.append(
-                            {
+                    from django.db import transaction as _tx
+                    with _tx.atomic():
+                        try:
+                            student_record = StudentAttendanceRecord.objects.select_for_update().get(
+                                student=student,
+                                date=today,
+                            )
+                            # Record exists — check-out logic
+                            if student_record.check_out_time is not None:
+                                # Already checked out
+                                results.append({
+                                    "status": "warning",
+                                    "icon": "bi-exclamation-circle-fill",
+                                    "label": "مغادرة مسجلة مسبقاً",
+                                    "message": (
+                                        f"{student.full_name} - غادر مسبقاً الساعة "
+                                        f"{student_record.check_out_time.strftime('%H:%M')}"
+                                    ),
+                                    "row_class": "warning",
+                                })
+                            else:
+                                now = localtime()
+                                if now < student_record.check_in_time:
+                                    results.append({
+                                        "status": "warning",
+                                        "icon": "bi-exclamation-circle-fill",
+                                        "label": "خطأ في التوقيت",
+                                        "message": (
+                                            f"{student.full_name} - وقت المغادرة "
+                                            f"({now.strftime('%H:%M')}) قبل وقت الحضور "
+                                            f"({student_record.check_in_time.strftime('%H:%M')})"
+                                        ),
+                                        "row_class": "warning",
+                                    })
+                                elif (now - student_record.check_in_time).total_seconds() < 300:
+                                    elapsed = int(
+                                        (now - student_record.check_in_time).total_seconds() // 60)
+                                    remaining = 5 - elapsed
+                                    results.append({
+                                        "status": "warning",
+                                        "icon": "bi-clock-fill",
+                                        "label": "مبكر جداً",
+                                        "message": (
+                                            f"{student.full_name} - لا يمكن تسجيل المغادرة "
+                                            f"قبل مرور 5 دقائق من الحضور "
+                                            f"(باقي {remaining} دقيقة)"
+                                        ),
+                                        "row_class": "warning",
+                                    })
+                                else:
+                                    student_record.check_out_time = now
+                                    student_record.save(update_fields=['check_out_time'])
+                                    results.append({
+                                        "status": "checkout",
+                                        "icon": "bi-door-open-fill",
+                                        "label": "تم تسجيل المغادرة",
+                                        "message": (
+                                            f"{student.full_name} - غادر الساعة "
+                                            f"{now.strftime('%H:%M')} | "
+                                            f"مدة الحضور: {student_record.duration_display}"
+                                        ),
+                                        "row_class": "info",
+                                    })
+                        except StudentAttendanceRecord.DoesNotExist:
+                            # No record today — first scan = check-in
+                            primary_link = (
+                                StudentTeacherLink.objects.filter(student=student)
+                                .order_by("-is_primary", "created_at")
+                                .select_related("teacher")
+                                .first()
+                            )
+                            original_teacher = primary_link.teacher if primary_link else None
+                            StudentAttendanceRecord.objects.create(
+                                student=student,
+                                date=today,
+                                check_in_time=localtime(),
+                                recorded_by=request.user,
+                                original_teacher=original_teacher,
+                                assigned_teacher=original_teacher,
+                                substitute_note="",
+                                rating=6,
+                            )
+                            results.append({
                                 "status": "success",
                                 "icon": "bi-check-circle-fill",
-                                        "label": "تم التسجيل",
-                                        "message": f"{student.full_name} - تم تسجيل الحضور بنجاح",
-                                        "row_class": "success",
-                            }
-                        )
-                    else:
-                        results.append(
-                            {
-                                "status": "warning",
-                                "icon": "bi-exclamation-circle-fill",
-                                        "label": "مسجل مسبقاً",
-                                        "message": (
-                                            f"{student.full_name} - مسجل مسبقاً الساعة "
-                                            f"{student_record.check_in_time.strftime('%H:%M')}"
-                                        ),
-                                "row_class": "warning",
-                            }
-                        )
+                                "label": "تم التسجيل",
+                                "message": f"{student.full_name} - تم تسجيل الحضور بنجاح",
+                                "row_class": "success",
+                            })
                     continue
 
                 if teacher is not None:
@@ -230,8 +275,9 @@ def station_view(request):
         {
             "kind": "student",
             "name": record.student.full_name,
-                    "code": record.student.student_code or record.student.national_id,
-                    "time": record.check_in_time,
+            "code": record.student.student_code or record.student.national_id,
+            "time": record.check_out_time if record.check_out_time else record.check_in_time,
+            "is_checkout": record.check_out_time is not None,
         }
         for record in recent_student_scans
     ] + [
