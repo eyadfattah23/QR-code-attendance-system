@@ -31,6 +31,10 @@ urlpatterns = [
          views.attendance_record_edit_rating, name='attendance_record_edit_rating'),
     path('attendance/<uuid:pk>/teacher-edit/',
          views.teacher_attendance_record_edit, name='teacher_attendance_record_edit'),
+    path('attendance/<uuid:pk>/delete/',
+         views.student_attendance_record_delete, name='student_attendance_record_delete'),
+    path('attendance/<uuid:pk>/teacher-delete/',
+         views.teacher_attendance_record_delete, name='teacher_attendance_record_delete'),
 
     # Teacher management
     path('teachers/', views.teacher_list, name='teacher_list'),

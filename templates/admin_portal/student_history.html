@@ -43,10 +43,13 @@
                                 <th>#</th>
                                 <th>التاريخ</th>
                                 <th>وقت الحضور</th>
+                                <th>وقت المغادرة</th>
+                                <th>مدة الحضور</th>
                                 <th>المعلم المكلف</th>
                                 <th>التقييم</th>
                                 <th>ملاحظات</th>
                                 <th>صورة اليوم</th>
+                                <th></th>
                             </tr>
                         </thead>
                         <tbody>
@@ -56,6 +59,15 @@
                                 <td class="fw-semibold">{{ record.date|date:"Y/m/d" }}</td>
                                 <td class="font-monospace small text-muted">
                                     {{ record.check_in_time|time:"H:i" }}
+                                </td>
+                                <td class="font-monospace small text-muted">
+                                    {% if record.check_out_time %}{{ record.check_out_time|time:"H:i" }}
+                                    {% else %}<span class="text-muted">—</span>{% endif %}
+                                </td>
+                                <td class="small">
+                                    {% if record.check_out_time %}
+                                    <span class="badge bg-light text-dark border">{{ record.duration_display }}</span>
+                                    {% else %}<span class="text-muted">—</span>{% endif %}
                                 </td>
                                 <td>
                                     {% if record.assigned_teacher %}
@@ -122,6 +134,16 @@
                                         </a>
                                     </div>
                                     {% endif %}
+                                </td>
+                                <td>
+                                    <form method="post" action="{% url 'admin_portal:student_attendance_record_delete' record.id %}"
+                                          onsubmit="return confirm('هل أنت متأكد من حذف سجل بتاريخ {{ record.date }}؟')">
+                                        {% csrf_token %}
+                                        <input type="hidden" name="next" value="{{ request.get_full_path }}">
+                                        <button type="submit" class="btn btn-outline-danger btn-sm p-1" title="حذف السجل">
+                                            <i class="bi bi-trash" style="font-size:.75rem;"></i>
+                                        </button>
+                                    </form>
                                 </td>
                             </tr>
                             {% endfor %}

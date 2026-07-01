@@ -101,10 +101,13 @@
                         <th>الطالب</th>
                         <th>الصف</th>
                         <th>وقت الحضور</th>
+                        <th>وقت المغادرة</th>
+                        <th>مدة الحضور</th>
                         <th>المعلم المكلف</th>
                         <th>التقييم</th>
                         <th>نيابة</th>
                         <th>صورة</th>
+                        <th></th>
                     </tr>
                 </thead>
                 <tbody>
@@ -127,6 +130,15 @@
                             {% else %}—{% endif %}
                         </td>
                         <td class="font-monospace small text-muted">{{ rec.check_in_time|time:"H:i" }}</td>
+                        <td class="font-monospace small text-muted">
+                            {% if rec.check_out_time %}{{ rec.check_out_time|time:"H:i" }}
+                            {% else %}<span class="text-muted">—</span>{% endif %}
+                        </td>
+                        <td class="small">
+                            {% if rec.check_out_time %}
+                            <span class="badge bg-light text-dark border">{{ rec.duration_display }}</span>
+                            {% else %}<span class="text-muted">—</span>{% endif %}
+                        </td>
                         <td>
                             {% if rec.assigned_teacher %}
                             <span class="badge bg-light text-dark border">{{ rec.assigned_teacher.full_name }}</span>
@@ -155,6 +167,16 @@
                                     style="width:36px;height:36px;object-fit:cover;">
                             </a>
                             {% else %}<span class="text-muted small">—</span>{% endif %}
+                        </td>
+                        <td>
+                            <form method="post" action="{% url 'admin_portal:student_attendance_record_delete' rec.pk %}"
+                                  onsubmit="return confirm('هل أنت متأكد من حذف سجل حضور {{ rec.student.full_name }} بتاريخ {{ rec.date }}؟')">
+                                {% csrf_token %}
+                                <input type="hidden" name="next" value="{{ request.get_full_path }}">
+                                <button type="submit" class="btn btn-outline-danger btn-sm" title="حذف السجل">
+                                    <i class="bi bi-trash"></i>
+                                </button>
+                            </form>
                         </td>
                     </tr>
                     {% endfor %}
@@ -285,10 +307,19 @@
                         </td>
                         <td class="small text-muted" style="max-width:200px;white-space:pre-wrap;">{{ rec.notes|default:"—" }}</td>
                         <td>
-                            <a href="{% url 'admin_portal:teacher_attendance_record_edit' rec.pk %}"
-                               class="btn btn-outline-secondary btn-sm" title="تعديل">
-                                <i class="bi bi-pencil"></i>
-                            </a>
+                            <div class="d-flex gap-1">
+                                <a href="{% url 'admin_portal:teacher_attendance_record_edit' rec.pk %}"
+                                   class="btn btn-outline-secondary btn-sm" title="تعديل">
+                                    <i class="bi bi-pencil"></i>
+                                </a>
+                                <form method="post" action="{% url 'admin_portal:teacher_attendance_record_delete' rec.pk %}"
+                                      onsubmit="return confirm('هل أنت متأكد من حذف سجل حضور {{ rec.teacher.full_name }} بتاريخ {{ rec.date }}؟')">
+                                    {% csrf_token %}
+                                    <button type="submit" class="btn btn-outline-danger btn-sm" title="حذف السجل">
+                                        <i class="bi bi-trash"></i>
+                                    </button>
+                                </form>
+                            </div>
                         </td>
                     </tr>
                     {% endfor %}

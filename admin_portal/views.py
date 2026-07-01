@@ -1153,6 +1153,36 @@ def teacher_attendance_record_edit(request, pk):
 
 
 # ---------------------------------------------------------------------------
+# Delete attendance records (admin only)
+# ---------------------------------------------------------------------------
+
+@admin_required
+@require_http_methods(['POST'])
+def student_attendance_record_delete(request, pk):
+    """Delete a StudentAttendanceRecord (POST only)."""
+    record = get_object_or_404(StudentAttendanceRecord, pk=pk)
+    record.delete()
+    messages.success(request, 'تم حذف سجل الحضور بنجاح')
+    next_url = request.POST.get('next', '').strip()
+    if next_url:
+        return redirect(next_url)
+    return redirect('admin_portal:attendance_records')
+
+
+@admin_required
+@require_http_methods(['POST'])
+def teacher_attendance_record_delete(request, pk):
+    """Delete a TeacherAttendanceRecord (POST only)."""
+    record = get_object_or_404(TeacherAttendanceRecord, pk=pk)
+    record.delete()
+    messages.success(request, 'تم حذف سجل الحضور بنجاح')
+    next_url = request.POST.get('next', '').strip()
+    if next_url:
+        return redirect(next_url)
+    return redirect(reverse('admin_portal:attendance_records') + '?tab=teachers')
+
+
+# ---------------------------------------------------------------------------
 # Mark teacher absent + reassign students to substitute teachers
 # ---------------------------------------------------------------------------
 
