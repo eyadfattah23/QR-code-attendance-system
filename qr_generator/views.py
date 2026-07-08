@@ -74,10 +74,10 @@ def qr_cards_config(request):
         if not student_ids:
             messages.error(request, 'يرجى اختيار طالب واحد على الأقل.')
         else:
+            request.session['qr_student_ids'] = student_ids
+            request.session['qr_cards_per_page'] = cards_per_page
             from django.urls import reverse
-            base = reverse('qr_generator:qr_cards_print')
-            ids_qs = '&'.join(f'sid={sid}' for sid in student_ids)
-            return redirect(f'{base}?{ids_qs}&cpp={cards_per_page}')
+            return redirect(reverse('qr_generator:qr_cards_print'))
 
     # GET – render config page with optional grade / name filters
     grade_filter = request.GET.get('grade', '').strip()
@@ -101,9 +101,10 @@ def qr_cards_config(request):
 @admin_required
 def qr_cards_print(request):
     """Step 2 – render a printable A4 page (or multiple pages) with QR cards."""
-    student_ids = request.GET.getlist('sid')
+    student_ids = request.session.pop('qr_student_ids', None) or request.GET.getlist('sid')
     try:
-        cards_per_page = max(1, min(12, int(request.GET.get('cpp', 8))))
+        cpp_raw = request.session.pop('qr_cards_per_page', None) or request.GET.get('cpp', 8)
+        cards_per_page = max(1, min(12, int(cpp_raw)))
     except (ValueError, TypeError):
         cards_per_page = 8
 
@@ -144,10 +145,10 @@ def teacher_qr_cards_config(request):
         if not teacher_ids:
             messages.error(request, 'يرجى اختيار معلم واحد على الأقل.')
         else:
+            request.session['qr_teacher_ids'] = teacher_ids
+            request.session['qr_teacher_cards_per_page'] = cards_per_page
             from django.urls import reverse as _reverse
-            base = _reverse('qr_generator:teacher_qr_cards_print')
-            ids_qs = '&'.join(f'tid={tid}' for tid in teacher_ids)
-            return redirect(f'{base}?{ids_qs}&cpp={cards_per_page}')
+            return redirect(_reverse('qr_generator:teacher_qr_cards_print'))
 
     name_filter = request.GET.get('name', '').strip()
     subject_filter = request.GET.get('subject', '').strip()
@@ -178,9 +179,10 @@ def teacher_qr_cards_config(request):
 @admin_required
 def teacher_qr_cards_print(request):
     """Step 2 – render a printable A4 page with teacher QR cards."""
-    teacher_ids = request.GET.getlist('tid')
+    teacher_ids = request.session.pop('qr_teacher_ids', None) or request.GET.getlist('tid')
     try:
-        cards_per_page = max(1, min(12, int(request.GET.get('cpp', 8))))
+        cpp_raw = request.session.pop('qr_teacher_cards_per_page', None) or request.GET.get('cpp', 8)
+        cards_per_page = max(1, min(12, int(cpp_raw)))
     except (ValueError, TypeError):
         cards_per_page = 8
 
