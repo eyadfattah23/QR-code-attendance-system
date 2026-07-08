@@ -96,7 +96,10 @@
                                         data-national="{{ student.national_id|lower }}"
                                         data-grade="{{ student.grade|default:'' }}">
                                         <td>
-                                            <input type="checkbox" class="form-check-input student-cb" name="students" value="{{ student.id }}" id="cb-{{ student.id }}" {% if sid in linked_ids %}checked{% endif %} onchange="onStudentToggle(this)">
+                                            <input type="checkbox" class="form-check-input student-cb" name="students"
+                                                value="{{ student.id }}" id="cb-{{ student.id }}"
+                                                {% if sid in linked_ids %}checked{% endif %}
+                                                onchange="onStudentToggle(this)">
                                         </td>
                                         <td>
                                             <label class="mb-0 fw-semibold" for="cb-{{ student.id }}"
@@ -115,7 +118,9 @@
                                         <td class="text-center">
                                             <input type="checkbox" class="form-check-input primary-cb" name="primary"
                                                 value="{{ student.id }}" id="primary-{{ student.id }}"
-                                                title="معلم أساسي لهذا الطالب" {% if sid in primary_ids %}checked{% endif %} {% if sid not in linked_ids %}disabled{% endif %}>
+                                                title="معلم أساسي لهذا الطالب"
+                                                {% if sid in primary_ids %}checked{% endif %}
+                                                {% if sid not in linked_ids %}disabled{% endif %}>
                                         </td>
                                     </tr>
                                     {% endwith %}
@@ -171,6 +176,14 @@
 </div>
 {% endblock %}
 
+{% block extra_css %}
+<style>
+    #students-table tbody tr.row-linked {
+        background-color: #f0fdf4;
+    }
+</style>
+{% endblock %}
+
 {% block extra_js %}
 <script>
     // ── live counter ──────────────────────────────────────────────────────────
@@ -187,6 +200,35 @@
             if (!cb.checked) primaryCb.checked = false;
         }
         updateCounter();
+        sortRows();
+    }
+
+    // ── sort: checked rows first, then a divider, then unchecked ─────────────
+    function sortRows() {
+        const tbody = document.querySelector('#students-table tbody');
+        if (!tbody) return;
+        const rows = Array.from(tbody.querySelectorAll('tr[data-name]'));
+        const checked = rows.filter(r => r.querySelector('.student-cb')?.checked);
+        const unchecked = rows.filter(r => !r.querySelector('.student-cb')?.checked);
+
+        // Update highlight class
+        checked.forEach(r => r.classList.add('row-linked'));
+        unchecked.forEach(r => r.classList.remove('row-linked'));
+
+        // Remove old divider if present
+        const old = tbody.querySelector('.divider-row');
+        if (old) old.remove();
+
+        // Re-append in order
+        checked.forEach(r => tbody.appendChild(r));
+        if (checked.length > 0 && unchecked.length > 0) {
+            const divider = document.createElement('tr');
+            divider.className = 'divider-row';
+            divider.innerHTML = '<td colspan="5" class="py-1 px-3 bg-light border-top border-bottom text-muted small fw-semibold" style="font-size:.72rem;letter-spacing:.05em">' +
+                '<i class="bi bi-chevron-bar-down me-1"></i>غير مرتبط (' + unchecked.length + ')</td>';
+            tbody.appendChild(divider);
+        }
+        unchecked.forEach(r => tbody.appendChild(r));
     }
 
     // ── select / deselect all visible rows ───────────────────────────────────
@@ -215,7 +257,7 @@
         const t = term.toLowerCase().trim();
         const grade = document.getElementById('grade-filter').value.toLowerCase();
         let visible = 0;
-        document.querySelectorAll('#students-table tbody tr').forEach(row => {
+        document.querySelectorAll('#students-table tbody tr[data-name]').forEach(row => {
             const matchesSearch = !t ||
                 row.dataset.name.includes(t) ||
                 row.dataset.code.includes(t) ||
@@ -225,6 +267,12 @@
             row.style.display = show ? '' : 'none';
             if (show) visible++;
         });
+        // Hide divider too if nothing linked is visible
+        const divider = document.querySelector('.divider-row');
+        if (divider) {
+            const linkedVisible = document.querySelectorAll('#students-table tbody tr[data-name]:not([style*="display: none"]) .student-cb:checked').length;
+            divider.style.display = linkedVisible ? '' : 'none';
+        }
         document.getElementById('visible-count').textContent = visible;
     }
 
@@ -240,6 +288,7 @@
 
     // ── init ──────────────────────────────────────────────────────────────────
     document.addEventListener('DOMContentLoaded', function () {
+        sortRows();
         updateCounter();
         // Apply any server-side filter values on load
         const q = document.getElementById('search-input').value;
