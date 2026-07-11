@@ -162,6 +162,10 @@
                             <button type="submit" class="btn btn-success">
                                 <i class="bi bi-floppy me-1"></i>حفظ التغييرات
                             </button>
+                            <a href="{% url 'admin_portal:teacher_students_export' teacher.pk %}"
+                               class="btn btn-outline-success">
+                                <i class="bi bi-file-earmark-excel me-1"></i>تصدير Excel
+                            </a>
                             <a href="{% url 'admin_portal:teacher_list' %}" class="btn btn-outline-secondary">إلغاء</a>
                         </div>
                     </div>

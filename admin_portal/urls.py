@@ -47,6 +47,8 @@ urlpatterns = [
          views.teacher_delete, name='teacher_delete'),
     path('teachers/<uuid:pk>/students/',
          views.teacher_students, name='teacher_students'),
+    path('teachers/<uuid:pk>/students/export/',
+         views.teacher_students_export, name='teacher_students_export'),
     path('teachers/<uuid:pk>/mark-absent/',
          views.teacher_mark_absent, name='teacher_mark_absent'),
 ]

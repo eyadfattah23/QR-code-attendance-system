@@ -10,7 +10,7 @@ from django.db.models import Avg, Q
 from django.http import HttpResponse
 from django.shortcuts import get_object_or_404, render, redirect
 from django.urls import reverse
-from django.utils.timezone import localdate
+from django.utils.timezone import localdate, localtime
 from django.views.decorators.http import require_http_methods
 from functools import wraps
 
@@ -811,6 +811,64 @@ def teacher_students(request, pk):
     })
 
 
+@admin_required
+def teacher_students_export(request, pk):
+    """Export the linked students of a teacher to Excel."""
+    teacher = get_object_or_404(Teacher.objects.select_related('user'), pk=pk)
+
+    linked_students = (
+        Student.objects
+        .filter(teacher_links__teacher=teacher)
+        .select_related()
+        .order_by('full_name')
+    )
+
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws.title = 'طلاب المعلم'
+    ws.append([
+        'full_name', 'national_id', 'student_code', 'grade', 'gender', 'phone',
+        'nickname', 'date_of_birth', 'joining_date', 'hall_name', 'notes',
+        'parent_phone', 'parent_full_name', 'parent_qualification', 'parent_job',
+        'parent_calls_phone', 'parent_marital_status', 'parent_spouse_job',
+        'parent_address', 'child_pickup_person',
+    ])
+    for s in linked_students:
+        ws.append([
+            s.full_name,
+            s.national_id or '',
+            s.student_code or '',
+            s.grade or '',
+            s.gender or '',
+            s.phone or '',
+            s.nickname,
+            s.date_of_birth.isoformat() if s.date_of_birth else '',
+            s.joining_date.isoformat() if s.joining_date else '',
+            s.hall_name,
+            s.notes,
+            s.parent_phone or '',
+            s.parent_full_name,
+            s.parent_qualification,
+            s.parent_job,
+            s.parent_calls_phone or '',
+            s.parent_marital_status,
+            s.parent_spouse_job,
+            s.parent_address,
+            s.child_pickup_person,
+        ])
+
+    buf = io.BytesIO()
+    wb.save(buf)
+    buf.seek(0)
+    safe_name = teacher.full_name.replace(' ', '_')
+    response = HttpResponse(
+        buf.read(),
+        content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    )
+    response['Content-Disposition'] = f'attachment; filename="students_{safe_name}.xlsx"'
+    return response
+
+
 # ---------------------------------------------------------------------------
 # Student attendance history
 # ---------------------------------------------------------------------------
@@ -977,7 +1035,7 @@ def export_attendance_excel(request):
             ws.append([
                 str(rec.date),
                 rec.teacher.full_name,
-                rec.check_in_time.strftime('%H:%M'),
+                localtime(rec.check_in_time).strftime('%H:%M'),
                 rec.rating,
                 rec.notes,
             ])
@@ -1017,7 +1075,7 @@ def export_attendance_excel(request):
                 rec.student.national_id,
                 rec.student.student_code or '',
                 rec.student.grade or '',
-                rec.check_in_time.strftime('%H:%M'),
+                localtime(rec.check_in_time).strftime('%H:%M'),
                 rec.assigned_teacher.full_name if rec.assigned_teacher else '',
                 rec.rating,
                 'نعم' if rec.is_substitute_assignment else 'لا',
