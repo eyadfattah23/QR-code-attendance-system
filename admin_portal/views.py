@@ -16,7 +16,7 @@ from functools import wraps
 
 from core.models import Student, Teacher, User, StudentTeacherLink
 from attendance.models import StudentAttendanceRecord, TeacherAttendanceRecord
-from .forms import StudentForm, TeacherForm
+from .forms import StudentForm, TeacherForm, SupervisorForm
 
 
 def admin_required(view_func):
@@ -867,6 +867,83 @@ def teacher_students_export(request, pk):
     )
     response['Content-Disposition'] = f'attachment; filename="students_{safe_name}.xlsx"'
     return response
+
+
+# ---------------------------------------------------------------------------
+# Supervisor management
+# ---------------------------------------------------------------------------
+
+@admin_required
+def supervisor_list(request):
+    """List all supervisor accounts."""
+    q = request.GET.get('q', '').strip()
+    qs = User.objects.filter(role=User.Role.SUPERVISOR).order_by('first_name')
+    if q:
+        qs = qs.filter(
+            Q(first_name__icontains=q) | Q(phone__icontains=q)
+        )
+    paginator = Paginator(qs, 25)
+    page_obj = paginator.get_page(request.GET.get('page'))
+    return render(request, 'admin_portal/supervisors.html', {
+        'page_obj': page_obj,
+        'q': q,
+        'total_count': qs.count(),
+    })
+
+
+@admin_required
+def supervisor_create(request):
+    """Create a new supervisor account."""
+    if request.method == 'POST':
+        form = SupervisorForm(request.POST)
+        if form.is_valid():
+            user = form.save()
+            messages.success(
+                request, f'تم إضافة المشرف "{user.first_name}" بنجاح')
+            return redirect('admin_portal:supervisor_list')
+    else:
+        form = SupervisorForm()
+    return render(request, 'admin_portal/supervisor_form.html', {
+        'form': form,
+        'title': 'إضافة مشرف جديد',
+        'submit_label': 'إضافة',
+    })
+
+
+@admin_required
+def supervisor_edit(request, pk):
+    """Edit an existing supervisor account."""
+    supervisor = get_object_or_404(User, pk=pk, role=User.Role.SUPERVISOR)
+    if request.method == 'POST':
+        form = SupervisorForm(request.POST, instance=supervisor)
+        if form.is_valid():
+            form.save()
+            messages.success(
+                request, f'تم تحديث بيانات "{supervisor.first_name}" بنجاح')
+            return redirect('admin_portal:supervisor_list')
+    else:
+        form = SupervisorForm(
+            initial={'full_name': supervisor.first_name,
+                     'phone': supervisor.phone},
+            instance=supervisor,
+        )
+    return render(request, 'admin_portal/supervisor_form.html', {
+        'form': form,
+        'supervisor': supervisor,
+        'title': f'تعديل: {supervisor.first_name}',
+        'submit_label': 'حفظ التغييرات',
+    })
+
+
+@admin_required
+@require_http_methods(['POST'])
+def supervisor_delete(request, pk):
+    """Delete a supervisor account (POST only)."""
+    supervisor = get_object_or_404(User, pk=pk, role=User.Role.SUPERVISOR)
+    name = supervisor.first_name
+    supervisor.delete()
+    messages.success(request, f'تم حذف المشرف "{name}" بنجاح')
+    return redirect('admin_portal:supervisor_list')
 
 
 # ---------------------------------------------------------------------------

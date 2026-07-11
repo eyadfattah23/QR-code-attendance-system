@@ -4,6 +4,23 @@
 
 {% block content %}
 <div class="container-fluid">
+
+    {% if request.user.is_supervisor %}
+    <div class="alert alert-primary d-flex align-items-center justify-content-between py-2 mb-3" role="alert">
+        <div>
+            <i class="bi bi-shield-check me-2"></i>
+            أنت تعمل الآن بصلاحيات المعلم:
+            <strong>{{ acting_teacher.full_name }}</strong>
+        </div>
+        <form method="post" action="{% url 'supervisor_portal:deselect_teacher' %}" class="mb-0">
+            {% csrf_token %}
+            <button type="submit" class="btn btn-sm btn-outline-primary">
+                <i class="bi bi-arrow-right me-1"></i>العودة لقائمة المعلمين
+            </button>
+        </form>
+    </div>
+    {% endif %}
+
     <!-- Page Header -->
     <div class="d-flex justify-content-between align-items-center mb-4">
         <h1 class="h3 mb-0">
@@ -63,10 +80,14 @@
                         <option value="" {% if not sort %}selected{% endif %}>ترتيب افتراضي</option>
                         <option value="name_asc" {% if sort == 'name_asc' %}selected{% endif %}>الاسم (أ-ي)</option>
                         <option value="name_desc" {% if sort == 'name_desc' %}selected{% endif %}>الاسم (ي-أ)</option>
-                        <option value="attended_first" {% if sort == 'attended_first' %}selected{% endif %}>الحاضرون أولاً</option>
-                        <option value="absent_first" {% if sort == 'absent_first' %}selected{% endif %}>الغائبون أولاً</option>
-                        <option value="avg_rating_desc" {% if sort == 'avg_rating_desc' %}selected{% endif %}>متوسط تقييم (أعلى)</option>
-                        <option value="avg_rating_asc" {% if sort == 'avg_rating_asc' %}selected{% endif %}>متوسط تقييم (أدنى)</option>
+                        <option value="attended_first" {% if sort == 'attended_first' %}selected{% endif %}>الحاضرون أولاً
+                        </option>
+                        <option value="absent_first" {% if sort == 'absent_first' %}selected{% endif %}>الغائبون أولاً
+                        </option>
+                        <option value="avg_rating_desc" {% if sort == 'avg_rating_desc' %}selected{% endif %}>متوسط تقييم
+                            (أعلى)</option>
+                        <option value="avg_rating_asc" {% if sort == 'avg_rating_asc' %}selected{% endif %}>متوسط تقييم
+                            (أدنى)</option>
                     </select>
                 </form>
                 <div class="btn-group">
@@ -181,9 +202,11 @@
                             </td>
                             <td class="d-none d-md-table-cell">
                                 {% if row.attendance and row.attendance.is_substitute_assignment %}
-                                <div class="d-flex align-items-center gap-1 p-1 rounded border border-danger bg-danger-subtle" style="font-size:.78rem;">
+                                <div class="d-flex align-items-center gap-1 p-1 rounded border border-danger bg-danger-subtle"
+                                    style="font-size:.78rem;">
                                     <i class="bi bi-person-x-fill text-danger flex-shrink-0"></i>
-                                    <span class="text-danger">غاب: <strong>{{ row.attendance.original_teacher.full_name }}</strong></span>
+                                    <span class="text-danger">غاب: <strong>{{ row.attendance.original_teacher.full_name
+                                            }}</strong></span>
                                 </div>
                                 {% else %}
                                 <span class="text-muted">-</span>
@@ -215,37 +238,43 @@
                                     </a>
                                     {% if row.attendance %}
                                     <a href="{% url 'teacher_portal:edit_record_note' row.attendance.id %}"
-                                        class="btn btn-outline-secondary btn-sm d-none d-md-inline-flex" title="{% if row.attendance.teacher_note %}تعديل الملاحظة{% else %}إضافة ملاحظة{% endif %}">
+                                        class="btn btn-outline-secondary btn-sm d-none d-md-inline-flex"
+                                        title="{% if row.attendance.teacher_note %}تعديل الملاحظة{% else %}إضافة ملاحظة{% endif %}">
                                         <i class="bi bi-pencil"></i>
                                     </a>
                                     {% endif %}
                                     <!-- Mobile: burger dropdown -->
                                     <div class="dropdown d-md-none">
-                                        <button class="btn btn-outline-secondary btn-sm" data-bs-toggle="dropdown" title="المزيد">
+                                        <button class="btn btn-outline-secondary btn-sm" data-bs-toggle="dropdown"
+                                            title="المزيد">
                                             <i class="bi bi-list"></i>
                                         </button>
                                         <ul class="dropdown-menu dropdown-menu-end">
                                             <li>
-                                                <a class="dropdown-item" href="{% url 'teacher_portal:student_history' row.student.id %}">
+                                                <a class="dropdown-item"
+                                                    href="{% url 'teacher_portal:student_history' row.student.id %}">
                                                     <i class="bi bi-clock-history me-2"></i>عرض السجل
                                                 </a>
                                             </li>
                                             {% if row.attendance %}
                                             <li>
-                                                <a class="dropdown-item" href="{% url 'teacher_portal:upload_photo' row.attendance.id %}">
+                                                <a class="dropdown-item"
+                                                    href="{% url 'teacher_portal:upload_photo' row.attendance.id %}">
                                                     <i class="bi bi-camera me-2"></i>{% if row.attendance.daily_photo %}تغيير الصورة{% else %}رفع صورة{% endif %}
                                                 </a>
                                             </li>
                                             <li>
-                                                <a class="dropdown-item" href="{% url 'teacher_portal:edit_record_note' row.attendance.id %}">
+                                                <a class="dropdown-item"
+                                                    href="{% url 'teacher_portal:edit_record_note' row.attendance.id %}">
                                                     <i class="bi bi-pencil me-2"></i>{% if row.attendance.teacher_note %}تعديل الملاحظة{% else %}إضافة ملاحظة{% endif %}
                                                 </a>
                                             </li>
                                             {% endif %}
-                                            <li><hr class="dropdown-divider"></li>
                                             <li>
-                                                <button class="dropdown-item"
-                                                    data-bs-toggle="modal"
+                                                <hr class="dropdown-divider">
+                                            </li>
+                                            <li>
+                                                <button class="dropdown-item" data-bs-toggle="modal"
                                                     data-bs-target="#student-detail-modal"
                                                     data-name="{{ row.student.full_name }}"
                                                     data-grade="{{ row.student.grade|default:'-' }}"
@@ -255,7 +284,7 @@
                                                     data-photo="{% if row.attendance and row.attendance.daily_photo %}مرفوعة{% else %}لا توجد{% endif %}"
                                                     data-rating="{% if row.attendance %}{{ row.attendance.rating }}/10{% else %}-{% endif %}"
                                                     data-transfer="{% if row.attendance and row.attendance.is_substitute_assignment %}غاب المعلم الأصلي: {{ row.attendance.original_teacher.full_name }}{% else %}-{% endif %}"
-                                    data-is-substitute="{% if row.attendance and row.attendance.is_substitute_assignment %}1{% else %}0{% endif %}"
+                                                    data-is-substitute="{% if row.attendance and row.attendance.is_substitute_assignment %}1{% else %}0{% endif %}"
                                                     data-note="{{ row.attendance.teacher_note|default:'' }}"
                                                     data-note-url="{% if row.attendance %}{% url 'teacher_portal:edit_record_note' row.attendance.id %}{% endif %}"
                                                     data-history-url="{% url 'teacher_portal:student_history' row.student.id %}">

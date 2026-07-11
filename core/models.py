@@ -72,6 +72,7 @@ class User(AbstractUser):
     class Role(models.TextChoices):
         ADMIN = 'admin', 'Admin'
         TEACHER = 'teacher', 'Teacher'
+        SUPERVISOR = 'supervisor', 'Supervisor'
 
     role = models.CharField(
         max_length=10,
@@ -119,6 +120,11 @@ class User(AbstractUser):
     def is_teacher(self) -> bool:
         """Check if user has teacher role."""
         return self.role == self.Role.TEACHER
+
+    @property
+    def is_supervisor(self) -> bool:
+        """Check if user has supervisor role."""
+        return self.role == self.Role.SUPERVISOR
 
 
 class Student(models.Model):

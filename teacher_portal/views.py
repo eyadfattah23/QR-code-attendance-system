@@ -14,15 +14,40 @@ from attendance.models import StudentAttendanceRecord
 
 
 def teacher_required(view_func):
-    """Decorator to ensure user is a teacher."""
+    """Decorator to ensure user is a teacher or a supervisor who has selected a teacher."""
     @wraps(view_func)
     @login_required
     def wrapper(request, *args, **kwargs):
-        if not request.user.is_teacher:
-            messages.error(request, 'ليس لديك صلاحية الوصول لهذه الصفحة')
-            return redirect('dashboard')
-        return view_func(request, *args, **kwargs)
+        if request.user.is_teacher:
+            return view_func(request, *args, **kwargs)
+        if request.user.is_supervisor:
+            if not request.session.get('supervisor_teacher_id'):
+                return redirect('supervisor_portal:dashboard')
+            return view_func(request, *args, **kwargs)
+        messages.error(request, 'ليس لديك صلاحية الوصول لهذه الصفحة')
+        return redirect('dashboard')
     return wrapper
+
+
+def get_acting_teacher(request):
+    """Return the Teacher this request is acting as.
+
+    For teachers: their own Teacher profile.
+    For supervisors: the teacher stored in session.
+    Returns None if the teacher cannot be resolved.
+    """
+    if request.user.is_supervisor:
+        pk = request.session.get('supervisor_teacher_id')
+        if not pk:
+            return None
+        try:
+            return Teacher.objects.get(pk=pk)
+        except Teacher.DoesNotExist:
+            return None
+    try:
+        return Teacher.objects.get(user=request.user)
+    except Teacher.DoesNotExist:
+        return None
 
 
 @teacher_required
@@ -31,8 +56,10 @@ def dashboard(request):
     today = localdate()
     sort = request.GET.get('sort', '')
 
+    teacher = get_acting_teacher(request)
     try:
-        teacher = Teacher.objects.get(user=request.user)
+        if teacher is None:
+            raise Teacher.DoesNotExist
         student_links = StudentTeacherLink.objects.filter(
             teacher=teacher
         ).select_related('student')
@@ -74,7 +101,8 @@ def dashboard(request):
         elif sort == 'name_asc':
             student_rows.sort(key=lambda r: r['student'].full_name)
         elif sort == 'name_desc':
-            student_rows.sort(key=lambda r: r['student'].full_name, reverse=True)
+            student_rows.sort(
+                key=lambda r: r['student'].full_name, reverse=True)
         elif sort == 'attended_first':
             student_rows.sort(key=lambda r: not r['is_attended'])
         elif sort == 'absent_first':
@@ -93,6 +121,7 @@ def dashboard(request):
         'attended_count': attended_count,
         'today': today,
         'sort': sort,
+        'acting_teacher': teacher,
     }
     return render(request, 'teacher_portal/dashboard.html', context)
 
@@ -101,8 +130,10 @@ def dashboard(request):
 @require_http_methods(["POST"])
 def teacher_scan(request):
     """Process attendance scans for teacher's linked students only."""
+    teacher = get_acting_teacher(request)
     try:
-        teacher = Teacher.objects.get(user=request.user)
+        if teacher is None:
+            raise Teacher.DoesNotExist
 
         linked_student_ids = set(
             StudentTeacherLink.objects.filter(teacher=teacher)
@@ -207,9 +238,8 @@ def teacher_scan(request):
 @teacher_required
 def student_history(request, pk):
     """Full attendance history for a student linked to the requesting teacher."""
-    try:
-        teacher = Teacher.objects.get(user=request.user)
-    except Teacher.DoesNotExist:
+    teacher = get_acting_teacher(request)
+    if teacher is None:
         messages.error(request, 'لم يتم ربط حسابك بملف معلم')
         return redirect('teacher_portal:dashboard')
 
@@ -240,9 +270,8 @@ def student_history(request, pk):
 @require_http_methods(["GET", "POST"])
 def upload_photo(request, pk):
     """Upload or replace the daily notebook photo for an attendance record."""
-    try:
-        teacher = Teacher.objects.get(user=request.user)
-    except Teacher.DoesNotExist:
+    teacher = get_acting_teacher(request)
+    if teacher is None:
         messages.error(request, 'لم يتم ربط حسابك بملف معلم')
         return redirect('teacher_portal:dashboard')
 
@@ -260,11 +289,13 @@ def upload_photo(request, pk):
 
         allowed_types = {'image/jpeg', 'image/png', 'image/webp'}
         if photo.content_type not in allowed_types:
-            messages.error(request, 'نوع الملف غير مدعوم. يُقبل JPEG أو PNG أو WebP فقط')
+            messages.error(
+                request, 'نوع الملف غير مدعوم. يُقبل JPEG أو PNG أو WebP فقط')
             return redirect('teacher_portal:upload_photo', pk=pk)
 
         if photo.size > 2 * 1024 * 1024:  # 2MB hard server-side cap
-            messages.error(request, 'حجم الملف كبير جداً. الحد الأقصى 2MB (يُرجى الضغط من المتصفح)')
+            messages.error(
+                request, 'حجم الملف كبير جداً. الحد الأقصى 2MB (يُرجى الضغط من المتصفح)')
             return redirect('teacher_portal:upload_photo', pk=pk)
 
         # Delete old file from storage before replacing
@@ -286,9 +317,8 @@ def upload_photo(request, pk):
 @require_http_methods(["GET", "POST"])
 def edit_record_note(request, pk):
     """Add or edit the teacher note on a single attendance record."""
-    try:
-        teacher = Teacher.objects.get(user=request.user)
-    except Teacher.DoesNotExist:
+    teacher = get_acting_teacher(request)
+    if teacher is None:
         messages.error(request, 'لم يتم ربط حسابك بملف معلم')
         return redirect('teacher_portal:dashboard')
 
@@ -315,9 +345,8 @@ def edit_record_note(request, pk):
 def export_attendance(request):
     """Export today's attendance list for the teacher's linked students as Excel."""
     today = localdate()
-    try:
-        teacher = Teacher.objects.get(user=request.user)
-    except Teacher.DoesNotExist:
+    teacher = get_acting_teacher(request)
+    if teacher is None:
         messages.error(request, 'لم يتم ربط حسابك بملف معلم')
         return redirect('teacher_portal:dashboard')
 
@@ -345,7 +374,8 @@ def export_attendance(request):
     wb = openpyxl.Workbook()
     ws = wb.active
     ws.title = str(today)
-    ws.append(['اسم الطالب', 'الصف', 'حالة الحضور', 'وقت الحضور', 'التقييم', 'متوسط التقييم', 'الملاحظة'])
+    ws.append(['اسم الطالب', 'الصف', 'حالة الحضور', 'وقت الحضور',
+              'التقييم', 'متوسط التقييم', 'الملاحظة'])
 
     for student in students:
         att = attendance_by_id.get(student.id)
@@ -354,7 +384,8 @@ def export_attendance(request):
             student.full_name,
             student.grade or '',
             'حضر' if att else 'لم يسجل',
-            localtime(att.check_in_time).strftime('%H:%M') if att and att.check_in_time else '',
+            localtime(att.check_in_time).strftime(
+                '%H:%M') if att and att.check_in_time else '',
             att.rating if att else '',
             round(avg, 1) if avg is not None else '',
             att.teacher_note if att else '',

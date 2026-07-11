@@ -1,0 +1,117 @@
+{% extends 'base.html' %}
+
+{% block title %}المشرفون - نظام الحضور{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+
+    <!-- Page header -->
+    <div class="d-flex justify-content-between align-items-center mb-4 mt-2">
+        <h1 class="h3 mb-0">
+            <i class="bi bi-shield-check me-2"></i>
+            المشرفون
+        </h1>
+        <a href="{% url 'admin_portal:supervisor_create' %}" class="btn btn-primary btn-sm">
+            <i class="bi bi-plus-lg me-1"></i>إضافة مشرف
+        </a>
+    </div>
+
+    <!-- Search -->
+    <div class="card border-0 shadow-sm mb-3">
+        <div class="card-body py-3">
+            <form method="get" class="row g-2 align-items-end">
+                <div class="col-md-4">
+                    <input type="text" name="q" value="{{ q }}" class="form-control"
+                        placeholder="البحث بالاسم أو رقم الهاتف…">
+                </div>
+                <div class="col-auto d-flex gap-1">
+                    <button type="submit" class="btn btn-primary btn-sm">
+                        <i class="bi bi-search"></i>
+                    </button>
+                    <a href="{% url 'admin_portal:supervisor_list' %}" class="btn btn-outline-secondary btn-sm">
+                        <i class="bi bi-x-lg"></i>
+                    </a>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div class="card border-0 shadow-sm">
+        {% if page_obj %}
+        <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0">
+                <thead class="table-light">
+                    <tr>
+                        <th>#</th>
+                        <th>الاسم</th>
+                        <!-- Forced explicit right alignment on the header -->
+                        <th style="text-align: right;">رقم الهاتف</th>
+                        <th></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for sup in page_obj %}
+                    <tr>
+                        <td class="text-muted small">{{ page_obj.start_index|add:forloop.counter0 }}</td>
+                        <td class="fw-semibold">{{ sup.first_name }}</td>
+                        <!-- Forced explicit right alignment on the LTR cell using standard CSS -->
+                        <td class="font-monospace small text-muted" dir="ltr" style="text-align: right;">{{ sup.phone }}</td>
+                        <td>
+                            <div class="d-flex gap-1">
+                                <a href="{% url 'admin_portal:supervisor_edit' sup.pk %}"
+                                   class="btn btn-outline-secondary btn-sm" title="تعديل">
+                                    <i class="bi bi-pencil"></i>
+                                </a>
+                                <form method="post"
+                                    action="{% url 'admin_portal:supervisor_delete' sup.pk %}"
+                                    onsubmit="return confirm('هل أنت متأكد من حذف المشرف {{ sup.first_name }}؟')">
+                                    {% csrf_token %}
+                                    <button type="submit" class="btn btn-outline-danger btn-sm" title="حذف">
+                                        <i class="bi bi-trash"></i>
+                                    </button>
+                                </form>
+                            </div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% if page_obj.has_other_pages %}
+        <div class="d-flex justify-content-between align-items-center px-3 py-3 border-top">
+            <small class="text-muted">عرض {{ page_obj.start_index }}–{{ page_obj.end_index }} من {{ total_count }}</small>
+            <nav>
+                <ul class="pagination pagination-sm mb-0">
+                    {% if page_obj.has_previous %}
+                    <li class="page-item">
+                        <a class="page-link" href="?page={{ page_obj.previous_page_number }}{% if q %}&q={{ q }}{% endif %}">&laquo;</a>
+                    </li>
+                    {% endif %}
+                    {% for num in page_obj.paginator.page_range %}
+                    {% if page_obj.number == num %}
+                    <li class="page-item active"><span class="page-link">{{ num }}</span></li>
+                    {% elif num > page_obj.number|add:"-3" and num < page_obj.number|add:"3" %}
+                    <li class="page-item">
+                        <a class="page-link" href="?page={{ num }}{% if q %}&q={{ q }}{% endif %}">{{ num }}</a>
+                    </li>
+                    {% endif %}
+                    {% endfor %}
+                    {% if page_obj.has_next %}
+                    <li class="page-item">
+                        <a class="page-link" href="?page={{ page_obj.next_page_number }}{% if q %}&q={{ q }}{% endif %}">&raquo;</a>
+                    </li>
+                    {% endif %}
+                </ul>
+            </nav>
+        </div>
+        {% endif %}
+        {% else %}
+        <div class="card-body text-center text-muted py-5">
+            <i class="bi bi-shield-check display-4 d-block mb-3 opacity-25"></i>
+            <p class="mb-0">لا يوجد مشرفون{% if q %} يطابقون البحث{% endif %}</p>
+        </div>
+        {% endif %}
+    </div>
+
+</div>
+{% endblock %}

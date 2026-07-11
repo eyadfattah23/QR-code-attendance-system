@@ -190,3 +190,64 @@ class TeacherForm(forms.Form):
             self.instance.save()
             teacher = self.instance
         return teacher
+
+
+class SupervisorForm(forms.Form):
+    """Form for creating / editing a supervisor user account."""
+
+    full_name = forms.CharField(
+        max_length=255,
+        label='الاسم الكامل',
+        widget=forms.TextInput(
+            attrs={'class': 'form-control', 'autofocus': True}),
+    )
+    phone = forms.CharField(
+        max_length=11,
+        label='رقم الهاتف',
+        widget=forms.TextInput(attrs={'class': 'form-control', 'dir': 'ltr'}),
+        help_text='11 رقم يبدأ بصفر',
+    )
+    password = forms.CharField(
+        required=False,
+        label='كلمة المرور',
+        widget=forms.PasswordInput(attrs={'class': 'form-control'}),
+        help_text='اتركها فارغة عند التعديل للإبقاء على كلمة المرور الحالية',
+    )
+
+    def __init__(self, *args, instance=None, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.instance = instance  # User object when editing, None when creating
+        if instance is None:
+            self.fields['password'].required = True
+            self.fields['password'].help_text = ''
+
+    def clean_phone(self):
+        phone = self.cleaned_data['phone']
+        if not re.match(r'^0\d{10}$', phone):
+            raise forms.ValidationError(
+                'رقم الهاتف يجب أن يكون 11 رقم ويبدأ بصفر')
+        qs = User.objects.filter(phone=phone)
+        if self.instance:
+            qs = qs.exclude(pk=self.instance.pk)
+        if qs.exists():
+            raise forms.ValidationError('رقم الهاتف مستخدم بالفعل')
+        return phone
+
+    @transaction.atomic
+    def save(self):
+        data = self.cleaned_data
+        if self.instance is None:
+            user = User.objects.create_user(
+                phone=data['phone'],
+                password=data['password'],
+                role=User.Role.SUPERVISOR,
+                first_name=data['full_name'],
+            )
+        else:
+            user = self.instance
+            user.phone = data['phone']
+            user.first_name = data['full_name']
+            if data.get('password'):
+                user.set_password(data['password'])
+            user.save()
+        return user

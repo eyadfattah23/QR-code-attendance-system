@@ -1,0 +1,78 @@
+{% extends 'base.html' %}
+
+{% block title %}لوحة تحكم المشرف - نظام الحضور{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+
+    <!-- Page header -->
+    <div class="d-flex justify-content-between align-items-center mb-4 mt-2">
+        <h1 class="h3 mb-0">
+            <i class="bi bi-shield-check me-2 text-primary"></i>
+            لوحة تحكم المشرف
+        </h1>
+        <span class="text-muted small">{{ today }}</span>
+    </div>
+
+    {% if teacher_cards %}
+    <div class="row g-3">
+        {% for card in teacher_cards %}
+        <div class="col-sm-6 col-lg-4 col-xl-3">
+            <div
+                class="card border-0 shadow-sm h-100 {% if card.is_active %}border-start border-4 border-primary{% endif %}">
+                <div class="card-body d-flex flex-column">
+                    <div class="d-flex align-items-center gap-3 mb-3">
+                        <div class="rounded-circle bg-success-subtle d-flex align-items-center justify-content-center flex-shrink-0"
+                            style="width:48px;height:48px;">
+                            <i class="bi bi-person-badge fs-5 text-success"></i>
+                        </div>
+                        <div class="overflow-hidden">
+                            <div class="fw-semibold text-truncate">{{ card.teacher.full_name }}</div>
+                            <div class="text-muted small">{{ card.teacher.subject|default:"—" }}</div>
+                        </div>
+                        {% if card.is_active %}
+                        <span class="badge bg-primary ms-auto">نشط</span>
+                        {% endif %}
+                    </div>
+
+                    <div class="row g-2 mb-3">
+                        <div class="col-6">
+                            <div class="text-center p-2 rounded bg-light">
+                                <div class="fw-bold text-primary">{{ card.student_count }}</div>
+                                <div class="text-muted" style="font-size:.72rem;">الطلاب</div>
+                            </div>
+                        </div>
+                        <div class="col-6">
+                            <div class="text-center p-2 rounded bg-light">
+                                <div class="fw-bold text-success">{{ card.today_count }}</div>
+                                <div class="text-muted" style="font-size:.72rem;">حضور اليوم</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="mt-auto">
+                        <form method="post" action="{% url 'supervisor_portal:select_teacher' card.teacher.pk %}">
+                            {% csrf_token %}
+                            <button type="submit"
+                                class="btn w-100 {% if card.is_active %}btn-primary{% else %}btn-outline-primary{% endif %} btn-sm">
+                                <i class="bi bi-box-arrow-in-left me-1"></i>
+                                {% if card.is_active %}العمل بهذا الحساب{% else %}عرض{% endif %}
+                            </button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+    {% else %}
+    <div class="card border-0 shadow-sm">
+        <div class="card-body text-center text-muted py-5">
+            <i class="bi bi-person-badge display-4 d-block mb-3 opacity-25"></i>
+            <p class="mb-0">لا يوجد معلمون مسجلون في النظام بعد</p>
+        </div>
+    </div>
+    {% endif %}
+
+</div>
+{% endblock %}

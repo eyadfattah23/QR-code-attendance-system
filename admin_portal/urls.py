@@ -16,7 +16,8 @@ urlpatterns = [
     path('students/export/', views.student_export, name='student_export'),
     path('students/<uuid:pk>/history/',
          views.student_history, name='student_history'),
-    path('students/<uuid:pk>/detail/', views.student_detail, name='student_detail'),
+    path('students/<uuid:pk>/detail/',
+         views.student_detail, name='student_detail'),
     path('students/<uuid:pk>/edit/', views.student_edit, name='student_edit'),
     path('students/<uuid:pk>/delete/',
          views.student_delete, name='student_delete'),
@@ -51,4 +52,12 @@ urlpatterns = [
          views.teacher_students_export, name='teacher_students_export'),
     path('teachers/<uuid:pk>/mark-absent/',
          views.teacher_mark_absent, name='teacher_mark_absent'),
+
+    # Supervisor management
+    path('supervisors/', views.supervisor_list, name='supervisor_list'),
+    path('supervisors/create/', views.supervisor_create, name='supervisor_create'),
+    path('supervisors/<int:pk>/edit/',
+         views.supervisor_edit, name='supervisor_edit'),
+    path('supervisors/<int:pk>/delete/',
+         views.supervisor_delete, name='supervisor_delete'),
 ]
