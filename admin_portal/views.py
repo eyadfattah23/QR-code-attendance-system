@@ -1107,12 +1107,14 @@ def export_attendance_excel(request):
                 Q(teacher__full_name__icontains=teacher_q)
                 | Q(teacher__user__phone__icontains=teacher_q)
             )
-        ws.append(['التاريخ', 'المعلم', 'وقت الحضور', 'التقييم', 'ملاحظات'])
+        ws.append(['التاريخ', 'المعلم', 'وقت الحضور', 'وقت المغادرة', 'مدة الحضور', 'التقييم', 'ملاحظات'])
         for rec in qs:
             ws.append([
                 str(rec.date),
                 rec.teacher.full_name,
                 localtime(rec.check_in_time).strftime('%H:%M'),
+                localtime(rec.check_out_time).strftime('%H:%M') if rec.check_out_time else '',
+                rec.duration_display if rec.check_out_time else '',
                 rec.rating,
                 rec.notes,
             ])
@@ -1143,7 +1145,7 @@ def export_attendance_excel(request):
             qs = qs.filter(student__grade=grade)
         ws.append([
             'التاريخ', 'اسم الطالب', 'الرقم القومي', 'الكود', 'الصف',
-            'وقت الحضور', 'المعلم المكلف', 'التقييم', 'نيابة', 'ملاحظات',
+            'وقت الحضور', 'وقت المغادرة', 'مدة الحضور', 'المعلم المكلف', 'التقييم', 'نيابة', 'ملاحظات',
         ])
         for rec in qs:
             ws.append([
@@ -1153,6 +1155,8 @@ def export_attendance_excel(request):
                 rec.student.student_code or '',
                 rec.student.grade or '',
                 localtime(rec.check_in_time).strftime('%H:%M'),
+                localtime(rec.check_out_time).strftime('%H:%M') if rec.check_out_time else '',
+                rec.duration_display if rec.check_out_time else '',
                 rec.assigned_teacher.full_name if rec.assigned_teacher else '',
                 rec.rating,
                 'نعم' if rec.is_substitute_assignment else 'لا',
