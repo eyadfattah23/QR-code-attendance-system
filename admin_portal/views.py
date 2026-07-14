@@ -199,6 +199,21 @@ def student_delete(request, pk):
 
 
 @admin_required
+@require_http_methods(['POST'])
+def student_bulk_delete(request):
+    """Bulk-delete selected students (POST only)."""
+    ids = request.POST.getlist('student_ids')
+    if not ids:
+        messages.warning(request, 'لم يتم تحديد أي طالب')
+        return redirect('admin_portal:student_list')
+    qs = Student.objects.filter(pk__in=ids)
+    count = qs.count()
+    qs.delete()
+    messages.success(request, f'تم حذف {count} طالب بنجاح')
+    return redirect('admin_portal:student_list')
+
+
+@admin_required
 def student_detail(request, pk):
     """Full profile page for a single student."""
     student = get_object_or_404(Student, pk=pk)
@@ -260,6 +275,7 @@ def student_import(request):
     col = {h: i for i, h in enumerate(headers) if h}
 
     created = skipped = 0
+    duplicate_rows = []
     error_msgs = []
 
     for row_num, row in enumerate(rows[1:], start=2):
@@ -285,6 +301,7 @@ def student_import(request):
 
         if Student.objects.filter(national_id=national_id).exists():
             skipped += 1
+            duplicate_rows.append(str(row_num))
             continue
 
         student_code = _cell('student_code') or None
@@ -365,8 +382,13 @@ def student_import(request):
     if created:
         messages.success(request, f'تمت إضافة {created} طالب بنجاح')
     if skipped:
+        rows_preview = ', '.join(duplicate_rows[:10])
+        if len(duplicate_rows) > 10:
+            rows_preview += f' ... (+{len(duplicate_rows) - 10})'
         messages.warning(
-            request, f'تم تخطي {skipped} سجل مكرر (الرقم القومي موجود مسبقاً)')
+            request,
+            f'تم تخطي {skipped} سجل مكرر (الرقم القومي موجود مسبقاً). الصفوف: {rows_preview}'
+        )
     if error_msgs:
         preview = ' | '.join(error_msgs[:5])
         if len(error_msgs) > 5:
@@ -1107,13 +1129,15 @@ def export_attendance_excel(request):
                 Q(teacher__full_name__icontains=teacher_q)
                 | Q(teacher__user__phone__icontains=teacher_q)
             )
-        ws.append(['التاريخ', 'المعلم', 'وقت الحضور', 'وقت المغادرة', 'مدة الحضور', 'التقييم', 'ملاحظات'])
+        ws.append(['التاريخ', 'المعلم', 'وقت الحضور',
+                  'وقت المغادرة', 'مدة الحضور', 'التقييم', 'ملاحظات'])
         for rec in qs:
             ws.append([
                 str(rec.date),
                 rec.teacher.full_name,
                 localtime(rec.check_in_time).strftime('%H:%M'),
-                localtime(rec.check_out_time).strftime('%H:%M') if rec.check_out_time else '',
+                localtime(rec.check_out_time).strftime(
+                    '%H:%M') if rec.check_out_time else '',
                 rec.duration_display if rec.check_out_time else '',
                 rec.rating,
                 rec.notes,
@@ -1155,7 +1179,8 @@ def export_attendance_excel(request):
                 rec.student.student_code or '',
                 rec.student.grade or '',
                 localtime(rec.check_in_time).strftime('%H:%M'),
-                localtime(rec.check_out_time).strftime('%H:%M') if rec.check_out_time else '',
+                localtime(rec.check_out_time).strftime(
+                    '%H:%M') if rec.check_out_time else '',
                 rec.duration_display if rec.check_out_time else '',
                 rec.assigned_teacher.full_name if rec.assigned_teacher else '',
                 rec.rating,

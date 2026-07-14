@@ -111,87 +111,106 @@
                 <small class="text-muted fw-normal ms-1">(نتائج مصفاة)</small>
                 {% endif %}
             </span>
+            <!-- Bulk action toolbar (hidden until rows selected) -->
+            <div id="bulk-toolbar" class="d-none align-items-center gap-2">
+                <span class="text-muted small" id="bulk-count-label"></span>
+                <button type="button" class="btn btn-danger btn-sm" data-bs-toggle="modal"
+                    data-bs-target="#bulkDeleteModal">
+                    <i class="bi bi-trash me-1"></i>حذف المحدد
+                </button>
+            </div>
         </div>
         <div class="card-body p-0">
             {% if page_obj.object_list %}
             <div class="table-responsive">
-                <table class="table table-hover align-middle mb-0">
-                    <thead class="table-light">
-                        <tr>
-                            <th style="width:3rem">#</th>
-                            <th>الاسم الكامل</th>
-                            <th>اللقب</th>
-                            <th>الرقم القومي</th>
-                            <th>الصف</th>
-                            <th>الجنس</th>
-                            <th>السن</th>
-                            <th>هاتف الطالب</th>
-                            <th>هاتف ولي الأمر</th>
-                            <th>متوسط التقييم</th>
-                            <th style="width:10rem">إجراءات</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% for student in page_obj %}
-                        <tr>
-                            <td class="text-muted small">{{ forloop.counter|add:page_obj.start_index|add:"-1" }}</td>
-                            <td class="fw-semibold">{{ student.full_name }}</td>
-                            <td class="text-muted small">{{ student.nickname|default:"—" }}</td>
-                            <td class="font-monospace small text-muted">{{ student.national_id }}</td>
-                            <td>
-                                {% if student.grade %}
-                                <span class="badge bg-light text-dark border">{{ student.grade }}</span>
-                                {% else %}—{% endif %}
-                            </td>
-                            <td>
-                                {% if student.gender == 'M' %}ذكر
-                                {% elif student.gender == 'F' %}أنثى
-                                {% else %}—{% endif %}
-                            </td>
-                            <td class="small">
-                                {% if student.age is not None %}{{ student.age }}
-                                {% else %}—{% endif %}
-                            </td>
-                            <td class="font-monospace small">{{ student.phone|default:"—" }}</td>
-                            <td class="font-monospace small">{{ student.parent_phone|default:"—" }}</td>
-                            <td>
-                                {% if student.avg_rating %}
-                                <span class="badge
+                <form id="bulk-form" method="post" action="{% url 'admin_portal:student_bulk_delete' %}">
+                    {% csrf_token %}
+                    <table class="table table-hover align-middle mb-0">
+                        <thead class="table-light">
+                            <tr>
+                                <th style="width:2.5rem">
+                                    <input type="checkbox" class="form-check-input" id="check-all" title="تحديد الكل">
+                                </th>
+                                <th style="width:3rem">#</th>
+                                <th>الاسم الكامل</th>
+                                <th>اللقب</th>
+                                <th>الرقم القومي</th>
+                                <th>الصف</th>
+                                <th>الجنس</th>
+                                <th>السن</th>
+                                <th>هاتف الطالب</th>
+                                <th>هاتف ولي الأمر</th>
+                                <th>متوسط التقييم</th>
+                                <th style="width:10rem">إجراءات</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for student in page_obj %}
+                            <tr>
+                                <td>
+                                    <input type="checkbox" class="form-check-input row-cb" name="student_ids"
+                                        value="{{ student.id }}">
+                                </td>
+                                <td class="text-muted small">{{ forloop.counter|add:page_obj.start_index|add:"-1" }}
+                                </td>
+                                <td class="fw-semibold">{{ student.full_name }}</td>
+                                <td class="text-muted small">{{ student.nickname|default:"—" }}</td>
+                                <td class="font-monospace small text-muted">{{ student.national_id }}</td>
+                                <td>
+                                    {% if student.grade %}
+                                    <span class="badge bg-light text-dark border">{{ student.grade }}</span>
+                                    {% else %}—{% endif %}
+                                </td>
+                                <td>
+                                    {% if student.gender == 'M' %}ذكر
+                                    {% elif student.gender == 'F' %}أنثى
+                                    {% else %}—{% endif %}
+                                </td>
+                                <td class="small">
+                                    {% if student.age is not None %}{{ student.age }}
+                                    {% else %}—{% endif %}
+                                </td>
+                                <td class="font-monospace small">{{ student.phone|default:"—" }}</td>
+                                <td class="font-monospace small">{{ student.parent_phone|default:"—" }}</td>
+                                <td>
+                                    {% if student.avg_rating %}
+                                    <span class="badge
                                     {% if student.avg_rating >= 8 %}bg-success
                                     {% elif student.avg_rating >= 5 %}bg-warning text-dark
                                     {% else %}bg-danger{% endif %}">
-                                    {{ student.avg_rating|floatformat:1 }}/10
-                                </span>
-                                {% else %}
-                                <span class="text-muted">—</span>
-                                {% endif %}
-                            </td>
-                            <td>
-                                <div class="btn-group btn-group-sm">
-                                    <a href="{% url 'admin_portal:student_detail' student.id %}"
-                                        class="btn btn-outline-secondary" title="التفاصيل">
-                                        <i class="bi bi-eye"></i>
-                                    </a>
-                                    <a href="{% url 'admin_portal:student_history' student.id %}"
-                                        class="btn btn-outline-info" title="سجل الحضور">
-                                        <i class="bi bi-clock-history"></i>
-                                    </a>
-                                    <a href="{% url 'admin_portal:student_edit' student.id %}"
-                                        class="btn btn-outline-primary" title="تعديل">
-                                        <i class="bi bi-pencil"></i>
-                                    </a>
-                                    <button type="button" class="btn btn-outline-danger" title="حذف"
-                                        data-bs-toggle="modal" data-bs-target="#deleteModal"
-                                        data-delete-url="{% url 'admin_portal:student_delete' student.id %}"
-                                        data-student-name="{{ student.full_name }}">
-                                        <i class="bi bi-trash"></i>
-                                    </button>
-                                </div>
-                            </td>
-                        </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
+                                        {{ student.avg_rating|floatformat:1 }}/10
+                                    </span>
+                                    {% else %}
+                                    <span class="text-muted">—</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    <div class="btn-group btn-group-sm">
+                                        <a href="{% url 'admin_portal:student_detail' student.id %}"
+                                            class="btn btn-outline-secondary" title="التفاصيل">
+                                            <i class="bi bi-eye"></i>
+                                        </a>
+                                        <a href="{% url 'admin_portal:student_history' student.id %}"
+                                            class="btn btn-outline-info" title="سجل الحضور">
+                                            <i class="bi bi-clock-history"></i>
+                                        </a>
+                                        <a href="{% url 'admin_portal:student_edit' student.id %}"
+                                            class="btn btn-outline-primary" title="تعديل">
+                                            <i class="bi bi-pencil"></i>
+                                        </a>
+                                        <button type="button" class="btn btn-outline-danger" title="حذف"
+                                            data-bs-toggle="modal" data-bs-target="#deleteModal"
+                                            data-delete-url="{% url 'admin_portal:student_delete' student.id %}"
+                                            data-student-name="{{ student.full_name }}">
+                                            <i class="bi bi-trash"></i>
+                                        </button>
+                                    </div>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </form>
             </div>
 
             <!-- Pagination -->
@@ -304,6 +323,33 @@
     </div>
 </div>
 
+<!-- Bulk Delete Confirmation Modal -->
+<div class="modal fade" id="bulkDeleteModal" tabindex="-1" aria-labelledby="bulkDeleteModalLabel">
+    <div class="modal-dialog modal-sm">
+        <div class="modal-content">
+            <div class="modal-header border-0 pb-0">
+                <h5 class="modal-title text-danger" id="bulkDeleteModalLabel">
+                    <i class="bi bi-exclamation-triangle me-2"></i>تأكيد الحذف
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <p class="mb-1">هل أنت متأكد من حذف <strong id="bulk-modal-count"></strong>؟</p>
+                <p class="text-danger small mb-0">
+                    <i class="bi bi-exclamation-circle me-1"></i>
+                    سيتم حذف جميع سجلات الحضور المرتبطة بهم.
+                </p>
+            </div>
+            <div class="modal-footer border-0 pt-0">
+                <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">إلغاء</button>
+                <button type="button" class="btn btn-danger btn-sm" id="bulk-delete-confirm">
+                    <i class="bi bi-trash me-1"></i>حذف
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
 <!-- Delete Confirmation Modal -->
 <div class="modal fade" id="deleteModal" tabindex="-1" aria-labelledby="deleteModalLabel">
     <div class="modal-dialog modal-sm">
@@ -338,10 +384,54 @@
 
 {% block extra_js %}
 <script>
+    // ── single-row delete modal ───────────────────────────────────────────────
     document.getElementById('deleteModal').addEventListener('show.bs.modal', function (event) {
         const btn = event.relatedTarget;
         document.getElementById('delete-student-name').textContent = btn.dataset.studentName;
         document.getElementById('delete-form').action = btn.dataset.deleteUrl;
+    });
+
+    // ── bulk selection ────────────────────────────────────────────────────────
+    const checkAll = document.getElementById('check-all');
+    const toolbar = document.getElementById('bulk-toolbar');
+    const countLabel = document.getElementById('bulk-count-label');
+
+    function getChecked() {
+        return document.querySelectorAll('.row-cb:checked');
+    }
+
+    function updateToolbar() {
+        const checked = getChecked();
+        const n = checked.length;
+        if (n > 0) {
+            toolbar.classList.remove('d-none');
+            toolbar.classList.add('d-flex');
+            countLabel.textContent = 'تم تحديد ' + n + ' طالب';
+        } else {
+            toolbar.classList.add('d-none');
+            toolbar.classList.remove('d-flex');
+        }
+        // sync check-all state
+        const all = document.querySelectorAll('.row-cb');
+        checkAll.indeterminate = n > 0 && n < all.length;
+        checkAll.checked = n === all.length && all.length > 0;
+    }
+
+    document.querySelectorAll('.row-cb').forEach(cb => cb.addEventListener('change', updateToolbar));
+
+    checkAll.addEventListener('change', function () {
+        document.querySelectorAll('.row-cb').forEach(cb => cb.checked = this.checked);
+        updateToolbar();
+    });
+
+    // ── bulk delete confirm ───────────────────────────────────────────────────
+    document.getElementById('bulkDeleteModal').addEventListener('show.bs.modal', function () {
+        const n = getChecked().length;
+        document.getElementById('bulk-modal-count').textContent = n + ' طالب';
+    });
+
+    document.getElementById('bulk-delete-confirm').addEventListener('click', function () {
+        document.getElementById('bulk-form').submit();
     });
 </script>
 {% endblock %}
