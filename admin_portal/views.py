@@ -34,6 +34,20 @@ def _log_audit(request, action, object_type, object_repr):
     )
 
 
+def _save_return(request, key):
+    """Save the current full URL (with query string) to session under key."""
+    request.session[key] = request.get_full_path()
+
+
+def _get_return(request, key, fallback_url):
+    """Return the saved list URL from session, or fallback_url."""
+    url = request.session.get(key, '')
+    # Safety: only use internal relative paths
+    if url and url.startswith('/'):
+        return url
+    return fallback_url
+
+
 def admin_required(view_func):
     """Decorator to ensure user is an admin."""
     @wraps(view_func)
@@ -81,6 +95,7 @@ def dashboard(request):
 @admin_required
 def student_list(request):
     """Paginated student list with search and grade filter."""
+    _save_return(request, 'student_list_return')
     q = request.GET.get('q', '').strip()
     grade_filter = request.GET.get('grade', '').strip()
     gender_filter = request.GET.get('gender', '').strip()
@@ -168,7 +183,8 @@ def student_create(request):
             student = form.save()
             messages.success(
                 request, f'تم إضافة الطالب "{student.full_name}" بنجاح')
-            return redirect('admin_portal:student_list')
+            return redirect(_get_return(request, 'student_list_return',
+                                        reverse('admin_portal:student_list')))
     else:
         form = StudentForm()
 
@@ -192,7 +208,8 @@ def student_edit(request, pk):
                        'طالب', student.full_name)
             messages.success(
                 request, f'تم تحديث بيانات "{student.full_name}" بنجاح')
-            return redirect('admin_portal:student_list')
+            return redirect(_get_return(request, 'student_list_return',
+                                        reverse('admin_portal:student_list')))
     else:
         form = StudentForm(instance=student)
 
@@ -213,7 +230,8 @@ def student_delete(request, pk):
     _log_audit(request, AuditLog.Action.DELETE, 'طالب', name)
     student.delete()
     messages.success(request, f'تم حذف الطالب "{name}" بنجاح')
-    return redirect('admin_portal:student_list')
+    return redirect(_get_return(request, 'student_list_return',
+                                reverse('admin_portal:student_list')))
 
 
 @admin_required
@@ -231,7 +249,8 @@ def student_bulk_delete(request):
         _log_audit(request, AuditLog.Action.DELETE, 'طالب', name)
     qs.delete()
     messages.success(request, f'تم حذف {count} طالب بنجاح')
-    return redirect('admin_portal:student_list')
+    return redirect(_get_return(request, 'student_list_return',
+                                reverse('admin_portal:student_list')))
 
 
 @admin_required
@@ -676,6 +695,7 @@ def student_export(request):
 @admin_required
 def teacher_list(request):
     """Paginated teacher list with name / phone / subject search."""
+    _save_return(request, 'teacher_list_return')
     q = request.GET.get('q', '').strip()
     gender_filter = request.GET.get('gender', '').strip()
 
@@ -709,7 +729,8 @@ def teacher_create(request):
             teacher = form.save()
             messages.success(
                 request, f'تم إضافة المعلم "{teacher.full_name}" بنجاح')
-            return redirect('admin_portal:teacher_list')
+            return redirect(_get_return(request, 'teacher_list_return',
+                                        reverse('admin_portal:teacher_list')))
     else:
         form = TeacherForm()
 
@@ -733,7 +754,8 @@ def teacher_edit(request, pk):
                        'معلم', teacher.full_name)
             messages.success(
                 request, f'تم تحديث بيانات "{teacher.full_name}" بنجاح')
-            return redirect('admin_portal:teacher_list')
+            return redirect(_get_return(request, 'teacher_list_return',
+                                        reverse('admin_portal:teacher_list')))
     else:
         form = TeacherForm(
             initial={
@@ -764,7 +786,8 @@ def teacher_delete(request, pk):
     # Deleting the user cascades to the Teacher profile
     teacher.user.delete()
     messages.success(request, f'تم حذف المعلم "{name}" بنجاح')
-    return redirect('admin_portal:teacher_list')
+    return redirect(_get_return(request, 'teacher_list_return',
+                                reverse('admin_portal:teacher_list')))
 
 
 # ---------------------------------------------------------------------------
@@ -922,6 +945,7 @@ def teacher_students_export(request, pk):
 @admin_required
 def supervisor_list(request):
     """List all supervisor accounts."""
+    _save_return(request, 'supervisor_list_return')
     q = request.GET.get('q', '').strip()
     qs = User.objects.filter(role=User.Role.SUPERVISOR).order_by('first_name')
     if q:
@@ -946,7 +970,8 @@ def supervisor_create(request):
             user = form.save()
             messages.success(
                 request, f'تم إضافة المشرف "{user.first_name}" بنجاح')
-            return redirect('admin_portal:supervisor_list')
+            return redirect(_get_return(request, 'supervisor_list_return',
+                                        reverse('admin_portal:supervisor_list')))
     else:
         form = SupervisorForm()
     return render(request, 'admin_portal/supervisor_form.html', {
@@ -968,7 +993,8 @@ def supervisor_edit(request, pk):
                        'مشرف', supervisor.first_name)
             messages.success(
                 request, f'تم تحديث بيانات "{supervisor.first_name}" بنجاح')
-            return redirect('admin_portal:supervisor_list')
+            return redirect(_get_return(request, 'supervisor_list_return',
+                                        reverse('admin_portal:supervisor_list')))
     else:
         form = SupervisorForm(
             initial={'full_name': supervisor.first_name,
@@ -992,7 +1018,8 @@ def supervisor_delete(request, pk):
     _log_audit(request, AuditLog.Action.DELETE, 'مشرف', name)
     supervisor.delete()
     messages.success(request, f'تم حذف المشرف "{name}" بنجاح')
-    return redirect('admin_portal:supervisor_list')
+    return redirect(_get_return(request, 'supervisor_list_return',
+                                reverse('admin_portal:supervisor_list')))
 
 
 # ---------------------------------------------------------------------------
