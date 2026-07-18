@@ -1,0 +1,138 @@
+{% extends 'base.html' %}
+
+{% block title %}سجل المراجعة - نظام الحضور{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+
+    <!-- Page header -->
+    <div class="d-flex justify-content-between align-items-center mb-4 mt-2">
+        <h1 class="h3 mb-0">
+            <i class="bi bi-journal-text me-2"></i>
+            سجل المراجعة
+        </h1>
+        <a href="{% url 'admin_portal:dashboard' %}" class="btn btn-outline-secondary btn-sm">
+            <i class="bi bi-arrow-right me-1"></i>لوحة التحكم
+        </a>
+    </div>
+
+    <!-- Filters -->
+    <div class="card border-0 shadow-sm mb-3">
+        <div class="card-body py-3">
+            <form method="get" class="row g-2 align-items-end">
+                <div class="col-md-2">
+                    <select name="action" class="form-select form-select-sm">
+                        <option value="">كل الإجراءات</option>
+                        <option value="delete" {% if action_filter == 'delete' %}selected{% endif %}>حذف</option>
+                        <option value="edit"   {% if action_filter == 'edit'   %}selected{% endif %}>تعديل</option>
+                    </select>
+                </div>
+                <div class="col-md-3">
+                    <select name="object_type" class="form-select form-select-sm">
+                        <option value="">كل الأنواع</option>
+                        {% for ot in object_types %}
+                        <option value="{{ ot }}" {% if object_type_filter == ot %}selected{% endif %}>{{ ot }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-3">
+                    <input type="text" name="actor" value="{{ actor_filter }}"
+                           class="form-control form-control-sm" placeholder="رقم هاتف المنفذ…" dir="ltr">
+                </div>
+                <div class="col-auto d-flex gap-1">
+                    <button type="submit" class="btn btn-primary btn-sm">
+                        <i class="bi bi-search"></i>
+                    </button>
+                    <a href="{% url 'admin_portal:audit_log' %}" class="btn btn-outline-secondary btn-sm">
+                        <i class="bi bi-x-lg"></i>
+                    </a>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Summary badge -->
+    <p class="text-muted small mb-2">
+        إجمالي النتائج: <strong>{{ total_count }}</strong>
+    </p>
+
+    <div class="card border-0 shadow-sm">
+        {% if page_obj %}
+        <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0">
+                <thead class="table-light">
+                    <tr>
+                        <th>#</th>
+                        <th>الإجراء</th>
+                        <th>النوع</th>
+                        <th>التفاصيل</th>
+                        <th>رقم المنفذ</th>
+                        <th>IP</th>
+                        <th>التاريخ والوقت</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for entry in page_obj %}
+                    <tr>
+                        <td class="text-muted small">{{ page_obj.start_index|add:forloop.counter0 }}</td>
+                        <td>
+                            {% if entry.action == 'delete' %}
+                            <span class="badge bg-danger">
+                                <i class="bi bi-trash me-1"></i>حذف
+                            </span>
+                            {% else %}
+                            <span class="badge bg-warning text-dark">
+                                <i class="bi bi-pencil me-1"></i>تعديل
+                            </span>
+                            {% endif %}
+                        </td>
+                        <td class="small">{{ entry.object_type }}</td>
+                        <td class="small fw-semibold">{{ entry.object_repr }}</td>
+                        <td class="font-monospace small text-muted" dir="ltr">{{ entry.actor_phone }}</td>
+                        <td class="font-monospace small text-muted" dir="ltr">{{ entry.ip_address }}</td>
+                        <td class="small text-muted" dir="ltr">{{ entry.timestamp|date:"Y-m-d H:i:s" }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        <!-- Pagination -->
+        {% if page_obj.has_other_pages %}
+        <div class="card-footer bg-white border-top-0 py-3">
+            <nav aria-label="pagination">
+                <ul class="pagination pagination-sm justify-content-center mb-0">
+                    {% if page_obj.has_previous %}
+                    <li class="page-item">
+                        <a class="page-link" href="?page={{ page_obj.previous_page_number }}&action={{ action_filter }}&object_type={{ object_type_filter }}&actor={{ actor_filter }}">
+                            <i class="bi bi-chevron-right"></i>
+                        </a>
+                    </li>
+                    {% endif %}
+                    <li class="page-item disabled">
+                        <span class="page-link">
+                            {{ page_obj.number }} / {{ page_obj.paginator.num_pages }}
+                        </span>
+                    </li>
+                    {% if page_obj.has_next %}
+                    <li class="page-item">
+                        <a class="page-link" href="?page={{ page_obj.next_page_number }}&action={{ action_filter }}&object_type={{ object_type_filter }}&actor={{ actor_filter }}">
+                            <i class="bi bi-chevron-left"></i>
+                        </a>
+                    </li>
+                    {% endif %}
+                </ul>
+            </nav>
+        </div>
+        {% endif %}
+
+        {% else %}
+        <div class="card-body text-center text-muted py-5">
+            <i class="bi bi-journal-x fs-1 d-block mb-2"></i>
+            لا توجد سجلات مطابقة للفلتر الحالي
+        </div>
+        {% endif %}
+    </div>
+
+</div>
+{% endblock %}

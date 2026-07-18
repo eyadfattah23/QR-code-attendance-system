@@ -23,7 +23,8 @@ from .models import AuditLog
 def _log_audit(request, action, object_type, object_repr):
     """Create an AuditLog entry for a delete or edit action."""
     forwarded = request.META.get('HTTP_X_FORWARDED_FOR', '')
-    ip = forwarded.split(',')[0].strip() if forwarded else request.META.get('REMOTE_ADDR', '')
+    ip = forwarded.split(',')[0].strip(
+    ) if forwarded else request.META.get('REMOTE_ADDR', '')
     AuditLog.objects.create(
         action=action,
         actor_phone=request.user.phone,
@@ -187,6 +188,8 @@ def student_edit(request, pk):
         form = StudentForm(request.POST, instance=student)
         if form.is_valid():
             form.save()
+            _log_audit(request, AuditLog.Action.EDIT,
+                       'طالب', student.full_name)
             messages.success(
                 request, f'تم تحديث بيانات "{student.full_name}" بنجاح')
             return redirect('admin_portal:student_list')
@@ -207,6 +210,7 @@ def student_delete(request, pk):
     """Delete a student (POST only)."""
     student = get_object_or_404(Student, pk=pk)
     name = student.full_name
+    _log_audit(request, AuditLog.Action.DELETE, 'طالب', name)
     student.delete()
     messages.success(request, f'تم حذف الطالب "{name}" بنجاح')
     return redirect('admin_portal:student_list')
@@ -221,7 +225,10 @@ def student_bulk_delete(request):
         messages.warning(request, 'لم يتم تحديد أي طالب')
         return redirect('admin_portal:student_list')
     qs = Student.objects.filter(pk__in=ids)
-    count = qs.count()
+    names = list(qs.values_list('full_name', flat=True))
+    count = len(names)
+    for name in names:
+        _log_audit(request, AuditLog.Action.DELETE, 'طالب', name)
     qs.delete()
     messages.success(request, f'تم حذف {count} طالب بنجاح')
     return redirect('admin_portal:student_list')
@@ -722,6 +729,8 @@ def teacher_edit(request, pk):
         form = TeacherForm(request.POST, instance=teacher)
         if form.is_valid():
             form.save()
+            _log_audit(request, AuditLog.Action.EDIT,
+                       'معلم', teacher.full_name)
             messages.success(
                 request, f'تم تحديث بيانات "{teacher.full_name}" بنجاح')
             return redirect('admin_portal:teacher_list')
@@ -751,6 +760,7 @@ def teacher_delete(request, pk):
     """Delete a teacher (and their user account) — POST only."""
     teacher = get_object_or_404(Teacher, pk=pk)
     name = teacher.full_name
+    _log_audit(request, AuditLog.Action.DELETE, 'معلم', name)
     # Deleting the user cascades to the Teacher profile
     teacher.user.delete()
     messages.success(request, f'تم حذف المعلم "{name}" بنجاح')
@@ -954,6 +964,8 @@ def supervisor_edit(request, pk):
         form = SupervisorForm(request.POST, instance=supervisor)
         if form.is_valid():
             form.save()
+            _log_audit(request, AuditLog.Action.EDIT,
+                       'مشرف', supervisor.first_name)
             messages.success(
                 request, f'تم تحديث بيانات "{supervisor.first_name}" بنجاح')
             return redirect('admin_portal:supervisor_list')
@@ -977,6 +989,7 @@ def supervisor_delete(request, pk):
     """Delete a supervisor account (POST only)."""
     supervisor = get_object_or_404(User, pk=pk, role=User.Role.SUPERVISOR)
     name = supervisor.first_name
+    _log_audit(request, AuditLog.Action.DELETE, 'مشرف', name)
     supervisor.delete()
     messages.success(request, f'تم حذف المشرف "{name}" بنجاح')
     return redirect('admin_portal:supervisor_list')
@@ -1248,6 +1261,8 @@ def attendance_record_edit_rating(request, pk):
         else:
             record.rating = rating
             record.save(update_fields=['rating'])
+            _log_audit(request, AuditLog.Action.EDIT, 'سجل حضور طالب',
+                       f'{record.student.full_name} — {record.date}')
             messages.success(request, f'تم تحديث التقييم إلى {rating}/10')
             if user.is_admin:
                 return redirect('admin_portal:student_history', pk=record.student_id)
@@ -1281,12 +1296,16 @@ def attendance_record_edit_photo(request, pk):
                 record.daily_photo.delete(save=False)
             record.daily_photo = None
             record.save(update_fields=['daily_photo'])
+            _log_audit(request, AuditLog.Action.EDIT, 'سجل حضور طالب (صورة)',
+                       f'{record.student.full_name} — {record.date}')
             messages.success(request, 'تم حذف الصورة بنجاح')
         elif 'daily_photo' in request.FILES:
             if record.daily_photo:
                 record.daily_photo.delete(save=False)
             record.daily_photo = request.FILES['daily_photo']
             record.save(update_fields=['daily_photo'])
+            _log_audit(request, AuditLog.Action.EDIT, 'سجل حضور طالب (صورة)',
+                       f'{record.student.full_name} — {record.date}')
             messages.success(request, 'تم تحديث الصورة بنجاح')
         return redirect('admin_portal:student_history', pk=record.student_id)
     return render(request, 'admin_portal/attendance_record_edit_photo.html', {
@@ -1319,6 +1338,8 @@ def teacher_attendance_record_edit(request, pk):
             record.rating = rating
             record.notes = notes
             record.save(update_fields=['rating', 'notes'])
+            _log_audit(request, AuditLog.Action.EDIT, 'سجل حضور معلم',
+                       f'{record.teacher.full_name} — {record.date}')
             messages.success(request, f'تم تحديث التقييم إلى {rating}/10')
             return redirect(back_url)
 
@@ -1338,7 +1359,10 @@ def teacher_attendance_record_edit(request, pk):
 @require_http_methods(['POST'])
 def student_attendance_record_delete(request, pk):
     """Delete a StudentAttendanceRecord (POST only)."""
-    record = get_object_or_404(StudentAttendanceRecord, pk=pk)
+    record = get_object_or_404(
+        StudentAttendanceRecord.objects.select_related('student'), pk=pk)
+    _log_audit(request, AuditLog.Action.DELETE, 'سجل حضور طالب',
+               f'{record.student.full_name} — {record.date}')
     record.delete()
     messages.success(request, 'تم حذف سجل الحضور بنجاح')
     next_url = request.POST.get('next', '').strip()
@@ -1351,7 +1375,10 @@ def student_attendance_record_delete(request, pk):
 @require_http_methods(['POST'])
 def teacher_attendance_record_delete(request, pk):
     """Delete a TeacherAttendanceRecord (POST only)."""
-    record = get_object_or_404(TeacherAttendanceRecord, pk=pk)
+    record = get_object_or_404(
+        TeacherAttendanceRecord.objects.select_related('teacher'), pk=pk)
+    _log_audit(request, AuditLog.Action.DELETE, 'سجل حضور معلم',
+               f'{record.teacher.full_name} — {record.date}')
     record.delete()
     messages.success(request, 'تم حذف سجل الحضور بنجاح')
     next_url = request.POST.get('next', '').strip()
@@ -1448,4 +1475,41 @@ def teacher_mark_absent(request, pk):
         'all_teachers': all_teachers,
         'present_with_records': present_with_records,
         'not_present_students': not_present_students,
+    })
+
+
+# ---------------------------------------------------------------------------
+# Audit log (admin only)
+# ---------------------------------------------------------------------------
+
+@admin_required
+def audit_log(request):
+    """Display all delete and edit audit log entries, newest first."""
+    action_filter = request.GET.get('action', '').strip()
+    object_type_filter = request.GET.get('object_type', '').strip()
+    actor_filter = request.GET.get('actor', '').strip()
+
+    qs = AuditLog.objects.all()
+    if action_filter:
+        qs = qs.filter(action=action_filter)
+    if object_type_filter:
+        qs = qs.filter(object_type=object_type_filter)
+    if actor_filter:
+        qs = qs.filter(actor_phone__icontains=actor_filter)
+
+    object_types = (
+        AuditLog.objects.values_list('object_type', flat=True)
+        .distinct().order_by('object_type')
+    )
+
+    paginator = Paginator(qs, 50)
+    page_obj = paginator.get_page(request.GET.get('page'))
+
+    return render(request, 'admin_portal/audit_log.html', {
+        'page_obj': page_obj,
+        'action_filter': action_filter,
+        'object_type_filter': object_type_filter,
+        'actor_filter': actor_filter,
+        'object_types': object_types,
+        'total_count': qs.count(),
     })

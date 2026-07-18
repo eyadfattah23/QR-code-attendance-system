@@ -11,6 +11,20 @@ import openpyxl
 
 from core.models import Student, Teacher, StudentTeacherLink
 from attendance.models import StudentAttendanceRecord
+from admin_portal.models import AuditLog
+
+
+def _log_audit(request, action, object_type, object_repr):
+    """Create an AuditLog entry for a delete or edit action."""
+    forwarded = request.META.get('HTTP_X_FORWARDED_FOR', '')
+    ip = forwarded.split(',')[0].strip() if forwarded else request.META.get('REMOTE_ADDR', '')
+    AuditLog.objects.create(
+        action=action,
+        actor_phone=request.user.phone,
+        ip_address=ip,
+        object_type=object_type,
+        object_repr=str(object_repr)[:255],
+    )
 
 
 def teacher_required(view_func):
@@ -304,6 +318,8 @@ def upload_photo(request, pk):
 
         record.daily_photo = photo
         record.save(update_fields=['daily_photo'])
+        _log_audit(request, AuditLog.Action.EDIT, 'سجل حضور طالب (صورة)',
+                   f'{record.student.full_name} — {record.date}')
         messages.success(request, 'تم رفع الصورة بنجاح')
         return redirect('teacher_portal:dashboard')
 
@@ -332,6 +348,8 @@ def edit_record_note(request, pk):
         note = request.POST.get('teacher_note', '').strip()
         record.teacher_note = note
         record.save(update_fields=['teacher_note'])
+        _log_audit(request, AuditLog.Action.EDIT, 'سجل حضور طالب (ملاحظة)',
+                   f'{record.student.full_name} — {record.date}')
         messages.success(request, 'تم حفظ الملاحظة بنجاح')
         return redirect('teacher_portal:dashboard')
 

@@ -62,4 +62,7 @@ urlpatterns = [
          views.supervisor_edit, name='supervisor_edit'),
     path('supervisors/<int:pk>/delete/',
          views.supervisor_delete, name='supervisor_delete'),
+
+    # Audit log
+    path('audit-log/', views.audit_log, name='audit_log'),
 ]
