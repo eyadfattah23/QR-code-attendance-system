@@ -1260,17 +1260,27 @@ def export_attendance_excel(request):
 
 @login_required
 def attendance_record_edit_rating(request, pk):
-    """Allow admin or a teacher linked to the student to edit the record rating."""
+    """Allow admin or a teacher/supervisor linked to the student to edit the record rating."""
     record = get_object_or_404(
         StudentAttendanceRecord.objects.select_related('student'), pk=pk
     )
     user = request.user
+    acting_as_teacher = False  # True when supervisor acts as a teacher
     if user.is_admin:
         can_edit = True
     elif user.is_teacher:
         can_edit = StudentTeacherLink.objects.filter(
             teacher__user=user, student=record.student
         ).exists()
+    elif user.is_supervisor:
+        teacher_pk = request.session.get('supervisor_teacher_id')
+        if teacher_pk:
+            can_edit = StudentTeacherLink.objects.filter(
+                teacher_id=teacher_pk, student=record.student
+            ).exists()
+            acting_as_teacher = can_edit
+        else:
+            can_edit = False
     else:
         can_edit = False
 
