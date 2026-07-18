@@ -2,6 +2,29 @@
 
 {% block title %}لوحة تحكم المشرف - نظام الحضور{% endblock %}
 
+{% block extra_css %}
+<style>
+    .teacher-card-wrapper {
+        transition: opacity 0.2s ease, transform 0.2s ease;
+    }
+    .teacher-card-wrapper.hidden {
+        display: none;
+    }
+    #teacher-search {
+        border-radius: 0.5rem;
+        border: 1px solid #dee2e6;
+        transition: border-color 0.15s ease, box-shadow 0.15s ease;
+    }
+    #teacher-search:focus {
+        border-color: #0d6efd;
+        box-shadow: 0 0 0 0.2rem rgba(13, 110, 253, 0.15);
+    }
+    #no-results-msg {
+        display: none;
+    }
+</style>
+{% endblock %}
+
 {% block content %}
 <div class="container-fluid">
 
@@ -15,9 +38,29 @@
     </div>
 
     {% if teacher_cards %}
-    <div class="row g-3">
+
+    <!-- Search bar -->
+    <div class="mb-4">
+        <div class="input-group" style="max-width: 420px;">
+            <span class="input-group-text bg-white border-end-0">
+                <i class="bi bi-search text-muted"></i>
+            </span>
+            <input
+                type="search"
+                id="teacher-search"
+                class="form-control border-start-0 ps-0"
+                placeholder="ابحث عن معلم بالاسم…"
+                autocomplete="off"
+                aria-label="بحث عن معلم"
+            >
+        </div>
+    </div>
+
+    <!-- Teacher cards grid -->
+    <div class="row g-3" id="teachers-grid">
         {% for card in teacher_cards %}
-        <div class="col-sm-6 col-lg-4 col-xl-3">
+        <div class="col-sm-6 col-lg-4 col-xl-3 teacher-card-wrapper"
+             data-teacher-name="{{ card.teacher.full_name }}">
             <div
                 class="card border-0 shadow-sm h-100 {% if card.is_active %}border-start border-4 border-primary{% endif %}">
                 <div class="card-body d-flex flex-column">
@@ -65,6 +108,15 @@
         </div>
         {% endfor %}
     </div>
+
+    <!-- No results message -->
+    <div id="no-results-msg" class="card border-0 shadow-sm">
+        <div class="card-body text-center text-muted py-5">
+            <i class="bi bi-search display-4 d-block mb-3 opacity-25"></i>
+            <p class="mb-0">لا يوجد معلم بهذا الاسم</p>
+        </div>
+    </div>
+
     {% else %}
     <div class="card border-0 shadow-sm">
         <div class="card-body text-center text-muted py-5">
@@ -76,3 +128,41 @@
 
 </div>
 {% endblock %}
+
+{% block extra_js %}
+<script>
+(function () {
+    const searchInput = document.getElementById('teacher-search');
+    if (!searchInput) return;
+
+    const cards = document.querySelectorAll('.teacher-card-wrapper');
+    const noResults = document.getElementById('no-results-msg');
+    const grid = document.getElementById('teachers-grid');
+
+    searchInput.addEventListener('input', function () {
+        const query = this.value.trim().toLowerCase();
+        let visibleCount = 0;
+
+        cards.forEach(function (card) {
+            const name = card.dataset.teacherName.toLowerCase();
+            if (!query || name.includes(query)) {
+                card.classList.remove('hidden');
+                visibleCount++;
+            } else {
+                card.classList.add('hidden');
+            }
+        });
+
+        // Toggle grid and no-results message
+        if (visibleCount === 0) {
+            grid.style.display = 'none';
+            noResults.style.display = '';
+        } else {
+            grid.style.display = '';
+            noResults.style.display = 'none';
+        }
+    });
+})();
+</script>
+{% endblock %}
+
