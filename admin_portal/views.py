@@ -17,6 +17,20 @@ from functools import wraps
 from core.models import Student, Teacher, User, StudentTeacherLink
 from attendance.models import StudentAttendanceRecord, TeacherAttendanceRecord
 from .forms import StudentForm, TeacherForm, SupervisorForm
+from .models import AuditLog
+
+
+def _log_audit(request, action, object_type, object_repr):
+    """Create an AuditLog entry for a delete or edit action."""
+    forwarded = request.META.get('HTTP_X_FORWARDED_FOR', '')
+    ip = forwarded.split(',')[0].strip() if forwarded else request.META.get('REMOTE_ADDR', '')
+    AuditLog.objects.create(
+        action=action,
+        actor_phone=request.user.phone,
+        ip_address=ip,
+        object_type=object_type,
+        object_repr=str(object_repr)[:255],
+    )
 
 
 def admin_required(view_func):
