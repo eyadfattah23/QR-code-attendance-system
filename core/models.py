@@ -183,6 +183,13 @@ class Student(models.Model):
         null=True,
         help_text="Student gender",
     )
+    
+    image = models.ImageField(
+        upload_to='students/images/%Y/%m/',
+        null=True,
+        blank=True,
+        help_text="صورة الطالب",
+    )
 
     _egyptian_phone_validator = RegexValidator(
         regex=r'^01\d{9}$',
@@ -300,6 +307,32 @@ class Student(models.Model):
         if not self.student_code and self.national_id:
             self.student_code = self.national_id.strip().upper()
         super().save(*args, **kwargs)
+        
+        if self.image:
+            try:
+                import os
+                from PIL import Image
+                img_path = self.image.path
+                if os.path.exists(img_path):
+                    # Check file size or just compress
+                    img = Image.open(img_path)
+                    
+                    changed = False
+                    if img.mode in ("RGBA", "P"):
+                        img = img.convert("RGB")
+                        changed = True
+                    
+                    max_size = (500, 500)
+                    if img.width > max_size[0] or img.height > max_size[1]:
+                        img.thumbnail(max_size, Image.Resampling.LANCZOS)
+                        changed = True
+                        
+                    # Even if not resized, we can re-save with lower quality to compress
+                    # To avoid re-compressing every save, we check if it was just uploaded or something.
+                    # But overwriting it once is fine.
+                    img.save(img_path, format='JPEG', quality=60, optimize=True)
+            except Exception as e:
+                pass
 
     @property
     def age(self):

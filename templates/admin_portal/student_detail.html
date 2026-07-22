@@ -10,9 +10,19 @@
         <a href="{% url 'admin_portal:student_list' %}" class="btn btn-outline-secondary btn-sm" title="رجوع">
             <i class="bi bi-arrow-right"></i>
         </a>
+        <div class="d-flex align-items-center me-3">
+            {% if student.image %}
+            <a href="#" data-bs-toggle="modal" data-bs-target="#imageModal">
+                <img src="{{ student.image.url }}" alt="صورة" class="rounded-circle border" style="width: 60px; height: 60px; object-fit: cover; cursor: pointer;">
+            </a>
+            {% else %}
+            <div class="rounded-circle bg-light border d-flex align-items-center justify-content-center text-secondary" style="width: 60px; height: 60px; font-size: 1.5rem;">
+                <i class="bi bi-person-fill"></i>
+            </div>
+            {% endif %}
+        </div>
         <div class="flex-grow-1">
             <h1 class="h3 mb-0">
-                <i class="bi bi-person-lines-fill me-2 text-primary"></i>
                 {{ student.full_name }}
                 {% if student.nickname %}
                 <span class="text-muted fs-5 fw-normal">({{ student.nickname }})</span>
@@ -241,4 +251,20 @@
 
     </div>
 </div>
+
+{% if student.image %}
+<!-- Image Modal -->
+<div class="modal fade" id="imageModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content bg-transparent border-0">
+            <div class="modal-header border-0 pb-0">
+                <button type="button" class="btn-close btn-close-white ms-auto bg-light m-2" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body text-center p-0">
+                <img src="{{ student.image.url }}" alt="صورة الطالب" class="img-fluid rounded shadow-lg" style="max-height: 80vh; object-fit: contain;">
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
 {% endblock %}

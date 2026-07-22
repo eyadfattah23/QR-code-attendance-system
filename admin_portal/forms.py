@@ -17,7 +17,7 @@ class StudentForm(forms.ModelForm):
         model = Student
         fields = [
             'full_name', 'nickname', 'national_id', 'student_code',
-            'grade', 'gender', 'phone', 'parent_phone',
+            'image', 'grade', 'gender', 'phone', 'parent_phone',
             'date_of_birth', 'joining_date', 'hall_name', 'notes',
             # Parent / Guardian
             'parent_full_name', 'parent_qualification', 'parent_job',
@@ -29,6 +29,7 @@ class StudentForm(forms.ModelForm):
             'nickname': 'اللقب / الاسم المختصر',
             'national_id': 'الرقم القومي / رقم التسجيل',
             'student_code': 'كود الطالب',
+            'image': 'صورة الطالب',
             'grade': 'الصف / المستوى',
             'gender': 'الجنس',
             'phone': 'هاتف الطالب',
@@ -63,6 +64,7 @@ class StudentForm(forms.ModelForm):
             'nickname': forms.TextInput(attrs={'class': 'form-control'}),
             'national_id': forms.TextInput(attrs={'class': 'form-control'}),
             'student_code': forms.TextInput(attrs={'class': 'form-control'}),
+            'image': forms.FileInput(attrs={'class': 'form-control', 'accept': 'image/*'}),
             'grade': forms.TextInput(attrs={'class': 'form-control'}),
             'gender': forms.Select(attrs={'class': 'form-select'}),
             'phone': forms.TextInput(attrs={'class': 'form-control', 'dir': 'ltr', 'placeholder': '01XXXXXXXXX'}),

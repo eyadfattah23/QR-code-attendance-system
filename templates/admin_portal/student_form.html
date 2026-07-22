@@ -22,7 +22,7 @@
             </div>
             {% endif %}
 
-            <form method="post" novalidate>
+            <form method="post" enctype="multipart/form-data" novalidate>
                 {% csrf_token %}
 
                 {% with fc=form %}
@@ -36,6 +36,7 @@
                         <div class="row g-3">
                             {% include "admin_portal/_form_field.html" with field=fc.full_name col="col-md-8" %}
                             {% include "admin_portal/_form_field.html" with field=fc.nickname col="col-md-4" %}
+                            {% include "admin_portal/_form_field.html" with field=fc.image col="col-12" %}
                             {% include "admin_portal/_form_field.html" with field=fc.national_id col="col-md-6" %}
                             {% include "admin_portal/_form_field.html" with field=fc.student_code col="col-md-6" %}
                             {% include "admin_portal/_form_field.html" with field=fc.grade col="col-md-6" %}

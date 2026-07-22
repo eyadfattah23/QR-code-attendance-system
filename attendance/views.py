@@ -80,6 +80,7 @@ def station_view(request):
                                         f"{student_record.check_out_time.strftime('%H:%M')}"
                                     ),
                                     "row_class": "warning",
+                                    "image_url": student.image.url if student.image else None,
                                 })
                             else:
                                 now = localtime()
@@ -94,6 +95,7 @@ def station_view(request):
                                             f"({student_record.check_in_time.strftime('%H:%M')})"
                                         ),
                                         "row_class": "warning",
+                                        "image_url": student.image.url if student.image else None,
                                     })
                                 elif (now - student_record.check_in_time).total_seconds() < 300:
                                     elapsed = int(
@@ -109,6 +111,7 @@ def station_view(request):
                                             f"(باقي {remaining} دقيقة)"
                                         ),
                                         "row_class": "warning",
+                                        "image_url": student.image.url if student.image else None,
                                     })
                                 else:
                                     student_record.check_out_time = now
@@ -123,6 +126,7 @@ def station_view(request):
                                             f"مدة الحضور: {student_record.duration_display}"
                                         ),
                                         "row_class": "info",
+                                        "image_url": student.image.url if student.image else None,
                                     })
                         except StudentAttendanceRecord.DoesNotExist:
                             # No record today — first scan = check-in
@@ -149,6 +153,7 @@ def station_view(request):
                                 "label": "تم التسجيل",
                                 "message": f"{student.full_name} - تم تسجيل الحضور بنجاح",
                                 "row_class": "success",
+                                "image_url": student.image.url if student.image else None,
                             })
                     continue
 
