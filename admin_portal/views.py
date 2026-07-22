@@ -1167,7 +1167,100 @@ def export_attendance_excel(request):
     wb = openpyxl.Workbook()
     ws = wb.active
 
-    if tab == 'teachers':
+    format_type = request.GET.get('format', 'old')
+
+    if tab == 'teachers' and format_type == 'pivot':
+        import datetime
+        from openpyxl.styles import Alignment
+
+        ws.title = 'حضور المعلمين (مجمع)'
+        
+        # Parse date range
+        d_from = None
+        d_to = None
+        if date_from:
+            try:
+                d_from = datetime.datetime.strptime(date_from, '%Y-%m-%d').date()
+            except ValueError:
+                pass
+        if date_to:
+            try:
+                d_to = datetime.datetime.strptime(date_to, '%Y-%m-%d').date()
+            except ValueError:
+                pass
+                
+        # Base querysets
+        teachers_qs = Teacher.objects.all().order_by('full_name')
+        if teacher_q:
+            teachers_qs = teachers_qs.filter(
+                Q(full_name__icontains=teacher_q)
+                | Q(user__phone__icontains=teacher_q)
+            )
+
+        qs = TeacherAttendanceRecord.objects.filter(teacher__in=teachers_qs)
+        if d_from:
+            qs = qs.filter(date__gte=d_from)
+        if d_to:
+            qs = qs.filter(date__lte=d_to)
+            
+        # If dates not provided, find min/max in qs
+        if not d_from and qs.exists():
+            d_from = qs.aggregate(models.Min('date'))['date__min']
+        if not d_to and qs.exists():
+            d_to = qs.aggregate(models.Max('date'))['date__max']
+            
+        # Fallback to today
+        if not d_from:
+            d_from = localdate()
+        if not d_to:
+            d_to = localdate()
+            
+        # Build date list
+        date_list = []
+        curr = d_from
+        while curr <= d_to and (curr - d_from).days < 366:
+            date_list.append(curr)
+            curr += datetime.timedelta(days=1)
+
+        # Build attendance map
+        attendance_map = {}
+        for rec in qs.order_by('date', 'check_in_time'):
+            attendance_map[(rec.teacher_id, rec.date)] = rec
+
+        # Build Headers
+        header1 = ['المعلم']
+        header2 = ['']
+        for d in date_list:
+            header1.extend([str(d), '', ''])
+            header2.extend(['الحضور', 'المغادرة', 'المدة'])
+            
+        ws.append(header1)
+        ws.append(header2)
+        
+        # Merge date cells in header1 and center align
+        for i, d in enumerate(date_list):
+            start_col = 2 + (i * 3)
+            end_col = start_col + 2
+            ws.merge_cells(start_row=1, start_column=start_col, end_row=1, end_column=end_col)
+            cell = ws.cell(row=1, column=start_col)
+            cell.alignment = Alignment(horizontal='center', vertical='center')
+
+        # Populate rows
+        for t in teachers_qs:
+            row = [t.full_name]
+            for d in date_list:
+                rec = attendance_map.get((t.id, d))
+                if rec:
+                    check_in = localtime(rec.check_in_time).strftime('%H:%M') if rec.check_in_time else ''
+                    check_out = localtime(rec.check_out_time).strftime('%H:%M') if rec.check_out_time else ''
+                    duration = rec.duration_display if rec.check_out_time else ''
+                    row.extend([check_in, check_out, duration])
+                else:
+                    row.extend(['absent', '', ''])
+            ws.append(row)
+
+        filename = 'teacher_attendance_pivot'
+    elif tab == 'teachers':
         ws.title = 'حضور المعلمين'
         qs = (
             TeacherAttendanceRecord.objects

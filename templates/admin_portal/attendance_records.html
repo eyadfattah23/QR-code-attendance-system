@@ -251,8 +251,12 @@
                         <i class="bi bi-x-lg"></i>
                     </a>
                     <a href="{% url 'admin_portal:attendance_export' %}?tab=teachers{% if date_from %}&date_from={{ date_from }}{% endif %}{% if date_to %}&date_to={{ date_to }}{% endif %}{% if teacher_q %}&teacher_q={{ teacher_q }}{% endif %}"
-                        class="btn btn-outline-success btn-sm" title="تصدير Excel">
-                        <i class="bi bi-file-earmark-excel"></i>
+                        class="btn btn-outline-success btn-sm" title="تصدير تفصيلي (قديم)">
+                        <i class="bi bi-file-earmark-excel"></i> تفصيلي (قديم)
+                    </a>
+                    <a href="{% url 'admin_portal:attendance_export' %}?tab=teachers&format=pivot{% if date_from %}&date_from={{ date_from }}{% endif %}{% if date_to %}&date_to={{ date_to }}{% endif %}{% if teacher_q %}&teacher_q={{ teacher_q }}{% endif %}"
+                        class="btn btn-success btn-sm" title="تصدير مجمع (جديد)">
+                        <i class="bi bi-file-earmark-excel"></i> مجمع (جديد)
                     </a>
                 </div>
             </form>
