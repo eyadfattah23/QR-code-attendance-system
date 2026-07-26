@@ -1316,7 +1316,7 @@ def export_attendance_excel(request):
             qs = qs.filter(student__grade=grade)
         ws.append([
             'التاريخ', 'اسم الطالب', 'الرقم القومي', 'الكود', 'الصف',
-            'وقت الحضور', 'وقت المغادرة', 'مدة الحضور', 'المعلم المكلف', 'التقييم', 'نيابة', 'ملاحظات',
+            'وقت الحضور', 'وقت المغادرة', 'مدة الحضور', 'المعلم المكلف', 'التقييم', 'نيابة', 'ملاحظات', 'ملاحظة المعلم',
         ])
         for rec in qs:
             ws.append([
@@ -1333,6 +1333,7 @@ def export_attendance_excel(request):
                 rec.rating,
                 'نعم' if rec.is_substitute_assignment else 'لا',
                 rec.substitute_note,
+                rec.teacher_note,
             ])
         filename = 'student_attendance'
 
