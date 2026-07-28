@@ -1363,15 +1363,17 @@ def attendance_record_edit_rating(request, pk):
     if user.is_admin:
         can_edit = True
     elif user.is_teacher:
-        can_edit = StudentTeacherLink.objects.filter(
-            teacher__user=user, student=record.student
-        ).exists()
+        can_edit = (
+            StudentTeacherLink.objects.filter(teacher__user=user, student=record.student).exists() or
+            (hasattr(user, 'teacher_profile') and record.assigned_teacher_id == user.teacher_profile.id)
+        )
     elif user.is_supervisor:
         teacher_pk = request.session.get('supervisor_teacher_id')
         if teacher_pk:
-            can_edit = StudentTeacherLink.objects.filter(
-                teacher_id=teacher_pk, student=record.student
-            ).exists()
+            can_edit = (
+                StudentTeacherLink.objects.filter(teacher_id=teacher_pk, student=record.student).exists() or
+                record.assigned_teacher_id == teacher_pk
+            )
             acting_as_teacher = can_edit
         else:
             can_edit = False

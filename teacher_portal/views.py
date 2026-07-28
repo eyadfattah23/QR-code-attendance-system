@@ -9,6 +9,8 @@ from functools import wraps
 import uuid
 import openpyxl
 
+from django.db.models import Avg, Q
+
 from core.models import Student, Teacher, StudentTeacherLink
 from attendance.models import StudentAttendanceRecord
 from admin_portal.models import AuditLog
@@ -74,10 +76,16 @@ def dashboard(request):
     try:
         if teacher is None:
             raise Teacher.DoesNotExist
-        student_links = StudentTeacherLink.objects.filter(
-            teacher=teacher
-        ).select_related('student')
-        students = [link.student for link in student_links]
+
+        linked_student_ids = list(
+            StudentTeacherLink.objects.filter(teacher=teacher).values_list('student_id', flat=True)
+        )
+        assigned_student_ids = list(
+            StudentAttendanceRecord.objects.filter(assigned_teacher=teacher, date=today).values_list('student_id', flat=True)
+        )
+        all_student_ids = set(linked_student_ids + assigned_student_ids)
+
+        students = list(Student.objects.filter(id__in=all_student_ids))
 
         today_attendance = StudentAttendanceRecord.objects.filter(
             student__in=students,
@@ -149,10 +157,15 @@ def teacher_scan(request):
         if teacher is None:
             raise Teacher.DoesNotExist
 
-        linked_student_ids = set(
-            StudentTeacherLink.objects.filter(teacher=teacher)
-            .values_list('student_id', flat=True)
+        today = localdate()
+
+        linked_student_ids = list(
+            StudentTeacherLink.objects.filter(teacher=teacher).values_list('student_id', flat=True)
         )
+        assigned_student_ids = list(
+            StudentAttendanceRecord.objects.filter(assigned_teacher=teacher, date=today).values_list('student_id', flat=True)
+        )
+        allowed_student_ids = set(linked_student_ids + assigned_student_ids)
 
         scanned_codes = request.POST.get("scanned_codes", "").strip()
         codes = [line.strip()
@@ -162,8 +175,6 @@ def teacher_scan(request):
             messages.warning(
                 request, "الرجاء إدخال رمز واحد على الأقل قبل الإرسال")
             return redirect('teacher_portal:dashboard')
-
-        today = localdate()
 
         for raw_code in codes:
             student = None
@@ -185,7 +196,7 @@ def teacher_scan(request):
                         request, f"لم يتم العثور على هذا الرمز: {raw_code}")
                     continue
 
-                if any_student.id not in linked_student_ids:
+                if any_student.id not in allowed_student_ids:
                     messages.error(
                         request, f"{any_student.full_name} - ليس ضمن قائمة طلابك")
                     continue
@@ -203,7 +214,7 @@ def teacher_scan(request):
                         request, f"لم يتم العثور على هذا الرمز: {raw_code}")
                     continue
 
-                if any_student.id not in linked_student_ids:
+                if any_student.id not in allowed_student_ids:
                     messages.error(
                         request, f"{any_student.full_name} - ليس ضمن قائمة طلابك")
                     continue
@@ -257,11 +268,11 @@ def student_history(request, pk):
         messages.error(request, 'لم يتم ربط حسابك بملف معلم')
         return redirect('teacher_portal:dashboard')
 
-    student = get_object_or_404(
-        Student,
-        pk=pk,
-        teacher_links__teacher=teacher,
-    )
+    students = Student.objects.filter(
+        Q(teacher_links__teacher=teacher) | Q(attendance_records__assigned_teacher=teacher),
+        pk=pk
+    ).distinct()
+    student = get_object_or_404(students)
 
     records = (
         StudentAttendanceRecord.objects
@@ -289,11 +300,11 @@ def upload_photo(request, pk):
         messages.error(request, 'لم يتم ربط حسابك بملف معلم')
         return redirect('teacher_portal:dashboard')
 
-    record = get_object_or_404(
-        StudentAttendanceRecord,
-        pk=pk,
-        student__teacher_links__teacher=teacher,
-    )
+    records = StudentAttendanceRecord.objects.filter(
+        Q(student__teacher_links__teacher=teacher) | Q(assigned_teacher=teacher),
+        pk=pk
+    ).distinct()
+    record = get_object_or_404(records)
 
     if request.method == 'POST':
         photo = request.FILES.get('photo')
@@ -338,11 +349,11 @@ def edit_record_note(request, pk):
         messages.error(request, 'لم يتم ربط حسابك بملف معلم')
         return redirect('teacher_portal:dashboard')
 
-    record = get_object_or_404(
-        StudentAttendanceRecord,
-        pk=pk,
-        student__teacher_links__teacher=teacher,
-    )
+    records = StudentAttendanceRecord.objects.filter(
+        Q(student__teacher_links__teacher=teacher) | Q(assigned_teacher=teacher),
+        pk=pk
+    ).distinct()
+    record = get_object_or_404(records)
 
     if request.method == 'POST':
         note = request.POST.get('teacher_note', '').strip()
@@ -368,10 +379,15 @@ def export_attendance(request):
         messages.error(request, 'لم يتم ربط حسابك بملف معلم')
         return redirect('teacher_portal:dashboard')
 
-    student_links = StudentTeacherLink.objects.filter(
-        teacher=teacher
-    ).select_related('student')
-    students = [link.student for link in student_links]
+    linked_student_ids = list(
+        StudentTeacherLink.objects.filter(teacher=teacher).values_list('student_id', flat=True)
+    )
+    assigned_student_ids = list(
+        StudentAttendanceRecord.objects.filter(assigned_teacher=teacher, date=today).values_list('student_id', flat=True)
+    )
+    all_student_ids = set(linked_student_ids + assigned_student_ids)
+
+    students = list(Student.objects.filter(id__in=all_student_ids))
 
     today_attendance = StudentAttendanceRecord.objects.filter(
         student__in=students, date=today

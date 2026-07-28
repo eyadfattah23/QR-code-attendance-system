@@ -94,9 +94,9 @@ class StudentHistoryTeacherPortalTestCase(TestCase):
         self.assertEqual(response.status_code, 200)
 
     def test_unlinked_teacher_gets_404(self):
-        self.client.logout()
-        self.client.login(phone='01700000002', password='pass')
-        response = self.client.get(self.url)
+        # other_student is linked to other_teacher, and has no attendance records assigned to self.teacher
+        url = reverse('teacher_portal:student_history', args=[self.other_student.id])
+        response = self.client.get(url)
         self.assertEqual(response.status_code, 404)
 
     def test_unauthenticated_redirected(self):
