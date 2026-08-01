@@ -32,6 +32,8 @@ urlpatterns = [
          views.attendance_record_edit_photo, name='attendance_record_edit_photo'),
     path('attendance/<uuid:pk>/edit-rating/',
          views.attendance_record_edit_rating, name='attendance_record_edit_rating'),
+    path('attendance/<uuid:pk>/edit-note/',
+         views.attendance_record_edit_note, name='attendance_record_edit_note'),
     path('attendance/<uuid:pk>/teacher-edit/',
          views.teacher_attendance_record_edit, name='teacher_attendance_record_edit'),
     path('attendance/<uuid:pk>/delete/',

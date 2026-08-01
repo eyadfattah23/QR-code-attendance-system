@@ -1413,6 +1413,24 @@ def attendance_record_edit_rating(request, pk):
     })
 
 
+@admin_required
+@require_http_methods(["POST"])
+def attendance_record_edit_note(request, pk):
+    """Admin updates the teacher note inline."""
+    record = get_object_or_404(StudentAttendanceRecord, pk=pk)
+    
+    note = request.POST.get('teacher_note', '').strip()
+    record.teacher_note = note
+    record.save(update_fields=['teacher_note'])
+    
+    _log_audit(request, AuditLog.Action.EDIT, 'سجل حضور طالب (ملاحظة)',
+               f'{record.student.full_name} — {record.date}')
+    messages.success(request, 'تم حفظ الملاحظة بنجاح')
+    
+    next_url = request.POST.get('next') or request.META.get('HTTP_REFERER') or reverse('admin_portal:attendance_records')
+    return redirect(next_url)
+
+
 # ---------------------------------------------------------------------------
 # Edit student attendance record photo
 # ---------------------------------------------------------------------------

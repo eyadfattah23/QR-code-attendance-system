@@ -106,6 +106,7 @@
                         <th>المعلم المكلف</th>
                         <th>التقييم</th>
                         <th>نيابة</th>
+                        <th>ملاحظات</th>
                         <th>صورة</th>
                         <th></th>
                     </tr>
@@ -159,6 +160,32 @@
                                 <span class="text-danger">غاب: <strong>{{ rec.original_teacher.full_name }}</strong></span>
                             </div>
                             {% else %}<span class="text-muted">—</span>{% endif %}
+                        </td>
+                        <td class="text-center">
+                            <button type="button" class="btn btn-sm {% if rec.teacher_note %}btn-info text-white{% else %}btn-outline-secondary{% endif %}" data-bs-toggle="modal" data-bs-target="#noteModal{{ rec.pk }}" title="الملاحظات">
+                                <i class="bi bi-chat-text"></i>
+                            </button>
+                            
+                            <!-- Modal -->
+                            <div class="modal fade" id="noteModal{{ rec.pk }}" tabindex="-1" aria-hidden="true">
+                                <div class="modal-dialog modal-dialog-centered">
+                                    <form method="post" action="{% url 'admin_portal:attendance_record_edit_note' rec.pk %}" class="modal-content">
+                                        {% csrf_token %}
+                                        <input type="hidden" name="next" value="{{ request.get_full_path }}">
+                                        <div class="modal-header">
+                                            <h5 class="modal-title fs-6">ملاحظات: {{ rec.student.full_name }}</h5>
+                                            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="إغلاق"></button>
+                                        </div>
+                                        <div class="modal-body text-start" dir="rtl">
+                                            <textarea name="teacher_note" class="form-control" rows="4" placeholder="أضف ملاحظات هنا...">{{ rec.teacher_note }}</textarea>
+                                        </div>
+                                        <div class="modal-footer p-2 border-0">
+                                            <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">إغلاق</button>
+                                            <button type="submit" class="btn btn-primary btn-sm">حفظ التغييرات</button>
+                                        </div>
+                                    </form>
+                                </div>
+                            </div>
                         </td>
                         <td class="text-center">
                             {% if rec.daily_photo %}
