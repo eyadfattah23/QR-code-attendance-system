@@ -39,21 +39,55 @@
 
     {% if teacher_cards %}
 
-    <!-- Search bar -->
+    <!-- Filters and Search -->
     <div class="mb-4">
-        <div class="input-group" style="max-width: 420px;">
-            <span class="input-group-text bg-white border-end-0">
-                <i class="bi bi-search text-muted"></i>
-            </span>
-            <input
-                type="search"
-                id="teacher-search"
-                class="form-control border-start-0 ps-0"
-                placeholder="ابحث عن معلم بالاسم…"
-                autocomplete="off"
-                aria-label="بحث عن معلم"
-            >
-        </div>
+        <form method="get" class="row g-2 align-items-end">
+            <!-- Client-side name search -->
+            <div class="col-md-4">
+                <label class="form-label mb-1 small fw-semibold text-muted">بحث بالاسم</label>
+                <div class="input-group">
+                    <span class="input-group-text bg-white border-end-0">
+                        <i class="bi bi-search text-muted"></i>
+                    </span>
+                    <input
+                        type="search"
+                        id="teacher-search"
+                        class="form-control border-start-0 ps-0"
+                        placeholder="ابحث عن معلم بالاسم…"
+                        autocomplete="off"
+                        aria-label="بحث عن معلم"
+                    >
+                </div>
+            </div>
+            <!-- Backend Filters -->
+            <div class="col-md-3">
+                <label class="form-label mb-1 small fw-semibold text-muted">المادة</label>
+                <select name="subject" class="form-select">
+                    <option value="">— كل المواد —</option>
+                    {% for subj in subjects %}
+                    <option value="{{ subj }}" {% if subject_q == subj %}selected{% endif %}>{{ subj }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-md-4">
+                <label class="form-label mb-1 small fw-semibold text-muted">ترتيب حسب</label>
+                <select name="sort" class="form-select">
+                    <option value="attended_desc" {% if sort_by == 'attended_desc' %}selected{% endif %}>حضور اليوم (الأعلى أولاً)</option>
+                    <option value="attended_asc" {% if sort_by == 'attended_asc' %}selected{% endif %}>حضور اليوم (الأقل أولاً)</option>
+                    <option value="students_desc" {% if sort_by == 'students_desc' %}selected{% endif %}>إجمالي الطلاب (الأعلى أولاً)</option>
+                    <option value="students_asc" {% if sort_by == 'students_asc' %}selected{% endif %}>إجمالي الطلاب (الأقل أولاً)</option>
+                    <option value="name" {% if sort_by == 'name' %}selected{% endif %}>الترتيب الافتراضي (الاسم)</option>
+                </select>
+            </div>
+            <div class="col-md-1 d-flex gap-1">
+                <button type="submit" class="btn btn-primary flex-fill" title="تطبيق">
+                    <i class="bi bi-filter"></i>
+                </button>
+                <a href="{% url 'supervisor_portal:dashboard' %}" class="btn btn-outline-secondary" title="إزالة الفلتر والترتيب">
+                    <i class="bi bi-x-lg"></i>
+                </a>
+            </div>
+        </form>
     </div>
 
     <!-- Teacher cards grid -->

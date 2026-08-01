@@ -26,37 +26,57 @@ def supervisor_required(view_func):
 def dashboard(request):
     """Supervisor dashboard — list of all teachers as cards."""
     today = localdate()
+    
+    subject = request.GET.get('subject', '').strip()
+    sort_by = request.GET.get('sort', '').strip()
 
     teachers = (
         Teacher.objects
         .select_related('user')
-        .annotate(student_count=Count('student_links', distinct=True))
-        .order_by('full_name')
+        .annotate(
+            student_count=Count('student_links', distinct=True),
+            today_count=Count(
+                'assigned_student_attendance_records',
+                filter=Q(assigned_student_attendance_records__date=today),
+                distinct=True
+            )
+        )
     )
 
-    # Build today's attendance counts per teacher
-    today_records = (
-        StudentAttendanceRecord.objects
-        .filter(date=today)
-        .values('assigned_teacher_id')
-        .annotate(count=Count('id'))
-    )
-    today_count_by_teacher = {
-        r['assigned_teacher_id']: r['count'] for r in today_records}
+    if subject:
+        teachers = teachers.filter(subject=subject)
+
+    if sort_by == 'students_desc':
+        teachers = teachers.order_by('-student_count', 'full_name')
+    elif sort_by == 'students_asc':
+        teachers = teachers.order_by('student_count', 'full_name')
+    elif sort_by == 'attended_asc':
+        teachers = teachers.order_by('today_count', 'full_name')
+    elif sort_by == 'name':
+        teachers = teachers.order_by('full_name')
+    else:
+        # Default sort
+        sort_by = 'attended_desc'
+        teachers = teachers.order_by('-today_count', 'full_name')
 
     teacher_cards = []
     for t in teachers:
         teacher_cards.append({
             'teacher': t,
             'student_count': t.student_count,
-            'today_count': today_count_by_teacher.get(t.id, 0),
+            'today_count': t.today_count,
             'is_active': str(t.pk) == request.session.get('supervisor_teacher_id', ''),
         })
+        
+    subjects = Teacher.objects.exclude(subject__isnull=True).exclude(subject='').values_list('subject', flat=True).distinct().order_by('subject')
 
     return render(request, 'supervisor_portal/dashboard.html', {
         'teacher_cards': teacher_cards,
         'today': today,
         'active_teacher_id': request.session.get('supervisor_teacher_id', ''),
+        'subject_q': subject,
+        'sort_by': sort_by,
+        'subjects': subjects,
     })
 
 
