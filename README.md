@@ -1,35 +1,49 @@
 # QR Code Attendance System
 
-A local Django-based attendance system with QR code scanning, designed for educational institutions.
+![Python](https://img.shields.io/badge/Python-3.12+-blue.svg)
+![Django](https://img.shields.io/badge/Django-6.0+-092E20.svg?logo=django)
+![PostgreSQL](https://img.shields.io/badge/PostgreSQL-Ready-336791.svg?logo=postgresql)
+![License](https://img.shields.io/badge/License-Proprietary-red.svg)
+
+A robust, localized (Arabic RTL), Django-based attendance system utilizing QR code scanning. Designed specifically for educational institutions to streamline the daily check-in process, manage substitute teachers, and provide a seamless experience for administrators, supervisors, and teachers.
+
+---
 
 ## Features
 
-- **QR Code Check-in**: Students and teachers check in by scanning their QR code cards
-- **Batch Scanning**: Scan multiple cards at once, submit in batches
-- **Admin Portal**: Manage students, teachers, view attendance records, export to Excel
-- **Teacher Portal**: View students, upload daily photos, see attendance history
-- **Substitute Teacher Handling**: Track when teachers are absent and students are reassigned
-- **QR Card Generation**: Generate printable QR code cards as PDF
+- **Rapid QR Code Check-in**: Instantly record attendance using unique QR code cards.
+- **Batch Scanning**: Scan and process multiple student cards simultaneously to eliminate bottlenecks.
+- **Dynamic Portals**: Dedicated workspaces tailored for Admins, Supervisors, and Teachers.
+- **Substitute Teacher Handling**: Intelligently track teacher absences and automatically reassign students for the day.
+- **Daily Student Evaluation**: Teachers can attach a daily photo, assign a performance rating (1-10), and leave daily behavioral notes for each student.
+- **QR Card Generator**: Programmatically generate printable PDF ID cards with customizable grid layouts.
+- **Rich Reporting & Exporting**: Export attendance data, substitute notes, and student histories to Excel (`.xlsx`).
+- **Fully Localized**: Complete Arabic Language support with right-to-left (RTL) interface design.
+
+---
 
 ## Tech Stack
 
-- **Backend**: Django 6.0+ with Django REST Framework
-- **Database**: SQLite (development) / PostgreSQL (production)
-- **Frontend**: Django Templates + HTMX
-- **PDF Generation**: ReportLab
-- **Excel Export**: openpyxl
+- **Backend Architecture**: Django 6.0+ & Django REST Framework
+- **Frontend Interactivity**: Django Templates, Vanilla JavaScript, & HTMX
+- **Database Engine**: SQLite (Development) / PostgreSQL (Production)
+- **PDF Engine**: ReportLab
+- **Data Export**: OpenPyXL
+
+---
 
 ## Quick Start
 
 ### Prerequisites
 
 - Python 3.12+
-- PostgreSQL (for production)
+- PostgreSQL (for production environments)
 
 ### Development Setup
 
 1. **Clone the repository**
    ```bash
+   git clone <repository-url>
    cd "QR code attendance system"
    ```
 
@@ -46,10 +60,10 @@ A local Django-based attendance system with QR code scanning, designed for educa
    pip install -r requirements.txt
    ```
 
-4. **Copy environment file**
+4. **Environment Configuration**
    ```bash
    cp .env.example .env
-   # Edit .env with your settings
+   # Edit .env with your local settings (Database, Secret Key, etc.)
    ```
 
 5. **Run migrations**
@@ -57,94 +71,113 @@ A local Django-based attendance system with QR code scanning, designed for educa
    python manage.py migrate
    ```
 
-6. **Create admin user**
+6. **Seed Initial Admin**
    ```bash
    python manage.py seed_admin
-   # Default: username=admin, password=admin123
+   # Default credentials: username=admin, password=admin123
    ```
 
-7. **Run development server**
+7. **Launch the development server**
    ```bash
    python manage.py runserver
    ```
 
 8. **Access the application**
-   - Admin: http://localhost:8000/admin/
-   - Application: http://localhost:8000/
+   - Application URL: [http://localhost:8000/](http://localhost:8000/)
+   - Django Admin: [http://localhost:8000/admin/](http://localhost:8000/admin/)
 
-### Production Setup
-
-See [docs/deployment.md](docs/deployment.md) for detailed production deployment instructions.
+---
 
 ## Project Structure
 
-```
+```text
 qr_attendance/
 ├── manage.py
 ├── requirements.txt
 ├── pytest.ini
 ├── .env.example
 │
-├── qr_attendance/              # Django project settings
-│   ├── settings/
-│   │   ├── base.py             # Shared settings
-│   │   ├── development.py      # Development settings
-│   │   └── production.py       # Production settings
-│   ├── urls.py
-│   └── wsgi.py
+├── qr_attendance/              # Core Django project settings
 │
-├── core/                       # Core models (User, Student, Teacher)
-├── attendance/                 # Attendance records and photos
-├── admin_portal/               # Admin-specific views
-├── teacher_portal/             # Teacher-specific views
-├── qr_generator/               # QR code generation
+├── core/                       # Core models (Users, Students, Teachers)
+├── attendance/                 # Core attendance logic & daily photos
+├── admin_portal/               # Admin dashboard & management views
+├── supervisor_portal/          # Supervisor dashboard & acting tools
+├── teacher_portal/             # Teacher attendance tracking & notes
+├── qr_generator/               # PDF Generation for QR Codes
 │
-├── templates/                  # HTML templates
-├── static/                     # Static files (CSS, JS)
-├── media/                      # Uploaded files (photos)
-└── docs/                       # Documentation
+├── templates/                  # Modular HTML templates
+├── static/                     # CSS, Fonts, and JavaScript assets
+├── media/                      # Uploaded files (Student Photos)
+└── docs/                       # Extensive System Documentation
 ```
 
-## Running Tests
+---
 
-```bash
-# Run all tests
-pytest
+## User Roles & Permissions
 
-# Run with coverage
-pytest --cov
+- **Admin**: Full system access. Can manage students, teachers, view all records, edit attendance notes, and export system-wide data.
+- **Supervisor**: Oversight role. Can view all teachers, filter them by subject and attendance metrics, and act on behalf of any teacher to assist them.
+- **Teacher**: Restricted view. Can only access their linked students (and daily assigned substitute students), upload daily photos, and view their class's specific attendance history.
 
-# Run specific app tests
-pytest core/tests/
-```
+---
 
-## Configuration
+## Configuration Variables
 
-Key environment variables (see `.env.example`):
+Key environment variables required for deployment (see `.env.example`):
 
 | Variable | Description | Default |
 |----------|-------------|---------|
-| `SECRET_KEY` | Django secret key | - |
+| `SECRET_KEY` | Django cryptographic secret key | - |
 | `DB_NAME` | Database name | `qr_attendance` |
 | `DB_USER` | Database user | `qr_attendance` |
 | `DB_PASSWORD` | Database password | - |
 | `DB_HOST` | Database host | `localhost` |
 | `TIME_ZONE` | Application timezone | `Africa/Cairo` |
-| `ALLOWED_HOSTS` | Allowed hosts (comma-separated) | `localhost,127.0.0.1` |
+| `ALLOWED_HOSTS` | Allowed hosts (comma-separated) | `localhost, 127.0.0.1` |
 
-## User Roles
+---
 
-- **Admin**: Full access - manage students/teachers, view all records, export data
-- **Teacher**: View assigned students, upload daily photos, view attendance history
+## Running Tests
+
+This project enforces a strict testing methodology utilizing `pytest`.
+
+```bash
+# Execute the full test suite
+pytest
+
+# Execute with coverage report
+pytest --cov
+
+# Execute tests for a specific module
+pytest core/tests/
+```
+
+---
+
+## QR Code Card Generation Layouts
+
+The `qr_generator` application can format PDF outputs into standard grid layouts for printing:
+
+| Cards/Page | Grid Layout | Approx. Card Size | Best For |
+|------------|-------------|-------------------|----------|
+| **1** | 1×1 | 190×277 mm | Full Page Display |
+| **4** | 2×2 | 95×138 mm | Badges / Large tags |
+| **8** | 2×4 | 95×69 mm | **Standard ID Card** |
+| **10** | 2×5 | 95×55 mm | Standard Business Card |
+| **12** | 3×4 | 63×69 mm | Small sticky labels |
+
+---
+
+## Documentation
+
+For deep dives into the system architecture and deployment guidelines, refer to the `docs/` directory:
+- [Authentication System](docs/AUTHENTICATION.md)
+- [Attendance Logic & Schema](docs/ATTENDANCE.md)
+- [Production Deployment](docs/deployment.md)
+
+---
 
 ## License
 
-This project is for internal use by [Redwan Oasis].
----
-|Cards/page | Grid | Approx. card size |
-|-----------|------|-------------------|
-|1 | 1×1 | 190×277 mm |
-|4 | 2×2 | 95×138 mm |
-|8 | 2×4 | 95×69 mm (≈ ID card) |
-|10 | 2×5 | 95×55 mm (≈ business card) |
-|12 | 3×4 | 63×69 mm |
+This software is developed for internal use by **Redwan Oasis**. Proprietary and confidential.

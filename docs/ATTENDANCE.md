@@ -29,11 +29,17 @@
 ### Admin Role
 - ✅ Can access scan station: `/scan/` (full-screen dedicated interface)
 - ✅ Can submit attendance scans for ANY student
-- ✅ Cannot access teacher dashboard scan form
+- ✅ Can edit attendance records, including adding notes via modal in `/portal/admin/attendance/`
+- ✅ Cannot access teacher dashboard scan form directly
+
+### Supervisor Role
+- ✅ Can access supervisor dashboard: `/portal/supervisor/`
+- ✅ Can select a teacher to act on their behalf
+- ✅ When acting as a teacher, can access the teacher dashboard (`/portal/teacher/`) and scan students for that teacher
 
 ### Teacher Role
 - ✅ Can access teacher dashboard: `/portal/teacher/`
-- ✅ Can scan ONLY their linked students from dashboard form
+- ✅ Can scan ONLY their linked students AND students assigned to them as substitutes for the day
 - ✅ CANNOT access admin scan station `/scan/` (blocked by decorator)
 
 ---
@@ -107,21 +113,21 @@ for raw_code in codes:
     # Create attendance record for ANY found student
 ```
 
-### Teacher Scan (Restricted Access)
+### Teacher Scan (Restricted & Substitute Access)
 In [teacher_portal/views.py](../teacher_portal/views.py) - `teacher_scan()`:
 
 ```python
 for raw_code in codes:
-    # Get teacher's linked students
-    linked_student_ids = StudentTeacherLink.objects.filter(
-        teacher=teacher
-    ).values_list('student_id', flat=True)
+    # 1. Try UUID lookup
+    # 2. Try Student Code
+    # 3. Try National ID
     
-    # Try UUID lookup → filter by id AND id__in linked_student_ids
-    # Try Student Code → filter by student_code AND id__in linked_student_ids
-    # Try National ID → filter by national_id AND id__in linked_student_ids
+    # Check Access Control:
+    # Student must be either:
+    # a) Linked to the teacher via StudentTeacherLink
+    # b) OR explicitly assigned to the teacher as a substitute (assigned_teacher) for today's record
     
-    # Only create record if student is linked to teacher
+    # Create or update record only if access is verified
 ```
 
 ---
@@ -136,9 +142,11 @@ for raw_code in codes:
     'date': Date,
     'check_in_time': DateTime,
     'recorded_by': FK(User),  # Who scanned (admin or teacher)
-    'original_teacher': FK(Teacher),
-    'assigned_teacher': FK(Teacher),
-    'substitute_note': str,
+    'original_teacher': FK(Teacher), # The default teacher
+    'assigned_teacher': FK(Teacher), # The teacher responsible today (substitute aware)
+    'substitute_note': str,          # Note from admin explaining the transfer
+    'teacher_note': str,             # Notes added by the teacher about the student
+    'notes': str,                    # Admin internal notes
     'daily_photo': ImageField (optional),
     'rating': int (1-10)
 }

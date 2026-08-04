@@ -12,7 +12,7 @@ This module provides secure user authentication with full Arabic language suppor
 
 - ✅ **تسجيل دخول آمن** - Secure login with CSRF protection
 - ✅ **تصميم متجاوب** - Fully responsive design for all screen sizes
-- ✅ **دعم الأدوار** - Role-based access control (Admin/Teacher)
+- ✅ **دعم الأدوار** - Role-based access control (Admin/Supervisor/Teacher)
 - ✅ **رسائل عربية** - Arabic error messages and notifications
 - ✅ **حماية من الهجمات** - Protection against common attacks
 
@@ -40,6 +40,10 @@ admin_portal/
 ├── views.py          # Admin dashboard view
 └── urls.py           # Admin URL routing
 
+supervisor_portal/
+├── views.py          # Supervisor dashboard view
+└── urls.py           # Supervisor URL routing
+
 teacher_portal/
 ├── views.py          # Teacher dashboard view
 └── urls.py           # Teacher URL routing
@@ -56,6 +60,7 @@ teacher_portal/
 | `/logout/` | `logout` | تسجيل الخروج |
 | `/dashboard/` | `dashboard` | إعادة توجيه للوحة التحكم |
 | `/portal/admin/` | `admin_portal:dashboard` | لوحة تحكم المدير |
+| `/portal/supervisor/` | `supervisor_portal:dashboard` | لوحة تحكم المشرف |
 | `/portal/teacher/` | `teacher_portal:dashboard` | لوحة تحكم المعلم |
 
 ---
@@ -66,8 +71,9 @@ teacher_portal/
 
 ```python
 class Role(models.TextChoices):
-    ADMIN = 'admin', 'Admin'      # المدير - Full system access
-    TEACHER = 'teacher', 'Teacher' # المعلم - Limited access
+    ADMIN = 'admin', 'Admin'            # المدير - Full system access
+    SUPERVISOR = 'supervisor', 'Supervisor' # المشرف - Can view all teachers and act on their behalf
+    TEACHER = 'teacher', 'Teacher'       # المعلم - Limited access
 ```
 
 ### الخصائص | Properties
@@ -75,6 +81,7 @@ class Role(models.TextChoices):
 | الخاصية | النوع | الوصف |
 |---------|-------|-------|
 | `is_admin` | bool | هل المستخدم مدير؟ |
+| `is_supervisor` | bool | هل المستخدم مشرف؟ |
 | `is_teacher` | bool | هل المستخدم معلم؟ |
 | `phone` | str | رقم الهاتف (مطلوب، 11 رقم يبدأ بصفر) |
 | `USERNAME_FIELD` | str | 'phone' - المصادقة عبر رقم الهاتف |
@@ -96,6 +103,9 @@ admin = User.objects.create_user(
 # Check role
 if user.is_admin:
     # Admin logic
+    pass
+elif user.is_supervisor:
+    # Supervisor logic
     pass
 elif user.is_teacher:
     # Teacher logic
