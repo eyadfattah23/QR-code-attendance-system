@@ -40,6 +40,8 @@ urlpatterns = [
          views.student_attendance_record_delete, name='student_attendance_record_delete'),
     path('attendance/<uuid:pk>/teacher-delete/',
          views.teacher_attendance_record_delete, name='teacher_attendance_record_delete'),
+    path('attendance/teacher-add-excused-absence/',
+         views.teacher_add_excused_absence, name='teacher_add_excused_absence'),
 
     # Teacher management
     path('teachers/', views.teacher_list, name='teacher_list'),

@@ -265,10 +265,18 @@
                     <label class="form-label mb-1 small fw-semibold">إلى تاريخ</label>
                     <input type="date" name="date_to" value="{{ date_to }}" class="form-control form-control-sm">
                 </div>
-                <div class="col-md-4">
+                <div class="col-md-2">
                     <label class="form-label mb-1 small fw-semibold">المعلم</label>
                     <input type="text" name="teacher_q" value="{{ teacher_q }}" class="form-control form-control-sm"
                         placeholder="الاسم أو رقم الهاتف…">
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label mb-1 small fw-semibold">نوع السجل</label>
+                    <select name="record_type" class="form-select form-select-sm">
+                        <option value="">— الكل —</option>
+                        <option value="normal" {% if record_type == 'normal' %}selected{% endif %}>حضور عادي</option>
+                        <option value="excused_absence" {% if record_type == 'excused_absence' %}selected{% endif %}>غياب بإذن</option>
+                    </select>
                 </div>
                 <div class="col-md-2 d-flex gap-1 align-items-end">
                     <button type="submit" class="btn btn-primary btn-sm flex-fill" title="بحث">
@@ -281,10 +289,13 @@
                         class="btn btn-outline-success btn-sm" title="تصدير تفصيلي (قديم)">
                         <i class="bi bi-file-earmark-excel"></i> تفصيلي (قديم)
                     </a>
-                    <a href="{% url 'admin_portal:attendance_export' %}?tab=teachers&format=pivot{% if date_from %}&date_from={{ date_from }}{% endif %}{% if date_to %}&date_to={{ date_to }}{% endif %}{% if teacher_q %}&teacher_q={{ teacher_q }}{% endif %}"
+                    <a href="{% url 'admin_portal:attendance_export' %}?tab=teachers&format=pivot{% if date_from %}&date_from={{ date_from }}{% endif %}{% if date_to %}&date_to={{ date_to }}{% endif %}{% if teacher_q %}&teacher_q={{ teacher_q }}{% endif %}{% if record_type %}&record_type={{ record_type }}{% endif %}"
                         class="btn btn-success btn-sm" title="تصدير مجمع (جديد)">
                         <i class="bi bi-file-earmark-excel"></i> مجمع (جديد)
                     </a>
+                    <button type="button" class="btn btn-warning btn-sm" data-bs-toggle="modal" data-bs-target="#addExcusedAbsenceModal">
+                        <i class="bi bi-person-dash"></i> إضافة غياب بإذن
+                    </button>
                 </div>
             </form>
         </div>
@@ -299,6 +310,7 @@
                         <th>#</th>
                         <th>التاريخ</th>
                         <th>المعلم</th>
+                        <th>نوع السجل</th>
                         <th>وقت الحضور</th>
                         <th>وقت المغادرة</th>
                         <th>مدة الحضور</th>
@@ -309,20 +321,33 @@
                 </thead>
                 <tbody>
                     {% for rec in teacher_page %}
-                    <tr>
+                    <tr {% if rec.record_type == 'excused_absence' %}class="table-warning"{% endif %}>
                         <td class="text-muted small">{{ teacher_page.start_index|add:forloop.counter0 }}</td>
                         <td class="fw-semibold">{{ rec.date|date:"Y/m/d" }}</td>
                         <td class="fw-semibold">{{ rec.teacher.full_name }}</td>
-                        <td class="font-monospace small text-muted">{{ rec.check_in_time|time:"H:i" }}</td>
+                        <td>
+                            {% if rec.record_type == 'excused_absence' %}
+                            <span class="badge bg-warning text-dark border">غياب بإذن</span>
+                            {% else %}
+                            <span class="badge bg-success-subtle text-success-emphasis border border-success-subtle">حضور عادي</span>
+                            {% endif %}
+                        </td>
                         <td class="font-monospace small text-muted">
-                            {% if rec.check_out_time %}
+                            {% if rec.record_type == 'excused_absence' %}
+                            <span class="text-muted">—</span>
+                            {% else %}
+                            {{ rec.check_in_time|time:"H:i" }}
+                            {% endif %}
+                        </td>
+                        <td class="font-monospace small text-muted">
+                            {% if rec.check_out_time and rec.record_type != 'excused_absence' %}
                             {{ rec.check_out_time|time:"H:i" }}
                             {% else %}
                             <span class="text-muted">—</span>
                             {% endif %}
                         </td>
                         <td class="small">
-                            {% if rec.check_out_time %}
+                            {% if rec.check_out_time and rec.record_type != 'excused_absence' %}
                             <span class="badge bg-light text-dark border">{{ rec.duration_display }}</span>
                             {% else %}
                             <span class="text-muted">—</span>
@@ -366,7 +391,7 @@
                     {% if teacher_page.has_previous %}
                     <li class="page-item">
                         <a class="page-link"
-                            href="?tab=teachers&page={{ teacher_page.previous_page_number }}{% if date_from %}&date_from={{ date_from }}{% endif %}{% if date_to %}&date_to={{ date_to }}{% endif %}{% if teacher_q %}&teacher_q={{ teacher_q }}{% endif %}">&laquo;</a>
+                            href="?tab=teachers&page={{ teacher_page.previous_page_number }}{% if date_from %}&date_from={{ date_from }}{% endif %}{% if date_to %}&date_to={{ date_to }}{% endif %}{% if teacher_q %}&teacher_q={{ teacher_q }}{% endif %}{% if record_type %}&record_type={{ record_type }}{% endif %}">&laquo;</a>
                     </li>
                     {% endif %}
                     {% for num in teacher_page.paginator.page_range %}
@@ -375,7 +400,7 @@
                     {% elif num > teacher_page.number|add:"-3" and num < teacher_page.number|add:"3" %} <li
                         class="page-item">
                         <a class="page-link"
-                            href="?tab=teachers&page={{ num }}{% if date_from %}&date_from={{ date_from }}{% endif %}{% if date_to %}&date_to={{ date_to }}{% endif %}{% if teacher_q %}&teacher_q={{ teacher_q }}{% endif %}">{{
+                            href="?tab=teachers&page={{ num }}{% if date_from %}&date_from={{ date_from }}{% endif %}{% if date_to %}&date_to={{ date_to }}{% endif %}{% if teacher_q %}&teacher_q={{ teacher_q }}{% endif %}{% if record_type %}&record_type={{ record_type }}{% endif %}">{{
                             num }}</a>
                         </li>
                         {% endif %}
@@ -383,7 +408,7 @@
                         {% if teacher_page.has_next %}
                         <li class="page-item">
                             <a class="page-link"
-                                href="?tab=teachers&page={{ teacher_page.next_page_number }}{% if date_from %}&date_from={{ date_from }}{% endif %}{% if date_to %}&date_to={{ date_to }}{% endif %}{% if teacher_q %}&teacher_q={{ teacher_q }}{% endif %}">&raquo;</a>
+                                href="?tab=teachers&page={{ teacher_page.next_page_number }}{% if date_from %}&date_from={{ date_from }}{% endif %}{% if date_to %}&date_to={{ date_to }}{% endif %}{% if teacher_q %}&teacher_q={{ teacher_q }}{% endif %}{% if record_type %}&record_type={{ record_type }}{% endif %}">&raquo;</a>
                         </li>
                         {% endif %}
                 </ul>
@@ -399,5 +424,41 @@
     </div>
     {% endif %}
 
+</div>
+
+<!-- Add Excused Absence Modal -->
+<div class="modal fade" id="addExcusedAbsenceModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <form method="post" action="{% url 'admin_portal:teacher_add_excused_absence' %}" class="modal-content">
+            {% csrf_token %}
+            <div class="modal-header">
+                <h5 class="modal-title fs-6"><i class="bi bi-person-dash text-warning me-1"></i>إضافة غياب بإذن</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="إغلاق"></button>
+            </div>
+            <div class="modal-body text-start" dir="rtl">
+                <div class="mb-3">
+                    <label class="form-label fw-semibold">المعلم</label>
+                    <select name="teacher_id" class="form-select" required>
+                        <option value="">— اختر المعلم —</option>
+                        {% for t in teachers %}
+                        <option value="{{ t.id }}">{{ t.full_name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label fw-semibold">التاريخ</label>
+                    <input type="date" name="date" class="form-control" required>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label fw-semibold">ملاحظات (اختياري)</label>
+                    <textarea name="notes" class="form-control" rows="3"></textarea>
+                </div>
+            </div>
+            <div class="modal-footer p-2 border-0">
+                <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">إغلاق</button>
+                <button type="submit" class="btn btn-warning btn-sm">حفظ</button>
+            </div>
+        </form>
+    </div>
 </div>
 {% endblock %}
