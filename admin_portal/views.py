@@ -517,6 +517,7 @@ def teacher_import(request):
             continue
 
         subject = _cell('subject') or None
+        teacher_code = _cell('teacher_code') or None
         first_name = _cell('first_name') or ''
         last_name = _cell('last_name') or ''
         gender_val = _cell('gender') or None
@@ -539,6 +540,7 @@ def teacher_import(request):
                     full_name=full_name,
                     subject=subject,
                     gender=gender_val,
+                    teacher_code=teacher_code,
                 )
             created += 1
         except Exception as exc:
@@ -568,9 +570,9 @@ def teacher_import_template(request):
     wb = openpyxl.Workbook()
     ws = wb.active
     ws.title = 'Teachers'
-    ws.append(['full_name', 'phone', 'password', 'subject',
+    ws.append(['full_name', 'phone', 'password', 'teacher_code', 'subject',
               'first_name', 'last_name', 'gender'])
-    ws.append(['أحمد محمد', '01012345678', 'password123',
+    ws.append(['أحمد محمد', '01012345678', 'password123', 'TCH001',
               'رياضيات', 'أحمد', 'محمد', 'M'])
 
     buf = io.BytesIO()
@@ -582,6 +584,52 @@ def teacher_import_template(request):
         content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
     )
     response['Content-Disposition'] = 'attachment; filename="teachers_import_template.xlsx"'
+    return response
+
+
+@admin_required
+@require_http_methods(['GET'])
+def teacher_export(request):
+    """Export all teacher records to Excel."""
+    q = request.GET.get('q', '').strip()
+    gender_filter = request.GET.get('gender', '').strip()
+
+    qs = Teacher.objects.select_related('user').all().order_by('full_name')
+    if q:
+        qs = qs.filter(
+            Q(full_name__icontains=q)
+            | Q(subject__icontains=q)
+            | Q(user__phone__icontains=q)
+        )
+    if gender_filter:
+        qs = qs.filter(gender=gender_filter)
+
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws.title = 'Teachers'
+    ws.append([
+        'الاسم الكامل', 'كود المعلم', 'رقم الهاتف', 'المجموعة',
+        'الاسم الأول', 'الاسم الأخير', 'الجنس'
+    ])
+    for t in qs:
+        ws.append([
+            t.full_name,
+            t.teacher_code or '',
+            t.user.phone,
+            t.subject or '',
+            t.user.first_name,
+            t.user.last_name,
+            t.gender or '',
+        ])
+
+    buf = io.BytesIO()
+    wb.save(buf)
+    buf.seek(0)
+    response = HttpResponse(
+        buf.read(),
+        content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    )
+    response['Content-Disposition'] = 'attachment; filename="teachers_export.xlsx"'
     return response
 
 
@@ -698,8 +746,9 @@ def teacher_list(request):
     _save_return(request, 'teacher_list_return')
     q = request.GET.get('q', '').strip()
     gender_filter = request.GET.get('gender', '').strip()
+    sort = request.GET.get('sort', '').strip()
 
-    qs = Teacher.objects.select_related('user').all()
+    qs = Teacher.objects.select_related('user').annotate(num_students=models.Count('student_links'))
     if q:
         qs = qs.filter(
             Q(full_name__icontains=q)
@@ -709,6 +758,21 @@ def teacher_list(request):
     if gender_filter:
         qs = qs.filter(gender=gender_filter)
 
+    if sort == 'name_asc':
+        qs = qs.order_by('full_name')
+    elif sort == 'name_desc':
+        qs = qs.order_by('-full_name')
+    elif sort == 'code_asc':
+        qs = qs.order_by('teacher_code')
+    elif sort == 'code_desc':
+        qs = qs.order_by('-teacher_code')
+    elif sort == 'students_asc':
+        qs = qs.order_by('num_students')
+    elif sort == 'students_desc':
+        qs = qs.order_by('-num_students')
+    else:
+        qs = qs.order_by('full_name')
+
     paginator = Paginator(qs, 25)
     page_obj = paginator.get_page(request.GET.get('page'))
 
@@ -717,6 +781,7 @@ def teacher_list(request):
         'q': q,
         'gender_filter': gender_filter,
         'total_count': qs.count(),
+        'sort': sort,
     })
 
 

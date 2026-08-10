@@ -47,6 +47,7 @@ urlpatterns = [
     path('teachers/import/template/', views.teacher_import_template,
          name='teacher_import_template'),
     path('teachers/import/', views.teacher_import, name='teacher_import'),
+    path('teachers/export/', views.teacher_export, name='teacher_export'),
     path('teachers/<uuid:pk>/edit/', views.teacher_edit, name='teacher_edit'),
     path('teachers/<uuid:pk>/delete/',
          views.teacher_delete, name='teacher_delete'),

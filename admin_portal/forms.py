@@ -106,6 +106,13 @@ class TeacherForm(forms.Form):
         widget=forms.TextInput(attrs={'class': 'form-control'}),
         help_text='اختياري',
     )
+    teacher_code = forms.CharField(
+        max_length=50,
+        required=False,
+        label='كود المعلم',
+        widget=forms.TextInput(attrs={'class': 'form-control'}),
+        help_text='كود تعريفي للمعلم',
+    )
     gender = forms.ChoiceField(
         choices=[('', '— غير محدد —'), ('M', 'ذكر'), ('F', 'أنثى')],
         required=False,
@@ -147,6 +154,7 @@ class TeacherForm(forms.Form):
             self.fields['password'].help_text = ''
         else:
             self.fields['gender'].initial = instance.gender or ''
+            self.fields['teacher_code'].initial = instance.teacher_code or ''
 
     def clean_phone(self):
         phone = self.cleaned_data['phone']
@@ -159,6 +167,17 @@ class TeacherForm(forms.Form):
         if qs.exists():
             raise forms.ValidationError('رقم الهاتف مستخدم بالفعل')
         return phone
+
+    def clean_teacher_code(self):
+        teacher_code = self.cleaned_data.get('teacher_code')
+        if not teacher_code:
+            return teacher_code
+        qs = Teacher.objects.filter(teacher_code=teacher_code)
+        if self.instance:
+            qs = qs.exclude(pk=self.instance.pk)
+        if qs.exists():
+            raise forms.ValidationError('كود المعلم مستخدم بالفعل')
+        return teacher_code
 
     @transaction.atomic
     def save(self):
@@ -176,6 +195,7 @@ class TeacherForm(forms.Form):
                 full_name=data['full_name'],
                 subject=data.get('subject') or None,
                 gender=data.get('gender') or None,
+                teacher_code=data.get('teacher_code') or None,
             )
         else:
             user = self.instance.user
@@ -189,6 +209,7 @@ class TeacherForm(forms.Form):
             self.instance.full_name = data['full_name']
             self.instance.subject = data.get('subject') or None
             self.instance.gender = data.get('gender') or None
+            self.instance.teacher_code = data.get('teacher_code') or None
             self.instance.save()
             teacher = self.instance
         return teacher

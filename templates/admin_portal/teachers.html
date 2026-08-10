@@ -16,6 +16,10 @@
                 <i class="bi bi-file-earmark-excel me-1"></i>
                 استيراد Excel
             </button>
+            <a href="{% url 'admin_portal:teacher_export' %}{% if q or gender_filter %}?{% if q %}q={{ q }}{% endif %}{% if gender_filter %}&gender={{ gender_filter }}{% endif %}{% endif %}" class="btn btn-outline-info">
+                <i class="bi bi-file-earmark-excel me-1"></i>
+                تصدير Excel
+            </a>
             <a href="{% url 'admin_portal:teacher_create' %}" class="btn btn-primary">
                 <i class="bi bi-person-plus me-1"></i>
                 إضافة معلم
@@ -27,10 +31,22 @@
     <div class="card border-0 shadow-sm mb-4">
         <div class="card-body py-3">
             <form method="get" class="row g-2 align-items-end">
-                <div class="col-md-4">
+                <div class="col-md-3">
                     <label class="form-label mb-1 small fw-semibold">بحث</label>
                     <input type="text" name="q" value="{{ q }}" class="form-control"
-                        placeholder="الاسم، المجموعة، رقم الهاتف…">
+                        placeholder="الاسم، المجموعة، الهاتف…">
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label mb-1 small fw-semibold">ترتيب حسب</label>
+                    <select name="sort" class="form-select">
+                        <option value="">— الافتراضي —</option>
+                        <option value="name_asc" {% if sort == 'name_asc' %}selected{% endif %}>الاسم (أ - ي)</option>
+                        <option value="name_desc" {% if sort == 'name_desc' %}selected{% endif %}>الاسم (ي - أ)</option>
+                        <option value="code_asc" {% if sort == 'code_asc' %}selected{% endif %}>الكود (تصاعدي)</option>
+                        <option value="code_desc" {% if sort == 'code_desc' %}selected{% endif %}>الكود (تنازلي)</option>
+                        <option value="students_desc" {% if sort == 'students_desc' %}selected{% endif %}>عدد الطلاب (الأكثر أولاً)</option>
+                        <option value="students_asc" {% if sort == 'students_asc' %}selected{% endif %}>عدد الطلاب (الأقل أولاً)</option>
+                    </select>
                 </div>
                 <div class="col-md-2">
                     <label class="form-label mb-1 small fw-semibold">الجنس</label>
@@ -45,7 +61,7 @@
                         <i class="bi bi-search me-1"></i>بحث
                     </button>
                 </div>
-                {% if q or gender_filter %}
+                {% if q or gender_filter or sort %}
                 <div class="col-md-2">
                     <a href="{% url 'admin_portal:teacher_list' %}" class="btn btn-outline-secondary w-100">
                         <i class="bi bi-x-lg me-1"></i>مسح
@@ -75,6 +91,7 @@
                         <tr>
                             <th style="width:3rem">#</th>
                             <th>الاسم الكامل</th>
+                            <th>كود المعلم</th>
                             <th>رقم الهاتف</th>
                             <th>المجموعة</th>
                             <th>الجنس</th>
@@ -87,6 +104,7 @@
                         <tr>
                             <td class="text-muted small">{{ forloop.counter|add:page_obj.start_index|add:"-1" }}</td>
                             <td class="fw-semibold">{{ teacher.full_name }}</td>
+                            <td class="font-monospace small text-muted">{{ teacher.teacher_code|default:"—" }}</td>
                             <td class="font-monospace small text-muted" dir="ltr">{{ teacher.user.phone }}</td>
                             <td>
                                 {% if teacher.subject %}
@@ -140,7 +158,7 @@
                         {% if page_obj.has_previous %}
                         <li class="page-item">
                             <a class="page-link"
-                                href="?page={{ page_obj.previous_page_number }}{% if q %}&q={{ q }}{% endif %}">
+                                href="?page={{ page_obj.previous_page_number }}{% if q %}&q={{ q }}{% endif %}{% if gender_filter %}&gender={{ gender_filter }}{% endif %}{% if sort %}&sort={{ sort }}{% endif %}">
                                 &laquo;
                             </a>
                         </li>
@@ -151,7 +169,7 @@
                         <li class="page-item active"><span class="page-link">{{ num }}</span></li>
                         {% elif num >= page_obj.number|add:"-2" and num <= page_obj.number|add:"2" %} <li
                             class="page-item">
-                            <a class="page-link" href="?page={{ num }}{% if q %}&q={{ q }}{% endif %}">{{ num }}</a>
+                            <a class="page-link" href="?page={{ num }}{% if q %}&q={{ q }}{% endif %}{% if gender_filter %}&gender={{ gender_filter }}{% endif %}{% if sort %}&sort={{ sort }}{% endif %}">{{ num }}</a>
                             </li>
                             {% endif %}
                             {% endfor %}
@@ -159,7 +177,7 @@
                             {% if page_obj.has_next %}
                             <li class="page-item">
                                 <a class="page-link"
-                                    href="?page={{ page_obj.next_page_number }}{% if q %}&q={{ q }}{% endif %}">
+                                    href="?page={{ page_obj.next_page_number }}{% if q %}&q={{ q }}{% endif %}{% if gender_filter %}&gender={{ gender_filter }}{% endif %}{% if sort %}&sort={{ sort }}{% endif %}">
                                     &raquo;
                                 </a>
                             </li>
@@ -237,7 +255,7 @@
                 <div class="modal-body">
                     <p class="text-muted small mb-3">
                         أعمدة <strong>مطلوبة</strong>: <code>full_name</code>، <code>phone</code>، <code>password</code><br>
-                        أعمدة <strong>اختيارية</strong>: <code>subject</code>، <code>first_name</code>، <code>last_name</code>
+                        أعمدة <strong>اختيارية</strong>: <code>teacher_code</code>، <code>subject</code>، <code>first_name</code>، <code>last_name</code>، <code>gender</code>
                     </p>
                     <div class="mb-3">
                         <label class="form-label fw-semibold">ملف Excel (.xlsx)</label>

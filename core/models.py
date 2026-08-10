@@ -372,6 +372,14 @@ class Teacher(models.Model):
         max_length=255,
         help_text="Teacher's full name"
     )
+    teacher_code = models.CharField(
+        max_length=50,
+        unique=True,
+        null=True,
+        blank=True,
+        db_index=True,
+        help_text="كود المعلم"
+    )
     subject = models.CharField(
         max_length=100,
         blank=True,
