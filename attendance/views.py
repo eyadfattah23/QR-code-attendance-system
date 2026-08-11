@@ -1,4 +1,5 @@
 import uuid
+from datetime import datetime, timezone
 from functools import wraps
 
 from django.contrib import messages
@@ -296,7 +297,10 @@ def station_view(request):
         for record in recent_teacher_scans
     ]
     recent_scans = sorted(
-        recent_scans, key=lambda item: item["time"], reverse=True)[:10]
+        recent_scans,
+        key=lambda item: item["time"] if item["time"] is not None else datetime.min.replace(tzinfo=timezone.utc),
+        reverse=True,
+    )[:10]
 
     context = {
         "scanned_codes": scanned_codes,
