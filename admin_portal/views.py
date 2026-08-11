@@ -81,7 +81,7 @@ def dashboard(request):
             assigned_teacher__isnull=False,
         ).exclude(original_teacher=models.F('assigned_teacher')).count(),
         'today_missing_photos_count': today_student_attendance.filter(
-            models.Q(daily_photo__isnull=True) | models.Q(daily_photo='')
+            models.Q(homework_photo__isnull=True) | models.Q(homework_photo='')
         ).count(),
         'today': today,
     }
@@ -1502,24 +1502,31 @@ def attendance_record_edit_note(request, pk):
 
 @admin_required
 def attendance_record_edit_photo(request, pk):
-    """Upload or remove the daily_photo of a StudentAttendanceRecord."""
+    """Upload or remove a photo for a StudentAttendanceRecord."""
     record = get_object_or_404(
         StudentAttendanceRecord.objects.select_related('student'), pk=pk
     )
     if request.method == 'POST':
+        photo_field = request.POST.get('photo_field')
+        if photo_field not in ('homework_photo', 'test_photo'):
+            messages.error(request, 'حقل الصورة غير صالح')
+            return redirect('admin_portal:student_history', pk=record.student_id)
+
+        current_photo = getattr(record, photo_field)
+
         if 'remove_photo' in request.POST:
-            if record.daily_photo:
-                record.daily_photo.delete(save=False)
-            record.daily_photo = None
-            record.save(update_fields=['daily_photo'])
+            if current_photo:
+                current_photo.delete(save=False)
+            setattr(record, photo_field, None)
+            record.save(update_fields=[photo_field])
             _log_audit(request, AuditLog.Action.EDIT, 'سجل حضور طالب (صورة)',
                        f'{record.student.full_name} — {record.date}')
             messages.success(request, 'تم حذف الصورة بنجاح')
-        elif 'daily_photo' in request.FILES:
-            if record.daily_photo:
-                record.daily_photo.delete(save=False)
-            record.daily_photo = request.FILES['daily_photo']
-            record.save(update_fields=['daily_photo'])
+        elif photo_field in request.FILES:
+            if current_photo:
+                current_photo.delete(save=False)
+            setattr(record, photo_field, request.FILES[photo_field])
+            record.save(update_fields=[photo_field])
             _log_audit(request, AuditLog.Action.EDIT, 'سجل حضور طالب (صورة)',
                        f'{record.student.full_name} — {record.date}')
             messages.success(request, 'تم تحديث الصورة بنجاح')

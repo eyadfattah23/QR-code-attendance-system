@@ -307,7 +307,12 @@ def upload_photo(request, pk):
     record = get_object_or_404(records)
 
     if request.method == 'POST':
-        photo = request.FILES.get('photo')
+        photo_field = request.POST.get('photo_field')
+        if photo_field not in ('homework_photo', 'test_photo'):
+            messages.error(request, 'حقل الصورة غير صالح')
+            return redirect('teacher_portal:upload_photo', pk=pk)
+            
+        photo = request.FILES.get(photo_field)
         if not photo:
             messages.error(request, 'الرجاء اختيار صورة')
             return redirect('teacher_portal:upload_photo', pk=pk)
@@ -323,12 +328,13 @@ def upload_photo(request, pk):
                 request, 'حجم الملف كبير جداً. الحد الأقصى 2MB (يُرجى الضغط من المتصفح)')
             return redirect('teacher_portal:upload_photo', pk=pk)
 
+        current_photo = getattr(record, photo_field)
         # Delete old file from storage before replacing
-        if record.daily_photo:
-            record.daily_photo.delete(save=False)
+        if current_photo:
+            current_photo.delete(save=False)
 
-        record.daily_photo = photo
-        record.save(update_fields=['daily_photo'])
+        setattr(record, photo_field, photo)
+        record.save(update_fields=[photo_field])
         _log_audit(request, AuditLog.Action.EDIT, 'سجل حضور طالب (صورة)',
                    f'{record.student.full_name} — {record.date}')
         messages.success(request, 'تم رفع الصورة بنجاح')

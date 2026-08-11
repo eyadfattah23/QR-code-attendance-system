@@ -52,11 +52,17 @@ class StudentAttendanceRecord(models.Model):
         blank=True,
         help_text='Reason/details when assigned teacher differs from original teacher',
     )
-    daily_photo = models.ImageField(
+    homework_photo = models.ImageField(
         upload_to='attendance/daily_photos/%Y/%m/%d/',
         null=True,
         blank=True,
-        help_text='Optional daily photo captured for the student',
+        help_text='صفحة الواجب — Homework page photo',
+    )
+    test_photo = models.ImageField(
+        upload_to='attendance/test_photos/%Y/%m/%d/',
+        null=True,
+        blank=True,
+        help_text='صفحة الاختبار — Test page photo',
     )
     rating = models.PositiveSmallIntegerField(
         default=6,

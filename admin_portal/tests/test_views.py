@@ -100,21 +100,22 @@ class AdminDashboardTestCase(TestCase):
 
     # ---------- missing photos ----------
 
-    def test_missing_photos_counts_null_records(self):
-        """Records created without a photo (daily_photo=NULL) are counted."""
+    def test_dashboard_today_missing_photos_count(self):
+        """Records created without a photo (homework_photo=NULL) are counted."""
         StudentAttendanceRecord.objects.create(
             student=self.student1, date=localdate(), check_in_time=localtime(),
-            recorded_by=self.admin_user, daily_photo=None,
+            recorded_by=self.admin_user, homework_photo=None,
         )
         self.client.login(phone='01234567890', password='adminpass123')
         response = self.client.get(self.url)
+        self.assertEqual(response.status_code, 200)
         self.assertEqual(response.context['today_missing_photos_count'], 1)
 
-    def test_missing_photos_counts_empty_string_records(self):
-        """Records where photo was cleared (daily_photo='') are also counted."""
+    def test_dashboard_today_missing_photos_empty_string(self):
+        """Records where photo was cleared (homework_photo='') are also counted."""
         StudentAttendanceRecord.objects.create(
             student=self.student1, date=localdate(), check_in_time=localtime(),
-            recorded_by=self.admin_user, daily_photo='',
+            recorded_by=self.admin_user, homework_photo='',
         )
         self.client.login(phone='01234567890', password='adminpass123')
         response = self.client.get(self.url)

@@ -161,15 +161,22 @@
                                 {% endif %}
                             </td>
                             <td class="d-none d-md-table-cell">
-                                {% if row.attendance and row.attendance.daily_photo %}
-                                <span class="badge bg-success-subtle text-success-emphasis">
-                                    <i class="bi bi-image me-1"></i>
-                                    مرفوعة
+                                {% if row.attendance and row.attendance.homework_photo %}
+                                <span class="badge bg-success-subtle text-success-emphasis" title="صورة الواجب مرفوعة">
+                                    <i class="bi bi-journal-text"></i>
                                 </span>
                                 {% else %}
-                                <span class="badge bg-light text-dark">
-                                    <i class="bi bi-image me-1"></i>
-                                    لا توجد
+                                <span class="badge bg-light text-dark text-muted" title="لا توجد صورة واجب">
+                                    <i class="bi bi-journal-text"></i>
+                                </span>
+                                {% endif %}
+                                {% if row.attendance and row.attendance.test_photo %}
+                                <span class="badge bg-info-subtle text-info-emphasis" title="صورة الاختبار مرفوعة">
+                                    <i class="bi bi-file-earmark-text"></i>
+                                </span>
+                                {% else %}
+                                <span class="badge bg-light text-dark text-muted" title="لا توجد صورة اختبار">
+                                    <i class="bi bi-file-earmark-text"></i>
                                 </span>
                                 {% endif %}
                             </td>
@@ -220,8 +227,8 @@
                                 <div class="d-flex gap-1">
                                     {% if row.attendance %}
                                     <a href="{% url 'teacher_portal:upload_photo' row.attendance.id %}"
-                                        class="btn btn-sm {% if row.attendance.daily_photo %}btn-warning{% else %}btn-outline-primary{% endif %}"
-                                        title="{% if row.attendance.daily_photo %}تغيير الصورة{% else %}رفع صورة{% endif %}">
+                                        class="btn btn-sm {% if row.attendance.homework_photo or row.attendance.test_photo %}btn-warning{% else %}btn-outline-primary{% endif %}"
+                                        title="إدارة الصور">
                                         <i class="bi bi-camera"></i>
                                     </a>
                                     {% else %}
@@ -259,7 +266,7 @@
                                             <li>
                                                 <a class="dropdown-item"
                                                     href="{% url 'teacher_portal:upload_photo' row.attendance.id %}">
-                                                    <i class="bi bi-camera me-2"></i>{% if row.attendance.daily_photo %}تغيير الصورة{% else %}رفع صورة{% endif %}
+                                                    <i class="bi bi-camera me-2"></i>إدارة الصور
                                                 </a>
                                             </li>
                                             <li>
@@ -280,7 +287,7 @@
                                                     data-phone="{{ row.student.phone|default:'-' }}"
                                                     data-parent-phone="{{ row.student.parent_phone|default:'-' }}"
                                                     data-time="{% if row.attendance %}{{ row.attendance.check_in_time|time:'H:i' }}{% else %}-{% endif %}"
-                                                    data-photo="{% if row.attendance and row.attendance.daily_photo %}مرفوعة{% else %}لا توجد{% endif %}"
+                                                    data-photo="{% if row.attendance %}{% if row.attendance.homework_photo %}الواجب {% endif %}{% if row.attendance.test_photo %}الاختبار{% endif %}{% if not row.attendance.homework_photo and not row.attendance.test_photo %}لا توجد{% endif %}{% else %}لا توجد{% endif %}"
                                                     data-rating="{% if row.attendance %}{{ row.attendance.rating }}/10{% else %}-{% endif %}"
                                                     data-transfer="{% if row.attendance and row.attendance.is_substitute_assignment %}غاب المعلم الأصلي: {{ row.attendance.original_teacher.full_name }}{% else %}-{% endif %}"
                                                     data-is-substitute="{% if row.attendance and row.attendance.is_substitute_assignment %}1{% else %}0{% endif %}"

@@ -393,44 +393,44 @@ class UploadPhotoTestCase(TestCase):
     # --- POST ---
 
     def test_post_no_file_shows_error(self):
-        response = self.client.post(self.url, {})
+        response = self.client.post(self.url, {'photo_field': 'homework_photo'})
         self.assertEqual(response.status_code, 302)
         self.record.refresh_from_db()
-        self.assertFalse(bool(self.record.daily_photo))
+        self.assertFalse(bool(self.record.homework_photo))
 
     def test_post_invalid_type_rejected(self):
         from django.core.files.uploadedfile import SimpleUploadedFile
         fake_pdf = SimpleUploadedFile('doc.pdf', b'%PDF-1.4', content_type='application/pdf')
-        self.client.post(self.url, {'photo': fake_pdf})
+        self.client.post(self.url, {'photo_field': 'homework_photo', 'homework_photo': fake_pdf})
         self.record.refresh_from_db()
-        self.assertFalse(bool(self.record.daily_photo))
+        self.assertFalse(bool(self.record.homework_photo))
 
     def test_post_valid_jpeg_saves_photo(self):
         photo = self._make_jpeg()
-        response = self.client.post(self.url, {'photo': photo})
+        response = self.client.post(self.url, {'photo_field': 'homework_photo', 'homework_photo': photo})
         self.assertEqual(response.status_code, 302)
         self.record.refresh_from_db()
-        self.assertTrue(bool(self.record.daily_photo))
+        self.assertTrue(bool(self.record.homework_photo))
 
     def test_post_redirects_to_dashboard(self):
         photo = self._make_jpeg()
-        response = self.client.post(self.url, {'photo': photo})
+        response = self.client.post(self.url, {'photo_field': 'homework_photo', 'homework_photo': photo})
         self.assertRedirects(response, reverse('teacher_portal:dashboard'))
 
     def test_post_unlinked_teacher_cannot_upload(self):
         self.client.logout()
         self.client.login(phone='01900000002', password='pass')
         photo = self._make_jpeg()
-        response = self.client.post(self.url, {'photo': photo})
+        response = self.client.post(self.url, {'photo_field': 'homework_photo', 'homework_photo': photo})
         self.assertEqual(response.status_code, 404)
         self.record.refresh_from_db()
-        self.assertFalse(bool(self.record.daily_photo))
+        self.assertFalse(bool(self.record.homework_photo))
 
     def tearDown(self):
         # Clean up any uploaded files to avoid leaving test artifacts
         self.record.refresh_from_db()
-        if self.record.daily_photo:
-            self.record.daily_photo.delete(save=True)
+        if self.record.homework_photo:
+            self.record.homework_photo.delete(save=True)
 
 
 class ExportAttendanceTestCase(TestCase):
