@@ -82,8 +82,13 @@ class StudentAttendanceRecord(models.Model):
         ordering = ['-date', '-check_in_time']
         constraints = [
             models.UniqueConstraint(
+                fields=['student', 'date', 'original_teacher'],
+                name='unique_student_attendance_per_day_per_course',
+            ),
+            models.UniqueConstraint(
                 fields=['student', 'date'],
-                name='unique_student_attendance_per_day',
+                condition=models.Q(original_teacher__isnull=True),
+                name='unique_student_attendance_per_day_no_course',
             ),
             models.CheckConstraint(
                 condition=models.Q(rating__gte=1) & models.Q(rating__lte=10),
@@ -134,6 +139,18 @@ class TeacherAttendanceRecord(models.Model):
     """Daily attendance record for a teacher."""
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+
+    class RecordType(models.TextChoices):
+        NORMAL = 'normal', 'حضور عادي'
+        EXCUSED_ABSENCE = 'excused_absence', 'غياب بإذن'
+
+    record_type = models.CharField(
+        max_length=20,
+        choices=RecordType.choices,
+        default=RecordType.NORMAL,
+        help_text='نوع السجل'
+    )
+
     teacher = models.ForeignKey(
         Teacher,
         on_delete=models.CASCADE,
@@ -141,7 +158,11 @@ class TeacherAttendanceRecord(models.Model):
         help_text='Teacher who checked in',
     )
     date = models.DateField(db_index=True)
-    check_in_time = models.DateTimeField()
+    check_in_time = models.DateTimeField(
+        null=True,
+        blank=True,
+        help_text='Time the teacher checked in (null if excused absence)',
+    )
     check_out_time = models.DateTimeField(
         null=True,
         blank=True,

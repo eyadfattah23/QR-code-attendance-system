@@ -30,11 +30,21 @@ def station_view(request):
     """Render scan station and process a submitted batch of scanned codes."""
     results = []
     scanned_codes = ""
+    session_teacher_id = ""
 
     if request.method == "POST":
         scanned_codes = request.POST.get("scanned_codes", "").strip()
+        session_teacher_id = request.POST.get("session_teacher", "").strip()
         codes = [line.strip()
                  for line in scanned_codes.splitlines() if line.strip()]
+
+        # Resolve session_teacher (the course dropdown)
+        session_teacher = None
+        if session_teacher_id:
+            try:
+                session_teacher = Teacher.objects.get(pk=session_teacher_id)
+            except (Teacher.DoesNotExist, ValueError):
+                session_teacher = None
 
         if not codes:
             messages.warning(
@@ -62,11 +72,25 @@ def station_view(request):
 
                 if student is not None:
                     from django.db import transaction as _tx
+
+                    # Determine the teacher for this attendance record
+                    if session_teacher is not None:
+                        record_teacher = session_teacher
+                    else:
+                        primary_link = (
+                            StudentTeacherLink.objects.filter(student=student)
+                            .order_by("-is_primary", "created_at")
+                            .select_related("teacher")
+                            .first()
+                        )
+                        record_teacher = primary_link.teacher if primary_link else None
+
                     with _tx.atomic():
                         try:
                             student_record = StudentAttendanceRecord.objects.select_for_update().get(
                                 student=student,
                                 date=today,
+                                original_teacher=record_teacher,
                             )
                             # Record exists — check-out logic
                             if student_record.check_out_time is not None:
@@ -129,21 +153,14 @@ def station_view(request):
                                         "image_url": student.image.url if student.image else None,
                                     })
                         except StudentAttendanceRecord.DoesNotExist:
-                            # No record today — first scan = check-in
-                            primary_link = (
-                                StudentTeacherLink.objects.filter(student=student)
-                                .order_by("-is_primary", "created_at")
-                                .select_related("teacher")
-                                .first()
-                            )
-                            original_teacher = primary_link.teacher if primary_link else None
+                            # No record today for this course — first scan = check-in
                             StudentAttendanceRecord.objects.create(
                                 student=student,
                                 date=today,
                                 check_in_time=localtime(),
                                 recorded_by=request.user,
-                                original_teacher=original_teacher,
-                                assigned_teacher=original_teacher,
+                                original_teacher=record_teacher,
+                                assigned_teacher=record_teacher,
                                 substitute_note="",
                                 rating=6,
                             )
@@ -165,6 +182,17 @@ def station_view(request):
                                 teacher=teacher,
                                 date=today,
                             )
+                            
+                            if teacher_record.record_type == TeacherAttendanceRecord.RecordType.EXCUSED_ABSENCE:
+                                results.append({
+                                    "status": "warning",
+                                    "icon": "bi-exclamation-circle-fill",
+                                    "label": "غياب مسجل مسبقاً",
+                                    "message": f"{teacher.full_name} (معلم) - مسجل غياب بإذن لهذا اليوم.",
+                                    "row_class": "warning",
+                                })
+                                continue
+                                
                             # Record exists — second scan = check-out
                             if teacher_record.check_out_time is not None:
                                 # Already checked out
@@ -296,7 +324,12 @@ def station_view(request):
         for record in recent_teacher_scans
     ]
     recent_scans = sorted(
-        recent_scans, key=lambda item: item["time"], reverse=True)[:10]
+        recent_scans,
+        key=lambda item: item["time"] if item["time"] is not None else datetime.min.replace(tzinfo=timezone.utc),
+        reverse=True,
+    )[:10]
+
+    courses = Teacher.objects.filter(is_course=True).order_by('full_name')
 
     context = {
         "scanned_codes": scanned_codes,
@@ -307,5 +340,7 @@ def station_view(request):
         "total_count": len(results),
         "recent_scans": recent_scans,
         "total_today": total_today,
+        "courses": courses,
+        "session_teacher_id": session_teacher_id,
     }
     return render(request, "scan/station.html", context)

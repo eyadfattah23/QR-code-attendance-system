@@ -399,6 +399,11 @@ class Teacher(models.Model):
         help_text="Teacher gender",
     )
 
+    is_course = models.BooleanField(
+        default=False,
+        help_text='صح إذا كان هذا السجل يمثل كورساً وليس معلماً أساسياً — للتمييز في قائمة محطة المسح فقط',
+    )
+
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
