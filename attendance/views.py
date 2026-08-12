@@ -166,6 +166,17 @@ def station_view(request):
                                 teacher=teacher,
                                 date=today,
                             )
+                            
+                            if teacher_record.record_type == TeacherAttendanceRecord.RecordType.EXCUSED_ABSENCE:
+                                results.append({
+                                    "status": "warning",
+                                    "icon": "bi-exclamation-circle-fill",
+                                    "label": "غياب مسجل مسبقاً",
+                                    "message": f"{teacher.full_name} (معلم) - مسجل غياب بإذن لهذا اليوم.",
+                                    "row_class": "warning",
+                                })
+                                continue
+                                
                             # Record exists — second scan = check-out
                             if teacher_record.check_out_time is not None:
                                 # Already checked out
