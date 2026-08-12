@@ -1,4 +1,5 @@
 import uuid
+from datetime import datetime, timezone
 from functools import wraps
 
 from django.contrib import messages
@@ -328,7 +329,6 @@ def station_view(request):
         key=lambda item: item["time"] if item["time"] is not None else datetime.min.replace(tzinfo=timezone.utc),
         reverse=True,
     )[:10]
-
     courses = Teacher.objects.filter(is_course=True).order_by('full_name')
 
     context = {

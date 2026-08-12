@@ -1124,6 +1124,43 @@ def student_history(request, pk):
 # ---------------------------------------------------------------------------
 
 @admin_required
+@require_http_methods(['POST'])
+def teacher_add_excused_absence(request):
+    """Add a manual excused absence record for a teacher."""
+    teacher_id = request.POST.get('teacher_id')
+    date_str = request.POST.get('date')
+    notes = request.POST.get('notes', '').strip()
+    
+    if not teacher_id or not date_str:
+        messages.error(request, 'يجب تحديد المعلم والتاريخ.')
+        return redirect('/portal/admin/attendance/?tab=teachers')
+        
+    try:
+        from datetime import datetime
+        d = datetime.strptime(date_str, '%Y-%m-%d').date()
+        teacher = Teacher.objects.get(pk=teacher_id)
+        
+        # Check if record already exists
+        if TeacherAttendanceRecord.objects.filter(teacher=teacher, date=d).exists():
+            messages.error(request, f'يوجد سجل حضور للمعلم في هذا اليوم بالفعل ({d}).')
+        else:
+            TeacherAttendanceRecord.objects.create(
+                teacher=teacher,
+                date=d,
+                record_type=TeacherAttendanceRecord.RecordType.EXCUSED_ABSENCE,
+                recorded_by=request.user,
+                notes=notes
+            )
+            messages.success(request, f'تم إضافة غياب بإذن للمعلم {teacher.full_name} في يوم {d} بنجاح.')
+            
+    except (ValueError, Teacher.DoesNotExist) as e:
+        messages.error(request, 'بيانات غير صالحة.')
+        
+    return redirect('/portal/admin/attendance/?tab=teachers')
+
+
+
+@admin_required
 def attendance_records(request):
     """Filterable table of student and teacher attendance records (tabbed)."""
     tab = request.GET.get('tab', 'students')  # 'students' | 'teachers'
@@ -1134,6 +1171,7 @@ def attendance_records(request):
     student_q = request.GET.get('student', '').strip()
     grade = request.GET.get('grade', '').strip()
     teacher_q = request.GET.get('teacher_q', '').strip()
+    record_type = request.GET.get('record_type', '').strip()
 
     # --- student records ---
     student_qs = (
@@ -1174,6 +1212,8 @@ def attendance_records(request):
             Q(teacher__full_name__icontains=teacher_q)
             | Q(teacher__user__phone__icontains=teacher_q)
         )
+    if record_type:
+        teacher_qs = teacher_qs.filter(record_type=record_type)
 
     student_total = student_qs.count()
     teacher_total = teacher_qs.count()
@@ -1208,6 +1248,7 @@ def attendance_records(request):
         'student_q': student_q,
         'grade': grade,
         'teacher_q': teacher_q,
+        'record_type': record_type,
     })
 
 
@@ -1228,6 +1269,7 @@ def export_attendance_excel(request):
     student_q = request.GET.get('student', '').strip()
     grade = request.GET.get('grade', '').strip()
     teacher_q = request.GET.get('teacher_q', '').strip()
+    record_type = request.GET.get('record_type', '').strip()
 
     wb = openpyxl.Workbook()
     ws = wb.active
@@ -1267,6 +1309,8 @@ def export_attendance_excel(request):
             qs = qs.filter(date__gte=d_from)
         if d_to:
             qs = qs.filter(date__lte=d_to)
+        if record_type:
+            qs = qs.filter(record_type=record_type)
             
         # If dates not provided, find min/max in qs
         if not d_from and qs.exists():
@@ -1316,10 +1360,13 @@ def export_attendance_excel(request):
             for d in date_list:
                 rec = attendance_map.get((t.id, d))
                 if rec:
-                    check_in = localtime(rec.check_in_time).strftime('%H:%M') if rec.check_in_time else ''
-                    check_out = localtime(rec.check_out_time).strftime('%H:%M') if rec.check_out_time else ''
-                    duration = rec.duration_display if rec.check_out_time else ''
-                    row.extend([check_in, check_out, duration])
+                    if rec.record_type == 'excused_absence':
+                        row.extend(['غياب بإذن', '', ''])
+                    else:
+                        check_in = localtime(rec.check_in_time).strftime('%H:%M') if rec.check_in_time else ''
+                        check_out = localtime(rec.check_out_time).strftime('%H:%M') if rec.check_out_time else ''
+                        duration = rec.duration_display if rec.check_out_time else ''
+                        row.extend([check_in, check_out, duration])
                 else:
                     row.extend(['absent', '', ''])
             ws.append(row)
@@ -1341,13 +1388,18 @@ def export_attendance_excel(request):
                 Q(teacher__full_name__icontains=teacher_q)
                 | Q(teacher__user__phone__icontains=teacher_q)
             )
-        ws.append(['التاريخ', 'المعلم', 'وقت الحضور',
+        if record_type:
+            qs = qs.filter(record_type=record_type)
+            
+        ws.append(['التاريخ', 'المعلم', 'نوع السجل', 'وقت الحضور',
                   'وقت المغادرة', 'مدة الحضور', 'التقييم', 'ملاحظات'])
         for rec in qs:
+            rec_type_display = 'غياب بإذن' if rec.record_type == 'excused_absence' else 'حضور عادي'
             ws.append([
                 str(rec.date),
                 rec.teacher.full_name,
-                localtime(rec.check_in_time).strftime('%H:%M'),
+                rec_type_display,
+                localtime(rec.check_in_time).strftime('%H:%M') if rec.check_in_time else '',
                 localtime(rec.check_out_time).strftime(
                     '%H:%M') if rec.check_out_time else '',
                 rec.duration_display if rec.check_out_time else '',

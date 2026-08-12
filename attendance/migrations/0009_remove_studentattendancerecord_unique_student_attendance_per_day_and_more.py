@@ -7,7 +7,7 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('attendance', '0007_remove_studentattendancerecord_daily_photo_and_more'),
+        ('attendance', '0008_remove_studentattendancerecord_daily_photo_and_more'),
         ('core', '0012_teacher_is_course'),
         migrations.swappable_dependency(settings.AUTH_USER_MODEL),
     ]
