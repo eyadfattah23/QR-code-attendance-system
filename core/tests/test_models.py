@@ -13,7 +13,7 @@ from django.test import TestCase
 from django.db import IntegrityError
 from django.core.exceptions import ValidationError
 
-from core.models import User, validate_phone_number
+from core.models import User, validate_phone_number, Student, Teacher, StudentTeacherLink
 
 
 class UserModelTestCase(TestCase):
@@ -184,6 +184,43 @@ class PhoneValidationTestCase(TestCase):
         """Test that phone with spaces fails validation."""
         with self.assertRaises(ValidationError):
             validate_phone_number('0123 456 789')
+
+
+class StudentTeacherLinkPrimaryConstraintTestCase(TestCase):
+    """Tests for the unique_primary_teacher_per_student DB constraint."""
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.teacher_user_1 = User.objects.create_user(
+            phone='01922222221', email='t1@primary.com', password='pass',
+            role=User.Role.TEACHER,
+        )
+        cls.teacher_user_2 = User.objects.create_user(
+            phone='01922222222', email='t2@primary.com', password='pass',
+            role=User.Role.TEACHER,
+        )
+        cls.teacher_1 = Teacher.objects.create(
+            user=cls.teacher_user_1, full_name='معلم أول')
+        cls.teacher_2 = Teacher.objects.create(
+            user=cls.teacher_user_2, full_name='معلم ثاني')
+        cls.student = Student.objects.create(
+            full_name='طالب القيد الأساسي', national_id='10000000000099',
+        )
+
+    def test_two_primary_links_for_same_student_raises_integrity_error(self):
+        StudentTeacherLink.objects.create(
+            student=self.student, teacher=self.teacher_1, is_primary=True)
+        with self.assertRaises(IntegrityError):
+            StudentTeacherLink.objects.create(
+                student=self.student, teacher=self.teacher_2, is_primary=True)
+
+    def test_two_non_primary_links_for_same_student_are_allowed(self):
+        StudentTeacherLink.objects.create(
+            student=self.student, teacher=self.teacher_1, is_primary=False)
+        StudentTeacherLink.objects.create(
+            student=self.student, teacher=self.teacher_2, is_primary=False)
+        self.assertEqual(
+            StudentTeacherLink.objects.filter(student=self.student).count(), 2)
 
 
 # Pytest-style tests

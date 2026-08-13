@@ -488,8 +488,10 @@ class StudentImportTestCase(_StudentManagementBase):
 
     def test_import_saves_phone_and_parent_phone(self):
         upload = _make_excel_upload([
-            ('full_name', 'national_id', 'student_code', 'grade', 'phone', 'parent_phone'),
-            ('طالب هاتف', '55555555555555', 'PH001', 'الصف الأول', '01012345678', '01098765432'),
+            ('full_name', 'national_id', 'student_code',
+             'grade', 'phone', 'parent_phone'),
+            ('طالب هاتف', '55555555555555', 'PH001',
+             'الصف الأول', '01012345678', '01098765432'),
         ])
         self.client.post(self.url, {'excel_file': upload})
         student = Student.objects.get(national_id='55555555555555')
@@ -608,10 +610,12 @@ class TeacherListTestCase(_TeacherManagementBase):
     def test_filter_by_gender_male(self):
         male_user = User.objects.create_user(
             phone='01300000001', password='pass', role=User.Role.TEACHER)
-        Teacher.objects.create(user=male_user, full_name='معلم ذكر', gender='M')
+        Teacher.objects.create(
+            user=male_user, full_name='معلم ذكر', gender='M')
         female_user = User.objects.create_user(
             phone='01300000002', password='pass', role=User.Role.TEACHER)
-        Teacher.objects.create(user=female_user, full_name='معلمة أنثى', gender='F')
+        Teacher.objects.create(
+            user=female_user, full_name='معلمة أنثى', gender='F')
         response = self.client.get(self.url, {'gender': 'M'})
         teachers = list(response.context['page_obj'])
         self.assertTrue(all(t.gender == 'M' for t in teachers))
@@ -619,7 +623,8 @@ class TeacherListTestCase(_TeacherManagementBase):
     def test_filter_by_gender_female(self):
         female_user = User.objects.create_user(
             phone='01300000003', password='pass', role=User.Role.TEACHER)
-        Teacher.objects.create(user=female_user, full_name='معلمة أنثى 2', gender='F')
+        Teacher.objects.create(
+            user=female_user, full_name='معلمة أنثى 2', gender='F')
         response = self.client.get(self.url, {'gender': 'F'})
         teachers = list(response.context['page_obj'])
         self.assertTrue(all(t.gender == 'F' for t in teachers))
@@ -833,11 +838,13 @@ class TeacherImportTestCase(_TeacherManagementBase):
         ])
         self.client.post(self.url, {'excel_file': upload})
         self.assertTrue(User.objects.filter(phone='01022222222').exists())
-        self.assertTrue(Teacher.objects.filter(full_name='معلم مستورد').exists())
+        self.assertTrue(Teacher.objects.filter(
+            full_name='معلم مستورد').exists())
 
     def test_import_optional_columns_populated(self):
         upload = _make_excel_upload([
-            ('full_name', 'phone', 'password', 'subject', 'first_name', 'last_name'),
+            ('full_name', 'phone', 'password',
+             'subject', 'first_name', 'last_name'),
             ('معلم كامل', '01033333333', 'pass1234', 'لغة عربية', 'يوسف', 'علي'),
         ])
         self.client.post(self.url, {'excel_file': upload})
@@ -877,7 +884,8 @@ class TeacherImportTestCase(_TeacherManagementBase):
             ('هاتف خاطئ', '123', 'pass1234'),
         ])
         self.client.post(self.url, {'excel_file': upload})
-        self.assertFalse(Teacher.objects.filter(full_name='هاتف خاطئ').exists())
+        self.assertFalse(Teacher.objects.filter(
+            full_name='هاتف خاطئ').exists())
 
     def test_import_missing_password_produces_error(self):
         upload = _make_excel_upload([
@@ -888,7 +896,8 @@ class TeacherImportTestCase(_TeacherManagementBase):
         from django.contrib.messages import get_messages
         msgs = [str(m) for m in get_messages(response.wsgi_request)]
         self.assertTrue(any('خطأ' in m for m in msgs))
-        self.assertFalse(Teacher.objects.filter(full_name='بلا كلمة مرور').exists())
+        self.assertFalse(Teacher.objects.filter(
+            full_name='بلا كلمة مرور').exists())
 
     def test_import_no_file_redirects_with_error(self):
         response = self.client.post(self.url, {})
@@ -905,7 +914,8 @@ class TeacherImportTestCase(_TeacherManagementBase):
         self.assertFalse(User.objects.filter(phone='01077777777').exists())
 
     def test_import_template_download(self):
-        response = self.client.get(reverse('admin_portal:teacher_import_template'))
+        response = self.client.get(
+            reverse('admin_portal:teacher_import_template'))
         self.assertEqual(response.status_code, 200)
         self.assertEqual(
             response['Content-Type'],
@@ -915,11 +925,13 @@ class TeacherImportTestCase(_TeacherManagementBase):
 
     def test_import_template_contains_required_headers(self):
         import io as _io
-        response = self.client.get(reverse('admin_portal:teacher_import_template'))
+        response = self.client.get(
+            reverse('admin_portal:teacher_import_template'))
         import openpyxl as _openpyxl
         wb = _openpyxl.load_workbook(_io.BytesIO(response.content))
         ws = wb.active
-        headers = [ws.cell(row=1, column=c).value for c in range(1, ws.max_column + 1)]
+        headers = [ws.cell(row=1, column=c).value for c in range(
+            1, ws.max_column + 1)]
         for col in ('full_name', 'phone', 'password'):
             self.assertIn(col, headers)
 
@@ -1102,6 +1114,60 @@ class TeacherStudentsTestCase(TestCase):
         link = StudentTeacherLink.objects.get(
             teacher=self.teacher, student=self.student_a)
         self.assertTrue(link.is_primary)
+
+    # --- primary conflict detection & auto-demote ---
+
+    def test_get_flags_other_primary_teacher(self):
+        other_teacher = Teacher.objects.create(
+            user=User.objects.create_user(
+                phone='01933333333', email='other@link.com', password='pass',
+                role=User.Role.TEACHER,
+            ),
+            full_name='معلم آخر',
+        )
+        StudentTeacherLink.objects.create(
+            teacher=other_teacher, student=self.student_a, is_primary=True)
+        response = self.client.get(self.url)
+        students = {s.id: s for s in response.context['students']}
+        self.assertEqual(
+            students[self.student_a.id].other_primary_teacher, 'معلم آخر')
+        self.assertIsNone(students[self.student_b.id].other_primary_teacher)
+
+    def test_post_marking_primary_demotes_other_teachers_primary_link(self):
+        other_teacher = Teacher.objects.create(
+            user=User.objects.create_user(
+                phone='01933333334', email='other2@link.com', password='pass',
+                role=User.Role.TEACHER,
+            ),
+            full_name='معلم آخر ٢',
+        )
+        other_link = StudentTeacherLink.objects.create(
+            teacher=other_teacher, student=self.student_a, is_primary=True)
+
+        response = self.client.post(self.url, {
+            'students': [str(self.student_a.id)],
+            'primary':  [str(self.student_a.id)],
+        }, follow=True)
+
+        other_link.refresh_from_db()
+        self.assertFalse(other_link.is_primary)
+        new_link = StudentTeacherLink.objects.get(
+            teacher=self.teacher, student=self.student_a)
+        self.assertTrue(new_link.is_primary)
+
+        warning_msgs = [
+            str(m) for m in response.context['messages'] if m.tags == 'warning']
+        self.assertTrue(any('معلم آخر ٢' in m for m in warning_msgs))
+        self.assertTrue(any('طالب ألف' in m for m in warning_msgs))
+
+    def test_post_marking_primary_with_no_conflict_shows_no_warning(self):
+        response = self.client.post(self.url, {
+            'students': [str(self.student_a.id)],
+            'primary':  [str(self.student_a.id)],
+        }, follow=True)
+        warning_msgs = [
+            m for m in response.context['messages'] if m.tags == 'warning']
+        self.assertEqual(warning_msgs, [])
 
 
 # ---------------------------------------------------------------------------
