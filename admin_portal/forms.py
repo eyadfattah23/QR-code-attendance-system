@@ -119,6 +119,12 @@ class TeacherForm(forms.Form):
         label='الجنس',
         widget=forms.Select(attrs={'class': 'form-select'}),
     )
+    is_course = forms.BooleanField(
+        required=False,
+        label='هذا كورس (وليس معلماً أساسياً)',
+        widget=forms.CheckboxInput(attrs={'class': 'form-check-input'}),
+        help_text='فعّل هذا الخيار ليظهر في قائمة الكورسات بمحطة المسح',
+    )
 
     # --- User account ---
     phone = forms.CharField(
@@ -155,6 +161,7 @@ class TeacherForm(forms.Form):
         else:
             self.fields['gender'].initial = instance.gender or ''
             self.fields['teacher_code'].initial = instance.teacher_code or ''
+            self.fields['is_course'].initial = instance.is_course
 
     def clean_phone(self):
         phone = self.cleaned_data['phone']
@@ -196,6 +203,7 @@ class TeacherForm(forms.Form):
                 subject=data.get('subject') or None,
                 gender=data.get('gender') or None,
                 teacher_code=data.get('teacher_code') or None,
+                is_course=data.get('is_course', False),
             )
         else:
             user = self.instance.user
@@ -210,6 +218,7 @@ class TeacherForm(forms.Form):
             self.instance.subject = data.get('subject') or None
             self.instance.gender = data.get('gender') or None
             self.instance.teacher_code = data.get('teacher_code') or None
+            self.instance.is_course = data.get('is_course', False)
             self.instance.save()
             teacher = self.instance
         return teacher

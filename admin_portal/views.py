@@ -6,7 +6,7 @@ from django.contrib.auth.decorators import login_required
 from django.core.exceptions import ValidationError
 from django.core.paginator import Paginator
 from django.db import models
-from django.db.models import Avg, Q
+from django.db.models import Avg, OuterRef, Q, Subquery
 from django.http import HttpResponse
 from django.shortcuts import get_object_or_404, render, redirect
 from django.urls import reverse
@@ -748,7 +748,8 @@ def teacher_list(request):
     gender_filter = request.GET.get('gender', '').strip()
     sort = request.GET.get('sort', '').strip()
 
-    qs = Teacher.objects.select_related('user').annotate(num_students=models.Count('student_links'))
+    qs = Teacher.objects.select_related('user').annotate(
+        num_students=models.Count('student_links'))
     if q:
         qs = qs.filter(
             Q(full_name__icontains=q)
@@ -829,6 +830,7 @@ def teacher_edit(request, pk):
                 'phone': teacher.user.phone,
                 'first_name': teacher.user.first_name,
                 'last_name': teacher.user.last_name,
+                'is_course': teacher.is_course,
             },
             instance=teacher,
         )
@@ -907,6 +909,7 @@ def teacher_students(request, pk):
             return redirect('admin_portal:teacher_students', pk=pk)
 
         from django.db import transaction
+        demoted = []  # list of (student_name, other_teacher_name)
         with transaction.atomic():
             # Remove links for de-selected students
             StudentTeacherLink.objects.filter(teacher=teacher).exclude(
@@ -916,6 +919,22 @@ def teacher_students(request, pk):
             # Upsert links for selected students
             for sid in existing_ids_str:
                 is_primary = sid in primary_ids
+                if is_primary:
+                    # A student can only have one primary teacher. Demote any
+                    # existing primary link with a *different* teacher rather
+                    # than silently conflicting or crashing on the unique
+                    # constraint.
+                    other_primary_links = (
+                        StudentTeacherLink.objects
+                        .filter(student_id=sid, is_primary=True)
+                        .exclude(teacher=teacher)
+                        .select_related('teacher', 'student')
+                    )
+                    for link in other_primary_links:
+                        demoted.append(
+                            (link.student.full_name, link.teacher.full_name))
+                    other_primary_links.update(is_primary=False)
+
                 StudentTeacherLink.objects.update_or_create(
                     teacher=teacher,
                     student_id=sid,
@@ -925,6 +944,14 @@ def teacher_students(request, pk):
         count = len(existing_ids_str)
         messages.success(
             request, f'تم تحديث قائمة طلاب "{teacher.full_name}" — {count} طالب مرتبط')
+        if demoted:
+            details = '، '.join(
+                f'{sname} (كان أساسياً لدى {tname})' for sname, tname in demoted)
+            messages.warning(
+                request,
+                'تنبيه: لا يمكن أن يكون للطالب أكثر من معلم أساسي واحد، لذلك تم '
+                f'إلغاء صفة "أساسي" تلقائياً لدى المعلم السابق للطلاب التالين: {details}'
+            )
         return redirect('admin_portal:teacher_students', pk=pk)
 
     # Build sets of currently-linked and primary student IDs for template use
@@ -932,6 +959,21 @@ def teacher_students(request, pk):
     linked_ids = {str(link.student_id) for link in links_qs}
     primary_ids = {str(link.student_id)
                    for link in links_qs if link.is_primary}
+
+    # For every student already marked primary with a DIFFERENT teacher,
+    # surface that fact so the admin sees an obvious warning before
+    # accidentally double-marking them as primary here too.
+    other_primary_subquery = (
+        StudentTeacherLink.objects
+        .filter(student_id=OuterRef('pk'), is_primary=True)
+        .exclude(teacher=teacher)
+        .order_by('-created_at')
+    )
+    all_students = all_students.annotate(
+        other_primary_teacher=Subquery(
+            other_primary_subquery.values('teacher__full_name')[:1]
+        )
+    )
 
     return render(request, 'admin_portal/teacher_students.html', {
         'teacher': teacher,
@@ -1130,19 +1172,20 @@ def teacher_add_excused_absence(request):
     teacher_id = request.POST.get('teacher_id')
     date_str = request.POST.get('date')
     notes = request.POST.get('notes', '').strip()
-    
+
     if not teacher_id or not date_str:
         messages.error(request, 'يجب تحديد المعلم والتاريخ.')
         return redirect('/portal/admin/attendance/?tab=teachers')
-        
+
     try:
         from datetime import datetime
         d = datetime.strptime(date_str, '%Y-%m-%d').date()
         teacher = Teacher.objects.get(pk=teacher_id)
-        
+
         # Check if record already exists
         if TeacherAttendanceRecord.objects.filter(teacher=teacher, date=d).exists():
-            messages.error(request, f'يوجد سجل حضور للمعلم في هذا اليوم بالفعل ({d}).')
+            messages.error(
+                request, f'يوجد سجل حضور للمعلم في هذا اليوم بالفعل ({d}).')
         else:
             TeacherAttendanceRecord.objects.create(
                 teacher=teacher,
@@ -1151,13 +1194,13 @@ def teacher_add_excused_absence(request):
                 recorded_by=request.user,
                 notes=notes
             )
-            messages.success(request, f'تم إضافة غياب بإذن للمعلم {teacher.full_name} في يوم {d} بنجاح.')
-            
+            messages.success(
+                request, f'تم إضافة غياب بإذن للمعلم {teacher.full_name} في يوم {d} بنجاح.')
+
     except (ValueError, Teacher.DoesNotExist) as e:
         messages.error(request, 'بيانات غير صالحة.')
-        
-    return redirect('/portal/admin/attendance/?tab=teachers')
 
+    return redirect('/portal/admin/attendance/?tab=teachers')
 
 
 @admin_required
@@ -1281,13 +1324,14 @@ def export_attendance_excel(request):
         from openpyxl.styles import Alignment
 
         ws.title = 'حضور المعلمين (مجمع)'
-        
+
         # Parse date range
         d_from = None
         d_to = None
         if date_from:
             try:
-                d_from = datetime.datetime.strptime(date_from, '%Y-%m-%d').date()
+                d_from = datetime.datetime.strptime(
+                    date_from, '%Y-%m-%d').date()
             except ValueError:
                 pass
         if date_to:
@@ -1295,7 +1339,7 @@ def export_attendance_excel(request):
                 d_to = datetime.datetime.strptime(date_to, '%Y-%m-%d').date()
             except ValueError:
                 pass
-                
+
         # Base querysets
         teachers_qs = Teacher.objects.all().order_by('full_name')
         if teacher_q:
@@ -1311,19 +1355,19 @@ def export_attendance_excel(request):
             qs = qs.filter(date__lte=d_to)
         if record_type:
             qs = qs.filter(record_type=record_type)
-            
+
         # If dates not provided, find min/max in qs
         if not d_from and qs.exists():
             d_from = qs.aggregate(models.Min('date'))['date__min']
         if not d_to and qs.exists():
             d_to = qs.aggregate(models.Max('date'))['date__max']
-            
+
         # Fallback to today
         if not d_from:
             d_from = localdate()
         if not d_to:
             d_to = localdate()
-            
+
         # Build date list
         date_list = []
         curr = d_from
@@ -1342,15 +1386,16 @@ def export_attendance_excel(request):
         for d in date_list:
             header1.extend([str(d), '', ''])
             header2.extend(['الحضور', 'المغادرة', 'المدة'])
-            
+
         ws.append(header1)
         ws.append(header2)
-        
+
         # Merge date cells in header1 and center align
         for i, d in enumerate(date_list):
             start_col = 2 + (i * 3)
             end_col = start_col + 2
-            ws.merge_cells(start_row=1, start_column=start_col, end_row=1, end_column=end_col)
+            ws.merge_cells(start_row=1, start_column=start_col,
+                           end_row=1, end_column=end_col)
             cell = ws.cell(row=1, column=start_col)
             cell.alignment = Alignment(horizontal='center', vertical='center')
 
@@ -1363,8 +1408,10 @@ def export_attendance_excel(request):
                     if rec.record_type == 'excused_absence':
                         row.extend(['غياب بإذن', '', ''])
                     else:
-                        check_in = localtime(rec.check_in_time).strftime('%H:%M') if rec.check_in_time else ''
-                        check_out = localtime(rec.check_out_time).strftime('%H:%M') if rec.check_out_time else ''
+                        check_in = localtime(rec.check_in_time).strftime(
+                            '%H:%M') if rec.check_in_time else ''
+                        check_out = localtime(rec.check_out_time).strftime(
+                            '%H:%M') if rec.check_out_time else ''
                         duration = rec.duration_display if rec.check_out_time else ''
                         row.extend([check_in, check_out, duration])
                 else:
@@ -1390,7 +1437,7 @@ def export_attendance_excel(request):
             )
         if record_type:
             qs = qs.filter(record_type=record_type)
-            
+
         ws.append(['التاريخ', 'المعلم', 'نوع السجل', 'وقت الحضور',
                   'وقت المغادرة', 'مدة الحضور', 'التقييم', 'ملاحظات'])
         for rec in qs:
@@ -1399,7 +1446,8 @@ def export_attendance_excel(request):
                 str(rec.date),
                 rec.teacher.full_name,
                 rec_type_display,
-                localtime(rec.check_in_time).strftime('%H:%M') if rec.check_in_time else '',
+                localtime(rec.check_in_time).strftime(
+                    '%H:%M') if rec.check_in_time else '',
                 localtime(rec.check_out_time).strftime(
                     '%H:%M') if rec.check_out_time else '',
                 rec.duration_display if rec.check_out_time else '',
@@ -1482,7 +1530,8 @@ def attendance_record_edit_rating(request, pk):
     elif user.is_teacher:
         can_edit = (
             StudentTeacherLink.objects.filter(teacher__user=user, student=record.student).exists() or
-            (hasattr(user, 'teacher_profile') and record.assigned_teacher_id == user.teacher_profile.id)
+            (hasattr(user, 'teacher_profile')
+             and record.assigned_teacher_id == user.teacher_profile.id)
         )
     elif user.is_supervisor:
         teacher_pk = request.session.get('supervisor_teacher_id')
@@ -1535,16 +1584,17 @@ def attendance_record_edit_rating(request, pk):
 def attendance_record_edit_note(request, pk):
     """Admin updates the teacher note inline."""
     record = get_object_or_404(StudentAttendanceRecord, pk=pk)
-    
+
     note = request.POST.get('teacher_note', '').strip()
     record.teacher_note = note
     record.save(update_fields=['teacher_note'])
-    
+
     _log_audit(request, AuditLog.Action.EDIT, 'سجل حضور طالب (ملاحظة)',
                f'{record.student.full_name} — {record.date}')
     messages.success(request, 'تم حفظ الملاحظة بنجاح')
-    
-    next_url = request.POST.get('next') or request.META.get('HTTP_REFERER') or reverse('admin_portal:attendance_records')
+
+    next_url = request.POST.get('next') or request.META.get(
+        'HTTP_REFERER') or reverse('admin_portal:attendance_records')
     return redirect(next_url)
 
 
@@ -1701,7 +1751,10 @@ def teacher_mark_absent(request, pk):
     # attendance records for the selected date keyed by student UUID string
     records_qs = (
         StudentAttendanceRecord.objects
-        .filter(student__in=linked_students, date=absence_date)
+        .filter(
+            Q(original_teacher=teacher) | Q(assigned_teacher=teacher),
+            student__in=linked_students, date=absence_date,
+        )
         .select_related('student', 'assigned_teacher', 'original_teacher')
     )
     record_by_student = {str(r.student_id): r for r in records_qs}

@@ -166,6 +166,13 @@
                         </select>
                         <small class="text-muted">اختر الكورس لتسجيل الحضور فيه، أو اتركه تلقائي.</small>
                     </div>
+                    <div class="form-check mb-3">
+                        <input class="form-check-input" type="checkbox" name="allow_unenrolled" id="id_allow_unenrolled"
+                            {% if allow_unenrolled %}checked{% endif %}>
+                        <label class="form-check-label" for="id_allow_unenrolled">
+                            السماح بتسجيل حضور طلاب غير مسجلين في هذه الحصة
+                        </label>
+                    </div>
                     {% endif %}
 
                     <label for="id_scanned_codes" class="form-label fw-semibold">الأكواد (كل كود في سطر)</label>
@@ -211,13 +218,16 @@ STU0001
                     {% for result in results %}
                     <article class="result-item {{ result.row_class }} d-flex align-items-center gap-3">
                         {% if 'image_url' in result %}
-                            {% if result.image_url %}
-                            <img src="{{ result.image_url }}" alt="صورة" class="rounded-circle border border-white shadow-sm" style="width: 55px; height: 55px; object-fit: cover; flex-shrink: 0;">
-                            {% else %}
-                            <div class="rounded-circle bg-white border shadow-sm d-flex align-items-center justify-content-center text-secondary" style="width: 55px; height: 55px; font-size: 1.5rem; flex-shrink: 0;">
-                                <i class="bi bi-person-fill"></i>
-                            </div>
-                            {% endif %}
+                        {% if result.image_url %}
+                        <img src="{{ result.image_url }}" alt="صورة"
+                            class="rounded-circle border border-white shadow-sm"
+                            style="width: 55px; height: 55px; object-fit: cover; flex-shrink: 0;">
+                        {% else %}
+                        <div class="rounded-circle bg-white border shadow-sm d-flex align-items-center justify-content-center text-secondary"
+                            style="width: 55px; height: 55px; font-size: 1.5rem; flex-shrink: 0;">
+                            <i class="bi bi-person-fill"></i>
+                        </div>
+                        {% endif %}
                         {% endif %}
                         <div>
                             <div class="fw-semibold mb-1">

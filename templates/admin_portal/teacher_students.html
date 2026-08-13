@@ -97,15 +97,21 @@
                                         data-grade="{{ student.grade|default:'' }}">
                                         <td>
                                             <input type="checkbox" class="form-check-input student-cb" name="students"
-                                                value="{{ student.id }}" id="cb-{{ student.id }}"
-                                                {% if sid in linked_ids %}checked{% endif %}
-                                                onchange="onStudentToggle(this)">
+                                                value="{{ student.id }}" id="cb-{{ student.id }}" {% if sid in linked_ids %}checked{% endif %} onchange="onStudentToggle(this)">
                                         </td>
                                         <td>
                                             <label class="mb-0 fw-semibold" for="cb-{{ student.id }}"
                                                 style="cursor:pointer">
                                                 {{ student.full_name }}
                                             </label>
+                                            {% if student.other_primary_teacher %}
+                                            <br>
+                                            <span class="badge bg-warning text-dark mt-1"
+                                                title="هذا الطالب أساسي حالياً لدى معلم آخر — سيتم إلغاء ذلك تلقائياً إذا جعلته أساسياً هنا">
+                                                <i class="bi bi-exclamation-triangle-fill me-1"></i>
+                                                أساسي لدى: {{ student.other_primary_teacher }}
+                                            </span>
+                                            {% endif %}
                                         </td>
                                         <td class="font-monospace small text-muted">
                                             {{ student.student_code|default:"—" }}
@@ -118,9 +124,9 @@
                                         <td class="text-center">
                                             <input type="checkbox" class="form-check-input primary-cb" name="primary"
                                                 value="{{ student.id }}" id="primary-{{ student.id }}"
-                                                title="معلم أساسي لهذا الطالب"
-                                                {% if sid in primary_ids %}checked{% endif %}
-                                                {% if sid not in linked_ids %}disabled{% endif %}>
+                                                title="معلم أساسي لهذا الطالب" {% if sid in primary_ids %}checked{% endif %} {% if sid not in linked_ids %}disabled{% endif %}
+                                                data-other-primary="{{ student.other_primary_teacher|default:'' }}"
+                                                onchange="onPrimaryToggle(this)">
                                         </td>
                                     </tr>
                                     {% endwith %}
@@ -163,7 +169,7 @@
                                 <i class="bi bi-floppy me-1"></i>حفظ التغييرات
                             </button>
                             <a href="{% url 'admin_portal:teacher_students_export' teacher.pk %}"
-                               class="btn btn-outline-success">
+                                class="btn btn-outline-success">
                                 <i class="bi bi-file-earmark-excel me-1"></i>تصدير Excel
                             </a>
                             <a href="{% url 'admin_portal:teacher_list' %}" class="btn btn-outline-secondary">إلغاء</a>
@@ -205,6 +211,19 @@
         }
         updateCounter();
         sortRows();
+    }
+
+    // ── warn when checking "primary" would demote another teacher's primary link ──
+    function onPrimaryToggle(cb) {
+        if (cb.checked && cb.dataset.otherPrimary) {
+            const ok = confirm(
+                'هذا الطالب "أساسي" حالياً لدى المعلم: ' + cb.dataset.otherPrimary +
+                '.\nلا يمكن أن يكون للطالب أكثر من معلم أساسي واحد، فسيتم إلغاء ذلك تلقائياً عند الحفظ.\n\nهل تريد المتابعة؟'
+            );
+            if (!ok) {
+                cb.checked = false;
+            }
+        }
     }
 
     // ── sort: checked rows first, then a divider, then unchecked ─────────────

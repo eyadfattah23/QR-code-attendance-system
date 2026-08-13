@@ -9,6 +9,7 @@ from functools import wraps
 import uuid
 import openpyxl
 
+from django.db import IntegrityError
 from django.db.models import Avg, Q
 
 from core.models import Student, Teacher, StudentTeacherLink
@@ -19,7 +20,8 @@ from admin_portal.models import AuditLog
 def _log_audit(request, action, object_type, object_repr):
     """Create an AuditLog entry for a delete or edit action."""
     forwarded = request.META.get('HTTP_X_FORWARDED_FOR', '')
-    ip = forwarded.split(',')[0].strip() if forwarded else request.META.get('REMOTE_ADDR', '')
+    ip = forwarded.split(',')[0].strip(
+    ) if forwarded else request.META.get('REMOTE_ADDR', '')
     AuditLog.objects.create(
         action=action,
         actor_phone=request.user.phone,
@@ -78,16 +80,19 @@ def dashboard(request):
             raise Teacher.DoesNotExist
 
         linked_student_ids = list(
-            StudentTeacherLink.objects.filter(teacher=teacher).values_list('student_id', flat=True)
+            StudentTeacherLink.objects.filter(
+                teacher=teacher).values_list('student_id', flat=True)
         )
         assigned_student_ids = list(
-            StudentAttendanceRecord.objects.filter(assigned_teacher=teacher, date=today).values_list('student_id', flat=True)
+            StudentAttendanceRecord.objects.filter(
+                assigned_teacher=teacher, date=today).values_list('student_id', flat=True)
         )
         all_student_ids = set(linked_student_ids + assigned_student_ids)
 
         students = list(Student.objects.filter(id__in=all_student_ids))
 
         today_attendance = StudentAttendanceRecord.objects.filter(
+            Q(original_teacher=teacher) | Q(assigned_teacher=teacher),
             student__in=students,
             date=today,
         ).select_related('assigned_teacher', 'original_teacher')
@@ -100,7 +105,10 @@ def dashboard(request):
         if student_ids:
             avg_ratings = dict(
                 StudentAttendanceRecord.objects
-                .filter(student_id__in=student_ids)
+                .filter(
+                    Q(original_teacher=teacher) | Q(assigned_teacher=teacher),
+                    student_id__in=student_ids,
+                )
                 .values('student_id')
                 .annotate(avg=Avg('rating'))
                 .values_list('student_id', 'avg')
@@ -160,10 +168,12 @@ def teacher_scan(request):
         today = localdate()
 
         linked_student_ids = list(
-            StudentTeacherLink.objects.filter(teacher=teacher).values_list('student_id', flat=True)
+            StudentTeacherLink.objects.filter(
+                teacher=teacher).values_list('student_id', flat=True)
         )
         assigned_student_ids = list(
-            StudentAttendanceRecord.objects.filter(assigned_teacher=teacher, date=today).values_list('student_id', flat=True)
+            StudentAttendanceRecord.objects.filter(
+                assigned_teacher=teacher, date=today).values_list('student_id', flat=True)
         )
         allowed_student_ids = set(linked_student_ids + assigned_student_ids)
 
@@ -221,38 +231,38 @@ def teacher_scan(request):
 
                 student = any_student
 
-            primary_link = (
-                StudentTeacherLink.objects.filter(student=student)
-                .order_by("-is_primary", "created_at")
-                .select_related("teacher")
-                .first()
-            )
-            original_teacher = primary_link.teacher if primary_link else None
-
-            student_record, created = StudentAttendanceRecord.objects.get_or_create(
-                student=student,
-                date=today,
-                defaults={
-                    "check_in_time": localtime(),
-                    "recorded_by": request.user,
-                    "original_teacher": original_teacher,
-                    "assigned_teacher": original_teacher,
-                    "substitute_note": "",
-                    "rating": 6,
-                },
-            )
-
-            if created:
-                messages.success(
-                    request,
-                    f"{student.full_name} - تم تسجيل الحضور بنجاح",
+            try:
+                student_record = StudentAttendanceRecord.objects.get(
+                    student=student,
+                    date=today,
+                    original_teacher=teacher,
                 )
-            else:
                 messages.warning(
                     request,
                     f"{student.full_name} - مسجل مسبقاً الساعة "
                     f"{student_record.check_in_time.strftime('%H:%M')}",
                 )
+            except StudentAttendanceRecord.DoesNotExist:
+                try:
+                    StudentAttendanceRecord.objects.create(
+                        student=student,
+                        date=today,
+                        check_in_time=localtime(),
+                        recorded_by=request.user,
+                        original_teacher=teacher,
+                        assigned_teacher=teacher,
+                        substitute_note="",
+                        rating=6,
+                    )
+                    messages.success(
+                        request,
+                        f"{student.full_name} - تم تسجيل الحضور بنجاح",
+                    )
+                except IntegrityError:
+                    messages.warning(
+                        request,
+                        f"{student.full_name} - تم تسجيل حضوره للتو من محطة أخرى",
+                    )
 
     except Teacher.DoesNotExist:
         messages.error(request, 'لم يتم ربط حسابك بملف معلم')
@@ -269,7 +279,8 @@ def student_history(request, pk):
         return redirect('teacher_portal:dashboard')
 
     students = Student.objects.filter(
-        Q(teacher_links__teacher=teacher) | Q(attendance_records__assigned_teacher=teacher),
+        Q(teacher_links__teacher=teacher) | Q(
+            attendance_records__assigned_teacher=teacher),
         pk=pk
     ).distinct()
     student = get_object_or_404(students)
@@ -311,7 +322,7 @@ def upload_photo(request, pk):
         if photo_field not in ('homework_photo', 'test_photo'):
             messages.error(request, 'حقل الصورة غير صالح')
             return redirect('teacher_portal:upload_photo', pk=pk)
-            
+
         photo = request.FILES.get(photo_field)
         if not photo:
             messages.error(request, 'الرجاء اختيار صورة')
@@ -386,17 +397,20 @@ def export_attendance(request):
         return redirect('teacher_portal:dashboard')
 
     linked_student_ids = list(
-        StudentTeacherLink.objects.filter(teacher=teacher).values_list('student_id', flat=True)
+        StudentTeacherLink.objects.filter(
+            teacher=teacher).values_list('student_id', flat=True)
     )
     assigned_student_ids = list(
-        StudentAttendanceRecord.objects.filter(assigned_teacher=teacher, date=today).values_list('student_id', flat=True)
+        StudentAttendanceRecord.objects.filter(
+            assigned_teacher=teacher, date=today).values_list('student_id', flat=True)
     )
     all_student_ids = set(linked_student_ids + assigned_student_ids)
 
     students = list(Student.objects.filter(id__in=all_student_ids))
 
     today_attendance = StudentAttendanceRecord.objects.filter(
-        student__in=students, date=today
+        Q(original_teacher=teacher) | Q(assigned_teacher=teacher),
+        student__in=students, date=today,
     )
     attendance_by_id = {r.student_id: r for r in today_attendance}
 
@@ -405,7 +419,10 @@ def export_attendance(request):
     if student_ids:
         avg_ratings = dict(
             StudentAttendanceRecord.objects
-            .filter(student_id__in=student_ids)
+            .filter(
+                Q(original_teacher=teacher) | Q(assigned_teacher=teacher),
+                student_id__in=student_ids,
+            )
             .values('student_id')
             .annotate(avg=Avg('rating'))
             .values_list('student_id', 'avg')

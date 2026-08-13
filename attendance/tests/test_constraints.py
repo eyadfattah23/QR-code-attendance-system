@@ -178,6 +178,15 @@ class StationSessionTeacherTestCase(TestCase):
             full_name='Primary Teacher',
             is_course=False,
         )
+        cls.course_teacher_2 = Teacher.objects.create(
+            user=User.objects.create_user(
+                phone='01100000006', email='course2@test.com',
+                password='pass123', role=User.Role.TEACHER,
+            ),
+            full_name='Course Science',
+            subject='علوم',
+            is_course=True,
+        )
         cls.student = Student.objects.create(
             national_id='NID_STATION_01',
             full_name='Student Station Test',
@@ -187,6 +196,16 @@ class StationSessionTeacherTestCase(TestCase):
             student=cls.student,
             teacher=cls.primary_teacher,
             is_primary=True,
+        )
+        StudentTeacherLink.objects.create(
+            student=cls.student,
+            teacher=cls.course_teacher,
+            is_primary=False,
+        )
+        StudentTeacherLink.objects.create(
+            student=cls.student,
+            teacher=cls.course_teacher_2,
+            is_primary=False,
         )
 
     def setUp(self):
@@ -271,16 +290,16 @@ class StationSessionTeacherTestCase(TestCase):
         self.assertIsNotNone(rec.check_out_time)
 
     def test_multi_course_checkin_same_student(self):
-        """A student can check in to two different courses on the same day via separate scans."""
-        # First scan — course
+        """A student can check in to two different courses on the same day via separate explicit scans."""
+        # First scan — explicit course A
         self.client.post(self.scan_url, {
             'scanned_codes': str(self.student.id),
             'session_teacher': str(self.course_teacher.id),
         })
-        # Second scan — automatic (primary teacher)
+        # Second scan — explicit course B (a different course, still open)
         self.client.post(self.scan_url, {
             'scanned_codes': str(self.student.id),
-            'session_teacher': '',
+            'session_teacher': str(self.course_teacher_2.id),
         })
         today = localdate()
         self.assertEqual(
@@ -305,10 +324,54 @@ class StationSessionTeacherTestCase(TestCase):
         """The courses queryset is passed to the template context."""
         response = self.client.get(self.scan_url)
         self.assertIn('courses', response.context)
-        course_ids = list(response.context['courses'].values_list('id', flat=True))
+        course_ids = list(
+            response.context['courses'].values_list('id', flat=True))
         self.assertIn(self.course_teacher.id, course_ids)
         # Non-course teacher should not appear
         self.assertNotIn(self.primary_teacher.id, course_ids)
+
+    def test_checkin_blocked_when_not_enrolled_in_selected_course(self):
+        """Selecting a course the student isn't enrolled in blocks check-in by default."""
+        other_course = Teacher.objects.create(
+            user=User.objects.create_user(
+                phone='01100000004', email='other-course@test.com',
+                password='pass123', role=User.Role.TEACHER,
+            ),
+            full_name='Other Course',
+            is_course=True,
+        )
+        response = self.client.post(self.scan_url, {
+            'scanned_codes': str(self.student.id),
+            'session_teacher': str(other_course.id),
+        })
+        self.assertEqual(response.status_code, 200)
+        self.assertFalse(
+            StudentAttendanceRecord.objects.filter(
+                student=self.student, date=localdate(), original_teacher=other_course,
+            ).exists()
+        )
+
+    def test_checkin_allowed_when_not_enrolled_but_force_flag_set(self):
+        """The allow_unenrolled checkbox forces check-in despite no enrollment link."""
+        other_course = Teacher.objects.create(
+            user=User.objects.create_user(
+                phone='01100000005', email='other-course2@test.com',
+                password='pass123', role=User.Role.TEACHER,
+            ),
+            full_name='Other Course 2',
+            is_course=True,
+        )
+        response = self.client.post(self.scan_url, {
+            'scanned_codes': str(self.student.id),
+            'session_teacher': str(other_course.id),
+            'allow_unenrolled': 'on',
+        })
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(
+            StudentAttendanceRecord.objects.filter(
+                student=self.student, date=localdate(), original_teacher=other_course,
+            ).exists()
+        )
 
 
 class IsCourseFieldTestCase(TestCase):
@@ -320,7 +383,8 @@ class IsCourseFieldTestCase(TestCase):
             phone='01200000001', email='def@test.com',
             password='pass', role=User.Role.TEACHER,
         )
-        teacher = Teacher.objects.create(user=user, full_name='Regular Teacher')
+        teacher = Teacher.objects.create(
+            user=user, full_name='Regular Teacher')
         self.assertFalse(teacher.is_course)
 
     def test_can_set_to_true(self):
