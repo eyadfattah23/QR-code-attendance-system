@@ -2137,3 +2137,86 @@ class TeacherMarkAbsentTestCase(TestCase):
             update_fields=['assigned_teacher', 'original_teacher'])
         self.record.refresh_from_db()
         self.assertTrue(self.record.is_substitute_assignment)
+
+
+class TeacherSoftDeleteTestCase(TestCase):
+    """Tests for teacher soft-delete (deactivate) vs hard-delete behaviour."""
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.admin_user = User.objects.create_user(
+            phone='01099990001', password='adminpass123',
+            role=User.Role.ADMIN,
+        )
+
+    def setUp(self):
+        self.client = Client()
+        self.client.login(phone='01099990001', password='adminpass123')
+
+    def _make_teacher(self, name, phone):
+        user = User.objects.create_user(
+            phone=phone, password='teacherpass',
+            role=User.Role.TEACHER,
+        )
+        return Teacher.objects.create(user=user, full_name=name)
+
+    def test_hard_delete_when_no_history(self):
+        """Teacher with zero related records is truly deleted."""
+        teacher = self._make_teacher('معلم بدون سجلات', '01099990010')
+        pk = teacher.pk
+        user_pk = teacher.user.pk
+        url = reverse('admin_portal:teacher_delete', args=[pk])
+        self.client.post(url)
+        self.assertFalse(Teacher.objects.filter(pk=pk).exists())
+        self.assertFalse(User.objects.filter(pk=user_pk).exists())
+
+    def test_soft_delete_when_has_student_links(self):
+        """Teacher with linked students is deactivated, not deleted."""
+        teacher = self._make_teacher('معلم مع طلاب', '01099990011')
+        student = Student.objects.create(full_name='طالب ربط', student_code='SD-001')
+        StudentTeacherLink.objects.create(student=student, teacher=teacher)
+        url = reverse('admin_portal:teacher_delete', args=[teacher.pk])
+        self.client.post(url)
+        teacher.refresh_from_db()
+        self.assertFalse(teacher.is_active)
+
+    def test_soft_delete_when_has_attendance(self):
+        """Teacher with attendance records is deactivated, not deleted."""
+        teacher = self._make_teacher('معلم مع حضور', '01099990012')
+        TeacherAttendanceRecord.objects.create(
+            teacher=teacher,
+            date=localdate(),
+            check_in_time=localtime(),
+            recorded_by=self.admin_user,
+        )
+        url = reverse('admin_portal:teacher_delete', args=[teacher.pk])
+        self.client.post(url)
+        teacher.refresh_from_db()
+        self.assertFalse(teacher.is_active)
+
+    def test_teacher_list_shows_only_active(self):
+        """Default teacher list only shows active teachers."""
+        active = self._make_teacher('معلم نشط', '01099990013')
+        inactive = self._make_teacher('معلم غير نشط', '01099990014')
+        inactive.is_active = False
+        inactive.save(update_fields=['is_active'])
+
+        url = reverse('admin_portal:teacher_list')
+        response = self.client.get(url)
+        teacher_ids = [t.pk for t in response.context['page_obj']]
+        self.assertIn(active.pk, teacher_ids)
+        self.assertNotIn(inactive.pk, teacher_ids)
+
+    def test_teacher_list_inactive_param_shows_deactivated(self):
+        """?inactive=1 shows only deactivated teachers."""
+        active = self._make_teacher('معلم نشط 2', '01099990015')
+        inactive = self._make_teacher('معلم غير نشط 2', '01099990016')
+        inactive.is_active = False
+        inactive.save(update_fields=['is_active'])
+
+        url = reverse('admin_portal:teacher_list') + '?inactive=1'
+        response = self.client.get(url)
+        teacher_ids = [t.pk for t in response.context['page_obj']]
+        self.assertNotIn(active.pk, teacher_ids)
+        self.assertIn(inactive.pk, teacher_ids)
+

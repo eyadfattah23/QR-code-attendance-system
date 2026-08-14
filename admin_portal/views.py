@@ -14,7 +14,7 @@ from django.utils.timezone import localdate, localtime
 from django.views.decorators.http import require_http_methods
 from functools import wraps
 
-from core.models import Student, Teacher, User, StudentTeacherLink
+from core.models import Student, Teacher, User, StudentTeacherLink, CoursePayment
 from attendance.models import StudentAttendanceRecord, TeacherAttendanceRecord
 from .forms import StudentForm, TeacherForm, SupervisorForm
 from .models import AuditLog
@@ -750,6 +750,14 @@ def teacher_list(request):
 
     qs = Teacher.objects.select_related('user').annotate(
         num_students=models.Count('student_links'))
+
+    # By default show only active teachers; ?inactive=1 shows deactivated
+    show_inactive = request.GET.get('inactive', '').strip()
+    if show_inactive == '1':
+        qs = qs.filter(is_active=False)
+    else:
+        qs = qs.filter(is_active=True)
+
     if q:
         qs = qs.filter(
             Q(full_name__icontains=q)
@@ -783,6 +791,7 @@ def teacher_list(request):
         'gender_filter': gender_filter,
         'total_count': qs.count(),
         'sort': sort,
+        'show_inactive': show_inactive,
     })
 
 
@@ -846,13 +855,39 @@ def teacher_edit(request, pk):
 @admin_required
 @require_http_methods(['POST'])
 def teacher_delete(request, pk):
-    """Delete a teacher (and their user account) — POST only."""
+    """Delete or deactivate a teacher.
+
+    If the teacher has any related records (payments, student links,
+    attendance), soft-delete by setting is_active=False.
+    Otherwise, hard-delete the teacher and their user account.
+    """
     teacher = get_object_or_404(Teacher, pk=pk)
     name = teacher.full_name
-    _log_audit(request, AuditLog.Action.DELETE, 'معلم', name)
-    # Deleting the user cascades to the Teacher profile
-    teacher.user.delete()
-    messages.success(request, f'تم حذف المعلم "{name}" بنجاح')
+
+    has_payments = CoursePayment.objects.filter(course=teacher).exists()
+    has_links = StudentTeacherLink.objects.filter(teacher=teacher).exists()
+    has_student_attendance = StudentAttendanceRecord.objects.filter(
+        models.Q(original_teacher=teacher) | models.Q(assigned_teacher=teacher)
+    ).exists()
+    has_teacher_attendance = TeacherAttendanceRecord.objects.filter(
+        teacher=teacher
+    ).exists()
+
+    has_history = has_payments or has_links or has_student_attendance or has_teacher_attendance
+
+    if has_history:
+        teacher.is_active = False
+        teacher.save(update_fields=['is_active'])
+        _log_audit(request, AuditLog.Action.EDIT, 'معلم', f'إلغاء تفعيل: {name}')
+        messages.warning(
+            request,
+            f'تم إلغاء تفعيل "{name}" بدلاً من الحذف (توجد سجلات مرتبطة)',
+        )
+    else:
+        _log_audit(request, AuditLog.Action.DELETE, 'معلم', name)
+        teacher.user.delete()  # Cascades to Teacher
+        messages.success(request, f'تم حذف المعلم "{name}" بنجاح')
+
     return redirect(_get_return(request, 'teacher_list_return',
                                 reverse('admin_portal:teacher_list')))
 

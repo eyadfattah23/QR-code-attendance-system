@@ -405,6 +405,17 @@ class Teacher(models.Model):
         help_text='صح إذا كان هذا السجل يمثل كورساً وليس معلماً أساسياً — للتمييز في قائمة محطة المسح فقط',
     )
 
+    is_active = models.BooleanField(
+        default=True,
+        help_text='إلغاء التفعيل بدلاً من الحذف عند وجود سجلات مرتبطة',
+    )
+
+    description = models.TextField(
+        blank=True,
+        default='',
+        help_text='وصف الكورس أو ملاحظات إضافية',
+    )
+
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -460,3 +471,53 @@ class StudentTeacherLink(models.Model):
     def __str__(self) -> str:
         primary = " (Primary)" if self.is_primary else ""
         return f"{self.student.full_name} → {self.teacher.full_name}{primary}"
+
+
+class CoursePayment(models.Model):
+    """Track monthly payment status per student per course."""
+
+    class PaymentStatus(models.TextChoices):
+        NOT_PAID = 'not_paid', 'لم يُدفع'
+        PARTIAL = 'partial', 'دفع جزئي'
+        PAID = 'paid', 'تم الدفع'
+
+    student = models.ForeignKey(
+        Student,
+        on_delete=models.CASCADE,
+        related_name='course_payments',
+    )
+    course = models.ForeignKey(
+        Teacher,
+        on_delete=models.PROTECT,
+        related_name='course_payments',
+        limit_choices_to={'is_course': True},
+    )
+    year = models.PositiveIntegerField()
+    month = models.PositiveSmallIntegerField(
+        help_text='1–12',
+    )
+    status = models.CharField(
+        max_length=10,
+        choices=PaymentStatus.choices,
+        default=PaymentStatus.NOT_PAID,
+    )
+    amount_paid = models.DecimalField(
+        max_digits=8,
+        decimal_places=2,
+        null=True,
+        blank=True,
+        help_text='المبلغ المدفوع فعلياً (اختياري — للتتبع المالي إن وجد)',
+    )
+    note = models.TextField(blank=True, default='')
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = 'course_payments'
+        unique_together = ['student', 'course', 'year', 'month']
+        ordering = ['-year', '-month']
+
+    def __str__(self) -> str:
+        return (
+            f"{self.student.full_name} → {self.course.full_name} "
+            f"({self.year}/{self.month}) — {self.get_status_display()}"
+        )

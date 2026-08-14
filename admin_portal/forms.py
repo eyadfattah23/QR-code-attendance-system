@@ -3,7 +3,7 @@ import re
 from django import forms
 from django.db import transaction
 
-from core.models import Student, Teacher, User
+from core.models import Student, Teacher, User, CoursePayment, StudentTeacherLink
 
 GENDER_CHOICES = [
     ('', '— الكل —'),
@@ -125,6 +125,12 @@ class TeacherForm(forms.Form):
         widget=forms.CheckboxInput(attrs={'class': 'form-check-input'}),
         help_text='فعّل هذا الخيار ليظهر في قائمة الكورسات بمحطة المسح',
     )
+    description = forms.CharField(
+        required=False,
+        label='وصف / ملاحظات',
+        widget=forms.Textarea(attrs={'class': 'form-control', 'rows': 3}),
+        help_text='اختياري — وصف الكورس أو ملاحظات إضافية',
+    )
 
     # --- User account ---
     phone = forms.CharField(
@@ -162,6 +168,7 @@ class TeacherForm(forms.Form):
             self.fields['gender'].initial = instance.gender or ''
             self.fields['teacher_code'].initial = instance.teacher_code or ''
             self.fields['is_course'].initial = instance.is_course
+            self.fields['description'].initial = instance.description or ''
 
     def clean_phone(self):
         phone = self.cleaned_data['phone']
@@ -204,6 +211,7 @@ class TeacherForm(forms.Form):
                 gender=data.get('gender') or None,
                 teacher_code=data.get('teacher_code') or None,
                 is_course=data.get('is_course', False),
+                description=data.get('description', ''),
             )
         else:
             user = self.instance.user
@@ -219,9 +227,52 @@ class TeacherForm(forms.Form):
             self.instance.gender = data.get('gender') or None
             self.instance.teacher_code = data.get('teacher_code') or None
             self.instance.is_course = data.get('is_course', False)
+            self.instance.description = data.get('description', '')
             self.instance.save()
             teacher = self.instance
         return teacher
+
+
+class CoursePaymentForm(forms.ModelForm):
+    """Form for creating / editing a CoursePayment record."""
+
+    class Meta:
+        model = CoursePayment
+        fields = ['student', 'course', 'year', 'month', 'status', 'amount_paid', 'note']
+        labels = {
+            'student': 'الطالب',
+            'course': 'الكورس',
+            'year': 'السنة',
+            'month': 'الشهر',
+            'status': 'حالة الدفع',
+            'amount_paid': 'المبلغ المدفوع',
+            'note': 'ملاحظات',
+        }
+        widgets = {
+            'student': forms.Select(attrs={'class': 'form-select'}),
+            'course': forms.Select(attrs={'class': 'form-select'}),
+            'year': forms.NumberInput(attrs={'class': 'form-control'}),
+            'month': forms.NumberInput(attrs={'class': 'form-control', 'min': 1, 'max': 12}),
+            'status': forms.Select(attrs={'class': 'form-select'}),
+            'amount_paid': forms.NumberInput(attrs={'class': 'form-control', 'step': '0.01'}),
+            'note': forms.Textarea(attrs={'class': 'form-control', 'rows': 2}),
+        }
+
+    def clean(self):
+        cleaned = super().clean()
+        student = cleaned.get('student')
+        course = cleaned.get('course')
+        if student and course:
+            if not StudentTeacherLink.objects.filter(
+                student=student, teacher=course
+            ).exists():
+                raise forms.ValidationError(
+                    'هذا الطالب غير مسجل في هذا الكورس. يجب ربطه أولاً.'
+                )
+        month = cleaned.get('month')
+        if month is not None and (month < 1 or month > 12):
+            raise forms.ValidationError('الشهر يجب أن يكون بين 1 و 12')
+        return cleaned
 
 
 class SupervisorForm(forms.Form):
