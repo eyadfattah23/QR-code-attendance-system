@@ -157,7 +157,7 @@
                             <i class="bi bi-book me-1"></i>الكورس / الحصة
                         </label>
                         <select id="id_session_teacher" name="session_teacher" class="form-select">
-                            <option value="">--- تلقائي (حسب الحصة المفتوحة) ---</option>
+                            <option value="">--- تلقائي (تسجيل مع المعلم/الكورس الأساسي المرتبط بهذا الطالب) ---</option>
                             {% for course in courses %}
                             <option value="{{ course.id }}" {% if session_teacher_id == course.id|stringformat:"s" %}selected{% endif %}>
                                 {{ course.full_name }}{% if course.subject %} ({{ course.subject }}){% endif %}
@@ -176,7 +176,7 @@
                     {% endif %}
 
                     <label for="id_scanned_codes" class="form-label fw-semibold">الأكواد (كل كود في سطر)</label>
-                    <textarea id="id_scanned_codes" name="scanned_codes" class="form-control scan-textarea" placeholder="الصق أو امسح الأكواد هنا (UUID أو كود الطالب أو الرقم الوطني)
+                    <textarea id="id_scanned_codes" name="scanned_codes" class="form-control scan-textarea" placeholder="الصق أو امسح الأكواد هنا (UUID أو كود الطالب/المعلم أو الرقم الوطني)
 STU0001
 550e8400-e29b-41d4-a716-446655440000" autofocus=""
                         style="height: auto; min-height: 150px; resize: vertical;"></textarea>
@@ -193,7 +193,7 @@ STU0001
                     </div>
 
                     <small class="text-muted d-block mt-2">
-                        Enter = إرسال سريع, Shift + Enter = سطر جديد | يدعم UUID و student_code و national_id
+                        Enter = إرسال سريع, Shift + Enter = سطر جديد | يدعم UUID و student_code و teacher_code و national_id
                     </small>
                 </form>
             </div>

@@ -130,6 +130,9 @@ def station_view(request):
                     if student is None:
                         student = Student.objects.filter(
                             national_id__iexact=lookup).first()
+                    if student is None:
+                        teacher = Teacher.objects.filter(
+                            teacher_code__iexact=lookup).first()
 
                 if student is not None:
                     with _tx.atomic():
@@ -151,38 +154,58 @@ def station_view(request):
                                     .first()
                                 )
                                 record_teacher = primary_link.teacher if primary_link else None
-                                try:
-                                    StudentAttendanceRecord.objects.create(
-                                        student=student,
-                                        date=today,
-                                        check_in_time=localtime(),
-                                        recorded_by=request.user,
-                                        original_teacher=record_teacher,
-                                        assigned_teacher=record_teacher,
-                                        substitute_note="",
-                                        rating=6,
-                                    )
-                                    course_suffix = (
-                                        f" (حصة: {record_teacher.full_name})"
-                                        if record_teacher else ""
-                                    )
-                                    results.append({
-                                        "status": "success",
-                                        "icon": "bi-check-circle-fill",
-                                        "label": "تم التسجيل",
-                                        "message": f"{student.full_name} - تم تسجيل الحضور بنجاح{course_suffix}",
-                                        "row_class": "success",
-                                        "image_url": student.image.url if student.image else None,
-                                    })
-                                except IntegrityError:
+
+                                closed_today = StudentAttendanceRecord.objects.filter(
+                                    student=student, date=today,
+                                    original_teacher=record_teacher,
+                                    check_out_time__isnull=False,
+                                ).first()
+
+                                if closed_today is not None:
                                     results.append({
                                         "status": "warning",
                                         "icon": "bi-exclamation-circle-fill",
-                                        "label": "تم التسجيل من جهاز آخر",
-                                        "message": f"{student.full_name} - تم تسجيل حضوره للتو من محطة أخرى",
+                                        "label": "مغادرة مسجلة مسبقاً",
+                                        "message": (
+                                            f"{student.full_name} - غادر مسبقاً الساعة "
+                                            f"{closed_today.check_out_time.strftime('%H:%M')}"
+                                        ),
                                         "row_class": "warning",
                                         "image_url": student.image.url if student.image else None,
                                     })
+                                else:
+                                    try:
+                                        StudentAttendanceRecord.objects.create(
+                                            student=student,
+                                            date=today,
+                                            check_in_time=localtime(),
+                                            recorded_by=request.user,
+                                            original_teacher=record_teacher,
+                                            assigned_teacher=record_teacher,
+                                            substitute_note="",
+                                            rating=6,
+                                        )
+                                        course_suffix = (
+                                            f" (حصة: {record_teacher.full_name})"
+                                            if record_teacher else ""
+                                        )
+                                        results.append({
+                                            "status": "success",
+                                            "icon": "bi-check-circle-fill",
+                                            "label": "تم التسجيل",
+                                            "message": f"{student.full_name} - تم تسجيل الحضور بنجاح{course_suffix}",
+                                            "row_class": "success",
+                                            "image_url": student.image.url if student.image else None,
+                                        })
+                                    except IntegrityError:
+                                        results.append({
+                                            "status": "warning",
+                                            "icon": "bi-exclamation-circle-fill",
+                                            "label": "تم التسجيل من جهاز آخر",
+                                            "message": f"{student.full_name} - تم تسجيل حضوره للتو من محطة أخرى",
+                                            "row_class": "warning",
+                                            "image_url": student.image.url if student.image else None,
+                                        })
                             elif len(open_records) == 1:
                                 _checkout_student_record(
                                     results, student, open_records[0])
