@@ -241,6 +241,20 @@ class DashboardRedirectViewTestCase(TestCase):
         response = self.client.get(self.dashboard_url)
         self.assertRedirects(response, reverse('teacher_portal:dashboard'))
 
+    def test_supervisor_redirected_to_supervisor_dashboard(self):
+        """Test that supervisor is redirected to supervisor portal."""
+        user = User.objects.create_user(phone='01234567896', password='pass', role=User.Role.SUPERVISOR)
+        self.client.login(phone='01234567896', password='pass')
+        response = self.client.get(self.dashboard_url)
+        self.assertRedirects(response, reverse('supervisor_portal:dashboard'))
+
+    def test_assistant_redirected_to_assistant_dashboard(self):
+        """Test that assistant is redirected to assistant portal."""
+        user = User.objects.create_user(phone='01234567897', password='pass', role=User.Role.ASSISTANT)
+        self.client.login(phone='01234567897', password='pass')
+        response = self.client.get(self.dashboard_url)
+        self.assertRedirects(response, reverse('assistant_portal:dashboard'))
+
 
 class AccessControlTestCase(TestCase):
     """Test cases for access control decorators."""

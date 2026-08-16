@@ -32,7 +32,7 @@ def _log_audit(request, action, object_type, object_repr):
 
 
 def teacher_required(view_func):
-    """Decorator to ensure user is a teacher or a supervisor who has selected a teacher."""
+    """Decorator to ensure user is a teacher, a supervisor, or an assistant."""
     @wraps(view_func)
     @login_required
     def wrapper(request, *args, **kwargs):
@@ -41,6 +41,10 @@ def teacher_required(view_func):
         if request.user.is_supervisor:
             if not request.session.get('supervisor_teacher_id'):
                 return redirect('supervisor_portal:dashboard')
+            return view_func(request, *args, **kwargs)
+        if request.user.is_assistant:
+            if not request.session.get('assistant_teacher_id'):
+                return redirect('assistant_portal:dashboard')
             return view_func(request, *args, **kwargs)
         messages.error(request, 'ليس لديك صلاحية الوصول لهذه الصفحة')
         return redirect('dashboard')
@@ -52,6 +56,7 @@ def get_acting_teacher(request):
 
     For teachers: their own Teacher profile.
     For supervisors: the teacher stored in session.
+    For assistants: the teacher stored in session, IF the link still exists.
     Returns None if the teacher cannot be resolved.
     """
     if request.user.is_supervisor:
@@ -62,6 +67,21 @@ def get_acting_teacher(request):
             return Teacher.objects.get(pk=pk)
         except Teacher.DoesNotExist:
             return None
+            
+    if request.user.is_assistant:
+        pk = request.session.get('assistant_teacher_id')
+        if not pk:
+            return None
+        try:
+            teacher = Teacher.objects.get(pk=pk, is_active=True)
+            # CRITICAL: Re-verify link exists to prevent stale-session access
+            from core.models import AssistantTeacherLink
+            if AssistantTeacherLink.objects.filter(user=request.user, teacher=teacher).exists():
+                return teacher
+            return None
+        except Teacher.DoesNotExist:
+            return None
+
     try:
         return Teacher.objects.get(user=request.user)
     except Teacher.DoesNotExist:

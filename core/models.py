@@ -73,6 +73,7 @@ class User(AbstractUser):
         ADMIN = 'admin', 'Admin'
         TEACHER = 'teacher', 'Teacher'
         SUPERVISOR = 'supervisor', 'Supervisor'
+        ASSISTANT = 'assistant', 'Assistant'
 
     role = models.CharField(
         max_length=10,
@@ -125,6 +126,11 @@ class User(AbstractUser):
     def is_supervisor(self) -> bool:
         """Check if user has supervisor role."""
         return self.role == self.Role.SUPERVISOR
+
+    @property
+    def is_assistant(self) -> bool:
+        """Check if user has assistant role."""
+        return self.role == self.Role.ASSISTANT
 
 
 class Student(models.Model):
@@ -521,3 +527,27 @@ class CoursePayment(models.Model):
             f"{self.student.full_name} → {self.course.full_name} "
             f"({self.year}/{self.month}) — {self.get_status_display()}"
         )
+
+
+class AssistantTeacherLink(models.Model):
+    """Link an assistant user to specific teachers/courses they can manage."""
+
+    user = models.ForeignKey(
+        User,
+        on_delete=models.CASCADE,
+        related_name='assistant_links',
+    )
+    teacher = models.ForeignKey(
+        Teacher,
+        on_delete=models.CASCADE,
+        related_name='assistant_links',
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = 'assistant_teacher_links'
+        unique_together = ['user', 'teacher']
+
+    def __str__(self) -> str:
+        return f"{self.user.get_full_name()} → {self.teacher.full_name}"
+

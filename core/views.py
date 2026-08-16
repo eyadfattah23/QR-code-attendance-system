@@ -98,6 +98,8 @@ def dashboard_redirect(request):
         return redirect('teacher_portal:dashboard')
     elif user.is_supervisor:
         return redirect('supervisor_portal:dashboard')
+    elif user.is_assistant:
+        return redirect('assistant_portal:dashboard')
     else:
         # Fallback - shouldn't happen with proper role setup
         messages.warning(

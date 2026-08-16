@@ -33,6 +33,7 @@ INSTALLED_APPS = [
     'admin_portal',
     'teacher_portal',
     'supervisor_portal',
+    'assistant_portal',
     'qr_generator',
 ]
 
