@@ -257,11 +257,19 @@ def teacher_scan(request):
                     date=today,
                     original_teacher=teacher,
                 )
-                messages.warning(
-                    request,
-                    f"{student.full_name} - مسجل مسبقاً الساعة "
-                    f"{student_record.check_in_time.strftime('%H:%M')}",
-                )
+                if student_record.check_out_time is None:
+                    student_record.check_out_time = localtime()
+                    student_record.save(update_fields=['check_out_time'])
+                    messages.success(
+                        request,
+                        f"{student.full_name} - تم تسجيل الانصراف بنجاح",
+                    )
+                else:
+                    messages.warning(
+                        request,
+                        f"{student.full_name} - غادر مسبقاً الساعة "
+                        f"{student_record.check_out_time.strftime('%H:%M')}",
+                    )
             except StudentAttendanceRecord.DoesNotExist:
                 try:
                     StudentAttendanceRecord.objects.create(
