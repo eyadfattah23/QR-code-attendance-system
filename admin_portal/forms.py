@@ -125,6 +125,13 @@ class TeacherForm(forms.Form):
         widget=forms.CheckboxInput(attrs={'class': 'form-check-input'}),
         help_text='فعّل هذا الخيار ليظهر في قائمة الكورسات بمحطة المسح',
     )
+    is_active = forms.BooleanField(
+        required=False,
+        initial=True,
+        label='نشط',
+        widget=forms.CheckboxInput(attrs={'class': 'form-check-input'}),
+        help_text='ألغِ التفعيل لإخفاء المعلم أو الكورس من القوائم دون حذف سجلاته القديمة',
+    )
     description = forms.CharField(
         required=False,
         label='وصف / ملاحظات',
@@ -168,6 +175,7 @@ class TeacherForm(forms.Form):
             self.fields['gender'].initial = instance.gender or ''
             self.fields['teacher_code'].initial = instance.teacher_code or ''
             self.fields['is_course'].initial = instance.is_course
+            self.fields['is_active'].initial = instance.is_active
             self.fields['description'].initial = instance.description or ''
 
     def clean_phone(self):
@@ -211,6 +219,7 @@ class TeacherForm(forms.Form):
                 gender=data.get('gender') or None,
                 teacher_code=data.get('teacher_code') or None,
                 is_course=data.get('is_course', False),
+                is_active=data.get('is_active', True),
                 description=data.get('description', ''),
             )
         else:
@@ -227,6 +236,7 @@ class TeacherForm(forms.Form):
             self.instance.gender = data.get('gender') or None
             self.instance.teacher_code = data.get('teacher_code') or None
             self.instance.is_course = data.get('is_course', False)
+            self.instance.is_active = data.get('is_active', True)
             self.instance.description = data.get('description', '')
             self.instance.save()
             teacher = self.instance
@@ -324,6 +334,67 @@ class SupervisorForm(forms.Form):
                 phone=data['phone'],
                 password=data['password'],
                 role=User.Role.SUPERVISOR,
+                first_name=data['full_name'],
+            )
+        else:
+            user = self.instance
+            user.phone = data['phone']
+            user.first_name = data['full_name']
+            if data.get('password'):
+                user.set_password(data['password'])
+            user.save()
+        return user
+
+
+class AssistantForm(forms.Form):
+    """Form for creating / editing an assistant user account."""
+
+    full_name = forms.CharField(
+        max_length=255,
+        label='الاسم الكامل',
+        widget=forms.TextInput(
+            attrs={'class': 'form-control', 'autofocus': True}),
+    )
+    phone = forms.CharField(
+        max_length=11,
+        label='رقم الهاتف',
+        widget=forms.TextInput(attrs={'class': 'form-control', 'dir': 'ltr'}),
+        help_text='11 رقم يبدأ بصفر',
+    )
+    password = forms.CharField(
+        required=False,
+        label='كلمة المرور',
+        widget=forms.PasswordInput(attrs={'class': 'form-control'}),
+        help_text='اتركها فارغة عند التعديل للإبقاء على كلمة المرور الحالية',
+    )
+
+    def __init__(self, *args, instance=None, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.instance = instance  # User object when editing, None when creating
+        if instance is None:
+            self.fields['password'].required = True
+            self.fields['password'].help_text = ''
+
+    def clean_phone(self):
+        phone = self.cleaned_data['phone']
+        if not re.match(r'^0\d{10}$', phone):
+            raise forms.ValidationError(
+                'رقم الهاتف يجب أن يكون 11 رقم ويبدأ بصفر')
+        qs = User.objects.filter(phone=phone)
+        if self.instance:
+            qs = qs.exclude(pk=self.instance.pk)
+        if qs.exists():
+            raise forms.ValidationError('رقم الهاتف مستخدم بالفعل')
+        return phone
+
+    @transaction.atomic
+    def save(self):
+        data = self.cleaned_data
+        if self.instance is None:
+            user = User.objects.create_user(
+                phone=data['phone'],
+                password=data['password'],
+                role=User.Role.ASSISTANT,
                 first_name=data['full_name'],
             )
         else:

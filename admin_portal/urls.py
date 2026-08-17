@@ -68,6 +68,16 @@ urlpatterns = [
     path('supervisors/<int:pk>/delete/',
          views.supervisor_delete, name='supervisor_delete'),
 
+    # Assistant management
+    path('assistants/', views.assistant_list, name='assistant_list'),
+    path('assistants/create/', views.assistant_create, name='assistant_create'),
+    path('assistants/<int:pk>/edit/',
+         views.assistant_edit, name='assistant_edit'),
+    path('assistants/<int:pk>/delete/',
+         views.assistant_delete, name='assistant_delete'),
+    path('assistants/<int:pk>/links/',
+         views.assistant_links, name='assistant_links'),
+
     # Audit log
     path('audit-log/', views.audit_log, name='audit_log'),
 ]

@@ -16,7 +16,7 @@ from functools import wraps
 
 from core.models import Student, Teacher, User, StudentTeacherLink, CoursePayment
 from attendance.models import StudentAttendanceRecord, TeacherAttendanceRecord
-from .forms import StudentForm, TeacherForm, SupervisorForm
+from .forms import StudentForm, TeacherForm, SupervisorForm, AssistantForm
 from .models import AuditLog
 
 
@@ -1162,6 +1162,137 @@ def supervisor_delete(request, pk):
     messages.success(request, f'تم حذف المشرف "{name}" بنجاح')
     return redirect(_get_return(request, 'supervisor_list_return',
                                 reverse('admin_portal:supervisor_list')))
+
+
+# ---------------------------------------------------------------------------
+# Assistant management
+# ---------------------------------------------------------------------------
+
+@admin_required
+def assistant_list(request):
+    """List all assistant accounts."""
+    from core.models import AssistantTeacherLink
+    _save_return(request, 'assistant_list_return')
+    q = request.GET.get('q', '').strip()
+    qs = User.objects.filter(role=User.Role.ASSISTANT).order_by('first_name')
+    if q:
+        qs = qs.filter(
+            Q(first_name__icontains=q) | Q(phone__icontains=q)
+        )
+    paginator = Paginator(qs, 25)
+    page_obj = paginator.get_page(request.GET.get('page'))
+    
+    # Pre-fetch links to show number of linked teachers
+    links = AssistantTeacherLink.objects.select_related('teacher').filter(user__in=page_obj)
+    assistant_links = {}
+    for link in links:
+        if link.user_id not in assistant_links:
+            assistant_links[link.user_id] = []
+        assistant_links[link.user_id].append(link.teacher.full_name)
+        
+    for ast in page_obj:
+        ast.teacher_link_names = assistant_links.get(ast.id, [])
+        
+    return render(request, 'admin_portal/assistants.html', {
+        'page_obj': page_obj,
+        'q': q,
+        'total_count': qs.count(),
+    })
+
+
+@admin_required
+def assistant_create(request):
+    """Create a new assistant account."""
+    if request.method == 'POST':
+        form = AssistantForm(request.POST)
+        if form.is_valid():
+            user = form.save()
+            messages.success(
+                request, f'تم إضافة المساعد "{user.first_name}" بنجاح')
+            return redirect(_get_return(request, 'assistant_list_return',
+                                        reverse('admin_portal:assistant_list')))
+    else:
+        form = AssistantForm()
+    return render(request, 'admin_portal/assistant_form.html', {
+        'form': form,
+        'title': 'إضافة مساعد جديد',
+        'submit_label': 'إضافة',
+    })
+
+
+@admin_required
+def assistant_edit(request, pk):
+    """Edit an existing assistant account."""
+    assistant = get_object_or_404(User, pk=pk, role=User.Role.ASSISTANT)
+    if request.method == 'POST':
+        form = AssistantForm(request.POST, instance=assistant)
+        if form.is_valid():
+            form.save()
+            _log_audit(request, AuditLog.Action.EDIT,
+                       'مساعد', assistant.first_name)
+            messages.success(
+                request, f'تم تحديث بيانات "{assistant.first_name}" بنجاح')
+            return redirect(_get_return(request, 'assistant_list_return',
+                                        reverse('admin_portal:assistant_list')))
+    else:
+        form = AssistantForm(
+            initial={'full_name': assistant.first_name,
+                     'phone': assistant.phone},
+            instance=assistant,
+        )
+    return render(request, 'admin_portal/assistant_form.html', {
+        'form': form,
+        'assistant': assistant,
+        'title': f'تعديل: {assistant.first_name}',
+        'submit_label': 'حفظ التغييرات',
+    })
+
+
+@admin_required
+@require_http_methods(['POST'])
+def assistant_delete(request, pk):
+    """Delete an assistant account (POST only)."""
+    assistant = get_object_or_404(User, pk=pk, role=User.Role.ASSISTANT)
+    name = assistant.first_name
+    _log_audit(request, AuditLog.Action.DELETE, 'مساعد', name)
+    assistant.delete()
+    messages.success(request, f'تم حذف المساعد "{name}" بنجاح')
+    return redirect(_get_return(request, 'assistant_list_return',
+                                reverse('admin_portal:assistant_list')))
+
+
+@admin_required
+def assistant_links(request, pk):
+    """Manage which teachers/courses an assistant is linked to."""
+    from core.models import AssistantTeacherLink
+    assistant = get_object_or_404(User, pk=pk, role=User.Role.ASSISTANT)
+    
+    if request.method == 'POST':
+        # Get list of selected teacher IDs from the form
+        selected_ids = request.POST.getlist('teachers')
+        
+        # Remove old links
+        AssistantTeacherLink.objects.filter(user=assistant).delete()
+        
+        # Create new links
+        new_links = [
+            AssistantTeacherLink(user=assistant, teacher_id=tid) 
+            for tid in selected_ids if tid
+        ]
+        if new_links:
+            AssistantTeacherLink.objects.bulk_create(new_links)
+            
+        messages.success(request, f'تم تحديث صلاحيات الوصول لـ {assistant.first_name} بنجاح')
+        return redirect('admin_portal:assistant_list')
+        
+    all_teachers = Teacher.objects.filter(is_active=True).order_by('full_name')
+    linked_teacher_ids = list(AssistantTeacherLink.objects.filter(user=assistant).values_list('teacher_id', flat=True))
+    
+    return render(request, 'admin_portal/assistant_links.html', {
+        'assistant': assistant,
+        'all_teachers': all_teachers,
+        'linked_teacher_ids': linked_teacher_ids,
+    })
 
 
 # ---------------------------------------------------------------------------

@@ -1,0 +1,103 @@
+{% extends 'base.html' %}
+
+{% block title %}صلاحيات المساعد - نظام الحضور{% endblock %}
+
+{% block content %}
+<div class="container-fluid" style="max-width: 800px;">
+
+    <div class="d-flex align-items-center mb-4 mt-2">
+        <a href="{% url 'admin_portal:assistant_list' %}" class="btn btn-outline-secondary btn-sm me-3">
+            <i class="bi bi-arrow-right"></i>
+        </a>
+        <h1 class="h4 mb-0">
+            <i class="bi bi-link-45deg me-2 text-primary"></i>
+            صلاحيات المساعد: {{ assistant.first_name }}
+        </h1>
+    </div>
+
+    <div class="card border-0 shadow-sm">
+        <div class="card-body p-4">
+            <p class="text-muted mb-4">
+                اختر المعلمين أو الكورسات التي يُسمح لهذا المساعد بإدارتها وتدوين الحضور لها.
+            </p>
+
+            <form method="post">
+                {% csrf_token %}
+
+                <!-- Search box -->
+                <div class="mb-4 position-relative">
+                    <i class="bi bi-search position-absolute top-50 start-0 translate-middle-y ms-3 text-muted"></i>
+                    <input type="text" id="teacherSearch" class="form-control ps-5" placeholder="ابحث عن معلم أو كورس...">
+                </div>
+
+                <div class="row g-3 mb-4" id="teachersGrid">
+                    {% for teacher in all_teachers %}
+                    <div class="col-md-6">
+                        <label class="form-check p-3 border rounded h-100 cursor-pointer {% if teacher.id in linked_teacher_ids %}bg-light border-primary{% endif %}" style="cursor: pointer; display: block;" for="teacher_{{ teacher.id }}">
+                            <input class="form-check-input ms-0 me-2" type="checkbox" name="teachers" value="{{ teacher.id }}" id="teacher_{{ teacher.id }}"
+                                   {% if teacher.id in linked_teacher_ids %}checked{% endif %}>
+                            <span class="ps-4 fw-semibold d-inline-block">
+                                {{ teacher.full_name }}
+                                {% if teacher.is_course %}
+                                <span class="badge bg-info text-dark ms-2 fw-normal">كورس</span>
+                                {% endif %}
+                                <div class="small text-muted fw-normal mt-1">{{ teacher.subject|default:"بدون تخصص" }}</div>
+                            </span>
+                        </label>
+                    </div>
+                    {% empty %}
+                    <div class="col-12 text-center text-muted py-4">
+                        لا يوجد معلمون في النظام.
+                    </div>
+                    {% endfor %}
+                </div>
+
+                <div class="d-flex gap-2">
+                    <button type="submit" class="btn btn-primary">
+                        <i class="bi bi-floppy me-1"></i>حفظ الصلاحيات
+                    </button>
+                    <a href="{% url 'admin_portal:assistant_list' %}" class="btn btn-outline-secondary">إلغاء</a>
+                </div>
+            </form>
+        </div>
+    </div>
+
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const checkboxes = document.querySelectorAll('input[name="teachers"]');
+        checkboxes.forEach(cb => {
+            cb.addEventListener('change', function() {
+                const card = this.closest('.form-check');
+                if (this.checked) {
+                    card.classList.add('bg-light', 'border-primary');
+                } else {
+                    card.classList.remove('bg-light', 'border-primary');
+                }
+            });
+        });
+
+        // Search functionality
+        const searchInput = document.getElementById('teacherSearch');
+        if (searchInput) {
+            searchInput.addEventListener('input', function(e) {
+                const term = e.target.value.toLowerCase().trim();
+                const teacherCards = document.querySelectorAll('#teachersGrid > .col-md-6');
+                
+                teacherCards.forEach(card => {
+                    const textContent = card.textContent.toLowerCase();
+                    if (textContent.includes(term)) {
+                        card.style.display = '';
+                    } else {
+                        card.style.display = 'none';
+                    }
+                });
+            });
+        }
+    });
+</script>
+{% endblock %}
