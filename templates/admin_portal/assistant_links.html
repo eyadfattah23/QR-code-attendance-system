@@ -41,6 +41,9 @@
                                 {% if teacher.is_course %}
                                 <span class="badge bg-info text-dark ms-2 fw-normal">كورس</span>
                                 {% endif %}
+                                {% if not teacher.is_active %}
+                                <span class="badge bg-secondary ms-2 fw-normal">غير نشط</span>
+                                {% endif %}
                                 <div class="small text-muted fw-normal mt-1">{{ teacher.subject|default:"بدون تخصص" }}</div>
                             </span>
                         </label>

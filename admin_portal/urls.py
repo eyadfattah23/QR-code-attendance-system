@@ -60,6 +60,15 @@ urlpatterns = [
     path('teachers/<uuid:pk>/mark-absent/',
          views.teacher_mark_absent, name='teacher_mark_absent'),
 
+    # Course payments
+    path('courses/<uuid:pk>/roster/', views.course_roster, name='course_roster'),
+    path('courses/<uuid:pk>/roster/mark-all-paid/',
+         views.course_mark_all_paid, name='course_mark_all_paid'),
+    path('courses/<uuid:pk>/roster/students/<uuid:student_pk>/cycle/',
+         views.course_payment_cycle, name='course_payment_cycle'),
+    path('courses/<uuid:pk>/roster/students/<uuid:student_pk>/history/',
+         views.course_payment_history, name='course_payment_history'),
+
     # Supervisor management
     path('supervisors/', views.supervisor_list, name='supervisor_list'),
     path('supervisors/create/', views.supervisor_create, name='supervisor_create'),

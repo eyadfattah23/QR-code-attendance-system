@@ -16,7 +16,7 @@ from functools import wraps
 
 from core.models import Student, Teacher, User, StudentTeacherLink, CoursePayment
 from attendance.models import StudentAttendanceRecord, TeacherAttendanceRecord
-from .forms import StudentForm, TeacherForm, SupervisorForm, AssistantForm
+from .forms import StudentForm, TeacherForm, SupervisorForm, AssistantForm, CoursePaymentForm
 from .models import AuditLog
 
 
@@ -271,11 +271,29 @@ def student_detail(request, pk):
     )
     total_records = StudentAttendanceRecord.objects.filter(
         student=student).count()
+
+    # Current-month payment status per enrolled course, linking back to
+    # that course's roster (the one canonical place payments are managed).
+    today = localdate()
+    course_links = [link for link in teachers if link.teacher.is_course]
+    course_payments_by_teacher_id = {
+        p.course_id: p
+        for p in CoursePayment.objects.filter(
+            student=student, year=today.year, month=today.month,
+            course_id__in=[link.teacher_id for link in course_links],
+        )
+    }
+    courses = [
+        {'teacher': link.teacher, 'payment': course_payments_by_teacher_id.get(link.teacher_id)}
+        for link in course_links
+    ]
+
     return render(request, 'admin_portal/student_detail.html', {
         'student': student,
         'teachers': teachers,
         'recent_records': recent_records,
         'total_records': total_records,
+        'courses': courses,
     })
 
 
@@ -1081,6 +1099,218 @@ def teacher_students_export(request, pk):
 
 
 # ---------------------------------------------------------------------------
+# Course payments (roster view — primary daily-use payment surface)
+# ---------------------------------------------------------------------------
+
+# Order status cycles through on each click of the inline toggle button.
+_PAYMENT_STATUS_CYCLE = [
+    CoursePayment.PaymentStatus.NOT_PAID,
+    CoursePayment.PaymentStatus.PARTIAL,
+    CoursePayment.PaymentStatus.PAID,
+]
+
+
+@admin_required
+def course_roster(request, pk):
+    """Roster of a course's enrolled students with the current month's
+    payment status shown inline. This is the primary, daily-use payment
+    surface (see docs/courses_plan_v3.md Phase 5 step 3)."""
+    course = get_object_or_404(Teacher, pk=pk, is_course=True)
+    today = localdate()
+    year, month = today.year, today.month
+
+    q = request.GET.get('q', '').strip()
+    links = (
+        StudentTeacherLink.objects
+        .filter(teacher=course)
+        .select_related('student')
+        .order_by('student__full_name')
+    )
+    if q:
+        links = links.filter(
+            Q(student__full_name__icontains=q)
+            | Q(student__student_code__icontains=q)
+            | Q(student__national_id__icontains=q)
+        )
+
+    student_ids = [link.student_id for link in links]
+    payments_by_student = {
+        p.student_id: p
+        for p in CoursePayment.objects.filter(
+            course=course, year=year, month=month, student_id__in=student_ids,
+        )
+    }
+
+    roster = [
+        {'student': link.student, 'payment': payments_by_student.get(link.student_id)}
+        for link in links
+    ]
+    unpaid_count = sum(
+        1 for row in roster
+        if row['payment'] is None
+        or row['payment'].status != CoursePayment.PaymentStatus.PAID
+    )
+
+    return render(request, 'admin_portal/course_roster.html', {
+        'course': course,
+        'roster': roster,
+        'year': year,
+        'month': month,
+        'q': q,
+        'total_count': len(roster),
+        'unpaid_count': unpaid_count,
+    })
+
+
+@admin_required
+@require_http_methods(['POST'])
+def course_payment_cycle(request, pk, student_pk):
+    """Cycle a student's current-month payment status for this course.
+
+    Returns the re-rendered status-button partial for an HTMX inline swap,
+    with no full page reload — the common-case interaction from the roster.
+    """
+    course = get_object_or_404(Teacher, pk=pk, is_course=True)
+    student = get_object_or_404(Student, pk=student_pk)
+    if not StudentTeacherLink.objects.filter(student=student, teacher=course).exists():
+        return HttpResponse(status=404)
+
+    today = localdate()
+    payment, _created = CoursePayment.objects.get_or_create(
+        student=student, course=course, year=today.year, month=today.month,
+    )
+    try:
+        next_index = (_PAYMENT_STATUS_CYCLE.index(payment.status) + 1) % len(_PAYMENT_STATUS_CYCLE)
+    except ValueError:
+        next_index = 0
+    payment.status = _PAYMENT_STATUS_CYCLE[next_index]
+    payment.save(update_fields=['status', 'updated_at'])
+
+    return render(request, 'admin_portal/partials/payment_status_button.html', {
+        'course': course,
+        'student': student,
+        'payment': payment,
+    })
+
+
+@admin_required
+@require_http_methods(['POST'])
+def course_mark_all_paid(request, pk):
+    """Bulk action: mark every currently unpaid/partial enrolled student as
+    PAID for the current month. Confirmed via a modal on the roster page."""
+    course = get_object_or_404(Teacher, pk=pk, is_course=True)
+    today = localdate()
+
+    student_ids = list(
+        StudentTeacherLink.objects.filter(teacher=course)
+        .values_list('student_id', flat=True)
+    )
+    existing_payments = {
+        p.student_id: p
+        for p in CoursePayment.objects.filter(
+            course=course, year=today.year, month=today.month,
+            student_id__in=student_ids,
+        )
+    }
+
+    from django.db import transaction
+    updated = 0
+    new_payments = []
+    with transaction.atomic():
+        for sid in student_ids:
+            payment = existing_payments.get(sid)
+            if payment is None:
+                new_payments.append(CoursePayment(
+                    student_id=sid, course=course,
+                    year=today.year, month=today.month,
+                    status=CoursePayment.PaymentStatus.PAID,
+                ))
+                updated += 1
+            elif payment.status != CoursePayment.PaymentStatus.PAID:
+                payment.status = CoursePayment.PaymentStatus.PAID
+                payment.save(update_fields=['status', 'updated_at'])
+                updated += 1
+        if new_payments:
+            CoursePayment.objects.bulk_create(new_payments)
+
+    messages.success(
+        request,
+        f'تم تحديد {updated} طالب كـ "تم الدفع" لشهر {today.month}/{today.year} '
+        f'في كورس "{course.full_name}"'
+    )
+    return redirect('admin_portal:course_roster', pk=course.pk)
+
+
+@admin_required
+def course_payment_history(request, pk, student_pk):
+    """12-month payment history drill-down for one student in a course.
+
+    GET  – renders the modal content (defaults to the current year).
+    POST – saves edits to any of the 12 months, then re-renders.
+    Both responses are HTMX partials swapped into the modal body.
+    """
+    course = get_object_or_404(Teacher, pk=pk, is_course=True)
+    student = get_object_or_404(Student, pk=student_pk)
+    if not StudentTeacherLink.objects.filter(student=student, teacher=course).exists():
+        return HttpResponse(status=404)
+
+    try:
+        year = int(request.POST.get('year') or request.GET.get('year') or localdate().year)
+    except (TypeError, ValueError):
+        year = localdate().year
+
+    save_errors = []
+    saved = False
+    if request.method == 'POST':
+        from django.db import transaction
+        with transaction.atomic():
+            for month in range(1, 13):
+                instance = CoursePayment.objects.filter(
+                    student=student, course=course, year=year, month=month,
+                ).first() or CoursePayment(
+                    student=student, course=course, year=year, month=month,
+                )
+                data = {
+                    'student': student.pk,
+                    'course': course.pk,
+                    'year': year,
+                    'month': month,
+                    'status': request.POST.get(
+                        f'status_{month}', CoursePayment.PaymentStatus.NOT_PAID),
+                    'amount_paid': request.POST.get(f'amount_paid_{month}', '').strip(),
+                    'note': request.POST.get(f'note_{month}', '').strip(),
+                }
+                form = CoursePaymentForm(data, instance=instance)
+                if form.is_valid():
+                    form.save()
+                else:
+                    save_errors.append(
+                        f'شهر {month}: ' + '، '.join(
+                            e for errs in form.errors.values() for e in errs)
+                    )
+        saved = not save_errors
+
+    payments_by_month = {
+        p.month: p
+        for p in CoursePayment.objects.filter(student=student, course=course, year=year)
+    }
+    months = [
+        {'month': m, 'payment': payments_by_month.get(m)}
+        for m in range(1, 13)
+    ]
+
+    return render(request, 'admin_portal/partials/payment_history_modal.html', {
+        'course': course,
+        'student': student,
+        'year': year,
+        'months': months,
+        'payment_status_choices': CoursePayment.PaymentStatus.choices,
+        'save_errors': save_errors,
+        'saved': saved,
+    })
+
+
+# ---------------------------------------------------------------------------
 # Supervisor management
 # ---------------------------------------------------------------------------
 
@@ -1285,8 +1515,13 @@ def assistant_links(request, pk):
         messages.success(request, f'تم تحديث صلاحيات الوصول لـ {assistant.first_name} بنجاح')
         return redirect('admin_portal:assistant_list')
         
-    all_teachers = Teacher.objects.filter(is_active=True).order_by('full_name')
     linked_teacher_ids = list(AssistantTeacherLink.objects.filter(user=assistant).values_list('teacher_id', flat=True))
+    # Include teachers already linked even if since deactivated, so an
+    # existing link is never silently dropped just by opening/saving this
+    # page — the admin can still see and explicitly unlink them here.
+    all_teachers = Teacher.objects.filter(
+        Q(is_active=True) | Q(pk__in=linked_teacher_ids)
+    ).order_by('full_name')
     
     return render(request, 'admin_portal/assistant_links.html', {
         'assistant': assistant,

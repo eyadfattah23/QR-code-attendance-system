@@ -1,0 +1,11 @@
+<button type="button"
+        class="btn btn-sm w-100
+               {% if payment and payment.status == 'paid' %}btn-success
+               {% elif payment and payment.status == 'partial' %}btn-warning text-dark
+               {% else %}btn-outline-danger{% endif %}"
+        hx-post="{% url 'admin_portal:course_payment_cycle' course.pk student.pk %}"
+        hx-target="this"
+        hx-swap="outerHTML"
+        title="اضغط لتغيير حالة الدفع">
+    {% if payment %}{{ payment.get_status_display }}{% else %}لم يُدفع{% endif %}
+</button>

@@ -65,6 +65,24 @@ class ScanStationPermissionTestCase(TestCase):
         self.assertEqual(response.status_code, 302)
         self.assertIn('/dashboard/', response.url)
 
+    def test_courses_dropdown_excludes_inactive_courses(self):
+        """Deactivated courses must not appear in the scan station's course dropdown."""
+        active_course = Teacher.objects.create(
+            user=User.objects.create_user(
+                phone='01234500001', password='pass', role=User.Role.TEACHER),
+            full_name='Active Course', is_course=True, is_active=True,
+        )
+        inactive_course = Teacher.objects.create(
+            user=User.objects.create_user(
+                phone='01234500002', password='pass', role=User.Role.TEACHER),
+            full_name='Inactive Course', is_course=True, is_active=False,
+        )
+        self.client.login(phone='01234567890', password='adminpass123')
+        response = self.client.get(self.scan_url)
+        courses = list(response.context['courses'])
+        self.assertIn(active_course, courses)
+        self.assertNotIn(inactive_course, courses)
+
 
 class TeacherScanTestCase(TestCase):
     """Test cases for teacher scan endpoint."""

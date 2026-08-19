@@ -75,6 +75,28 @@ class AssistantManagementTestCase(TestCase):
         self.assertEqual(response.status_code, 302)
         self.assertEqual(AssistantTeacherLink.objects.filter(user=self.assistant_user).count(), 0)
 
+    def test_assistant_links_preserves_link_to_deactivated_teacher(self):
+        """Deactivating a linked teacher must not silently drop the link
+        the next time the assistant_links form is viewed/saved."""
+        AssistantTeacherLink.objects.create(user=self.assistant_user, teacher=self.teacher1)
+        self.teacher1.is_active = False
+        self.teacher1.save()
+
+        url = reverse('admin_portal:assistant_links', args=[self.assistant_user.pk])
+
+        # GET: the deactivated-but-linked teacher must still appear in the form
+        response = self.client.get(url)
+        self.assertContains(response, 'Teacher 1')
+        self.assertContains(response, str(self.teacher1.id))
+
+        # Re-saving with the same (still-checked) selection preserves the link
+        response = self.client.post(url, {
+            'teachers': [self.teacher1.id, self.teacher2.id]
+        })
+        self.assertEqual(response.status_code, 302)
+        self.assertTrue(AssistantTeacherLink.objects.filter(user=self.assistant_user, teacher=self.teacher1).exists())
+        self.assertTrue(AssistantTeacherLink.objects.filter(user=self.assistant_user, teacher=self.teacher2).exists())
+
     def test_assistant_delete(self):
         url = reverse('admin_portal:assistant_delete', args=[self.assistant_user.pk])
         response = self.client.post(url)

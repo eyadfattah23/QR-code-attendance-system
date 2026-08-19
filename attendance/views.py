@@ -463,7 +463,8 @@ def station_view(request):
             tzinfo=timezone.utc),
         reverse=True,
     )[:10]
-    courses = Teacher.objects.filter(is_course=True).order_by('full_name')
+    courses = Teacher.objects.filter(
+        is_course=True, is_active=True).order_by('full_name')
 
     context = {
         "scanned_codes": scanned_codes,
