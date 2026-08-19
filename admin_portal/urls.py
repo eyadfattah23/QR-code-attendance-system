@@ -68,6 +68,8 @@ urlpatterns = [
          views.course_payment_cycle, name='course_payment_cycle'),
     path('courses/<uuid:pk>/roster/students/<uuid:student_pk>/history/',
          views.course_payment_history, name='course_payment_history'),
+    path('payments/', views.payments_list, name='payments_list'),
+    path('payments/export/', views.payments_export, name='payments_export'),
 
     # Supervisor management
     path('supervisors/', views.supervisor_list, name='supervisor_list'),

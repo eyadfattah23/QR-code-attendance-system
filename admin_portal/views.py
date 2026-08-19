@@ -6,7 +6,7 @@ from django.contrib.auth.decorators import login_required
 from django.core.exceptions import ValidationError
 from django.core.paginator import Paginator
 from django.db import models
-from django.db.models import Avg, OuterRef, Q, Subquery
+from django.db.models import Avg, Count, OuterRef, Q, Subquery, Sum
 from django.http import HttpResponse
 from django.shortcuts import get_object_or_404, render, redirect
 from django.urls import reverse
@@ -1308,6 +1308,112 @@ def course_payment_history(request, pk, student_pk):
         'save_errors': save_errors,
         'saved': saved,
     })
+
+
+def _filtered_course_payments(request):
+    """Shared filter logic for the global payments report/export (GET params:
+    course, q, status, year, month)."""
+    course_id = request.GET.get('course', '').strip()
+    q = request.GET.get('q', '').strip()
+    status_filter = request.GET.get('status', '').strip()
+    year_filter = request.GET.get('year', '').strip()
+    month_filter = request.GET.get('month', '').strip()
+
+    qs = CoursePayment.objects.select_related('student', 'course')
+    if course_id:
+        qs = qs.filter(course_id=course_id)
+    if q:
+        qs = qs.filter(
+            Q(student__full_name__icontains=q)
+            | Q(student__student_code__icontains=q)
+            | Q(student__national_id__icontains=q)
+        )
+    if status_filter in dict(CoursePayment.PaymentStatus.choices):
+        qs = qs.filter(status=status_filter)
+    if year_filter.isdigit():
+        qs = qs.filter(year=int(year_filter))
+    if month_filter.isdigit():
+        qs = qs.filter(month=int(month_filter))
+
+    qs = qs.order_by('-year', '-month', 'course__full_name', 'student__full_name')
+    filters = {
+        'course_id': course_id,
+        'q': q,
+        'status_filter': status_filter,
+        'year_filter': year_filter,
+        'month_filter': month_filter,
+    }
+    return qs, filters
+
+
+@admin_required
+def payments_list(request):
+    """Global payments report: summary stats and a filterable list across all
+    courses, for reporting/audit purposes. This is NOT where payments are
+    day-to-day recorded — that happens on each course's roster page
+    (see course_roster)."""
+    qs, filters = _filtered_course_payments(request)
+
+    stats = qs.aggregate(
+        paid_count=Count('id', filter=Q(status=CoursePayment.PaymentStatus.PAID)),
+        partial_count=Count('id', filter=Q(status=CoursePayment.PaymentStatus.PARTIAL)),
+        not_paid_count=Count('id', filter=Q(status=CoursePayment.PaymentStatus.NOT_PAID)),
+        total_collected=Sum('amount_paid'),
+    )
+
+    paginator = Paginator(qs, 50)
+    page_obj = paginator.get_page(request.GET.get('page'))
+
+    courses = Teacher.objects.filter(is_course=True).order_by('full_name')
+    years = (
+        CoursePayment.objects.order_by('-year')
+        .values_list('year', flat=True).distinct()
+    )
+
+    return render(request, 'admin_portal/payments_list.html', {
+        'page_obj': page_obj,
+        'courses': courses,
+        'years': years,
+        'months': range(1, 13),
+        'payment_status_choices': CoursePayment.PaymentStatus.choices,
+        'stats': stats,
+        **filters,
+    })
+
+
+@admin_required
+def payments_export(request):
+    """Export the currently filtered global payments report to Excel."""
+    qs, _filters = _filtered_course_payments(request)
+
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws.title = 'سجل الدفعات'
+    ws.append([
+        'الطالب', 'الكورس', 'السنة', 'الشهر', 'الحالة', 'المبلغ المدفوع',
+        'ملاحظات', 'آخر تحديث',
+    ])
+    for p in qs:
+        ws.append([
+            p.student.full_name,
+            p.course.full_name,
+            p.year,
+            p.month,
+            p.get_status_display(),
+            float(p.amount_paid) if p.amount_paid is not None else '',
+            p.note,
+            localtime(p.updated_at).strftime('%Y-%m-%d %H:%M') if p.updated_at else '',
+        ])
+
+    buf = io.BytesIO()
+    wb.save(buf)
+    buf.seek(0)
+    response = HttpResponse(
+        buf.read(),
+        content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    )
+    response['Content-Disposition'] = 'attachment; filename="course_payments.xlsx"'
+    return response
 
 
 # ---------------------------------------------------------------------------
