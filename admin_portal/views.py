@@ -1388,7 +1388,7 @@ def payments_export(request):
 
     wb = openpyxl.Workbook()
     ws = wb.active
-    ws.title = 'سجل الدفعات'
+    ws.title = 'سجلات الدفع'
     ws.append([
         'الطالب', 'الكورس', 'السنة', 'الشهر', 'الحالة', 'المبلغ المدفوع',
         'ملاحظات', 'آخر تحديث',

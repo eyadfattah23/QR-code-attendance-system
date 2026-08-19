@@ -1,6 +1,6 @@
 {% extends 'base.html' %}
 
-{% block title %}سجل دفعات: {{ course.full_name }} - نظام الحضور{% endblock %}
+{% block title %}سجلات دفع: {{ course.full_name }} - نظام الحضور{% endblock %}
 
 {% block content %}
 <div class="container-fluid">
@@ -10,7 +10,7 @@
             <i class="bi bi-arrow-right"></i>
         </a>
         <div class="flex-grow-1">
-            <h1 class="h4 mb-0"><i class="bi bi-cash-coin me-2 text-success"></i>سجل دفعات: {{ course.full_name }}</h1>
+            <h1 class="h4 mb-0"><i class="bi bi-cash-coin me-2 text-success"></i>سجلات دفع: {{ course.full_name }}</h1>
             <div class="text-muted small mt-1">
                 شهر {{ month }}/{{ year }} — {{ total_count }} طالب مسجل
                 {% if unpaid_count %}
