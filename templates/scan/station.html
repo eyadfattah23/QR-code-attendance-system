@@ -229,12 +229,21 @@ STU0001
                         </div>
                         {% endif %}
                         {% endif %}
-                        <div>
+                        <div class="flex-grow-1">
                             <div class="fw-semibold mb-1">
                                 <i class="bi {{ result.icon }} me-1"></i>
                                 {{ result.label }}
                             </div>
                             <div>{{ result.message }}</div>
+                            {% if result.action == 'force_enroll' %}
+                            <button type="button" onclick="forceCheckIn('{{ result.action_code }}')" class="btn btn-sm btn-danger mt-2">
+                                <i class="bi bi-shield-exclamation me-1"></i> تسجيل كحضور استثنائي (تأكيد)
+                            </button>
+                            {% elif result.action == 'ambiguous' %}
+                            <button type="button" onclick="document.getElementById('id_session_teacher').focus()" class="btn btn-sm btn-warning mt-2 border-dark">
+                                <i class="bi bi-list-task me-1"></i> اختر الكورس من القائمة
+                            </button>
+                            {% endif %}
                         </div>
                     </article>
                     {% endfor %}
@@ -347,5 +356,11 @@ STU0001
             beep(280, 180);
         }
     })();
+
+    function forceCheckIn(code) {
+        document.getElementById('id_allow_unenrolled').checked = true;
+        document.getElementById('id_scanned_codes').value = code;
+        document.getElementById('scan-form').submit();
+    }
 </script>
 {% endblock %}

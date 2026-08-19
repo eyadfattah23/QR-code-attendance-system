@@ -262,13 +262,13 @@ def teacher_scan(request):
                     student_record.save(update_fields=['check_out_time'])
                     messages.success(
                         request,
-                        f"{student.full_name} - تم تسجيل الانصراف بنجاح",
+                        f"{student.full_name} - تم تسجيل الانصراف بنجاح (حصة: {teacher.full_name})",
                     )
                 else:
                     messages.warning(
                         request,
                         f"{student.full_name} - غادر مسبقاً الساعة "
-                        f"{student_record.check_out_time.strftime('%H:%M')}",
+                        f"{student_record.check_out_time.strftime('%H:%M')} (حصة: {teacher.full_name})",
                     )
             except StudentAttendanceRecord.DoesNotExist:
                 try:
@@ -284,7 +284,7 @@ def teacher_scan(request):
                     )
                     messages.success(
                         request,
-                        f"{student.full_name} - تم تسجيل الحضور بنجاح",
+                        f"{student.full_name} - تم تسجيل الحضور بنجاح (حصة: {teacher.full_name})",
                     )
                 except IntegrityError:
                     messages.warning(

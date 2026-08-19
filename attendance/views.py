@@ -222,7 +222,8 @@ def station_view(request):
                                         f"{student.full_name} - لديه أكثر من حصة مفتوحة اليوم "
                                         f"({course_names}) — يرجى اختيار الحصة من القائمة"
                                     ),
-                                    "row_class": "warning",
+                                    "row_class": "warning border border-warning border-2",
+                                    "action": "ambiguous",
                                     "image_url": student.image.url if student.image else None,
                                 })
                         else:
@@ -265,11 +266,11 @@ def station_view(request):
                                             "label": "غير مسجل في هذه الحصة",
                                             "message": (
                                                 f"{student.full_name} - غير مسجل في حصة "
-                                                f"{session_teacher.full_name}. فعّل خيار "
-                                                "'السماح بتسجيل غير المسجلين' أعلاه وأعد "
-                                                "المسح للتأكيد إن كان مقصوداً"
+                                                f"{session_teacher.full_name}."
                                             ),
-                                            "row_class": "danger",
+                                            "row_class": "danger border border-danger border-2",
+                                            "action": "force_enroll",
+                                            "action_code": raw_code,
                                             "image_url": student.image.url if student.image else None,
                                         })
                                     else:

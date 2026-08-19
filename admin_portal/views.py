@@ -83,6 +83,18 @@ def dashboard(request):
         'today_missing_photos_count': today_student_attendance.filter(
             models.Q(homework_photo__isnull=True) | models.Q(homework_photo='')
         ).count(),
+        'this_month_unpaid_count': StudentTeacherLink.objects.filter(
+            teacher__is_course=True,
+            teacher__is_active=True
+        ).exclude(
+            student__course_payments__course=models.F('teacher'),
+            student__course_payments__year=today.year,
+            student__course_payments__month=today.month,
+            student__course_payments__status__in=[
+                CoursePayment.PaymentStatus.PAID,
+                CoursePayment.PaymentStatus.PARTIAL
+            ]
+        ).count(),
         'today': today,
     }
     return render(request, 'admin_portal/dashboard.html', context)
