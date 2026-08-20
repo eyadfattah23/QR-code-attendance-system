@@ -1905,6 +1905,8 @@ def export_attendance_excel(request):
         for d in date_list:
             header1.extend([str(d), '', ''])
             header2.extend(['الحضور', 'المغادرة', 'المدة'])
+        header1.append('متوسط التقييم')
+        header2.append('')
 
         ws.append(header1)
         ws.append(header2)
@@ -1917,6 +1919,13 @@ def export_attendance_excel(request):
                            end_row=1, end_column=end_col)
             cell = ws.cell(row=1, column=start_col)
             cell.alignment = Alignment(horizontal='center', vertical='center')
+
+        # Pre-compute average ratings per teacher from filtered records
+        avg_ratings = dict(
+            qs.values('teacher_id')
+            .annotate(avg_rating=models.Avg('rating'))
+            .values_list('teacher_id', 'avg_rating')
+        )
 
         # Populate rows
         for t in teachers_qs:
@@ -1935,6 +1944,8 @@ def export_attendance_excel(request):
                         row.extend([check_in, check_out, duration])
                 else:
                     row.extend(['absent', '', ''])
+            avg = avg_ratings.get(t.id)
+            row.append(round(avg, 2) if avg is not None else '')
             ws.append(row)
 
         filename = 'teacher_attendance_pivot'
