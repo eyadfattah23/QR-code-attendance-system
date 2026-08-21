@@ -1,0 +1,68 @@
+{% if save_errors %}
+<div class="alert alert-danger py-2 small mb-3">{{ save_errors|join:" | " }}</div>
+{% elif saved %}
+<div class="alert alert-success py-2 small mb-3">تم حفظ التغييرات بنجاح</div>
+{% endif %}
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <div class="btn-group btn-group-sm" role="group">
+        <button type="button" class="btn btn-outline-secondary"
+                hx-get="{% url 'admin_portal:course_payment_history' course.pk student.pk %}?year={{ year|add:'-1' }}"
+                hx-target="#historyModalBody{{ student.id }}" hx-swap="innerHTML">
+            &laquo; {{ year|add:"-1" }}
+        </button>
+        <span class="btn btn-light disabled fw-semibold">{{ year }}</span>
+        <button type="button" class="btn btn-outline-secondary"
+                hx-get="{% url 'admin_portal:course_payment_history' course.pk student.pk %}?year={{ year|add:'1' }}"
+                hx-target="#historyModalBody{{ student.id }}" hx-swap="innerHTML">
+            {{ year|add:"1" }} &raquo;
+        </button>
+    </div>
+</div>
+
+<form hx-post="{% url 'admin_portal:course_payment_history' course.pk student.pk %}"
+      hx-target="#historyModalBody{{ student.id }}" hx-swap="innerHTML">
+    {% csrf_token %}
+    <input type="hidden" name="year" value="{{ year }}">
+    <div class="table-responsive">
+        <table class="table table-sm align-middle mb-3">
+            <thead class="table-light">
+                <tr>
+                    <th style="width:5rem">الشهر</th>
+                    <th style="width:9rem">الحالة</th>
+                    <th style="width:8rem">المبلغ المدفوع</th>
+                    <th>ملاحظات</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for row in months %}
+                <tr>
+                    <td class="fw-semibold">{{ row.month }}</td>
+                    <td>
+                        <select name="status_{{ row.month }}" class="form-select form-select-sm">
+                            {% for value, label in payment_status_choices %}
+                            <option value="{{ value }}"
+                                {% if row.payment.status == value or not row.payment and value == 'not_paid' %}selected{% endif %}>
+                                {{ label }}
+                            </option>
+                            {% endfor %}
+                        </select>
+                    </td>
+                    <td>
+                        <input type="number" step="0.01" min="0" name="amount_paid_{{ row.month }}"
+                               class="form-control form-control-sm"
+                               value="{{ row.payment.amount_paid|default_if_none:'' }}">
+                    </td>
+                    <td>
+                        <input type="text" name="note_{{ row.month }}" class="form-control form-control-sm"
+                               value="{{ row.payment.note|default:'' }}">
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    <div class="text-end">
+        <button type="submit" class="btn btn-primary btn-sm"><i class="bi bi-floppy me-1"></i>حفظ التغييرات</button>
+    </div>
+</form>

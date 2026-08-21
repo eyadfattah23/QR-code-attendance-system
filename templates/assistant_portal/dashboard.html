@@ -1,0 +1,202 @@
+{% extends 'base.html' %}
+
+{% block title %}لوحة تحكم المساعد - نظام الحضور{% endblock %}
+
+{% block extra_css %}
+<style>
+    .teacher-card-wrapper {
+        transition: opacity 0.2s ease, transform 0.2s ease;
+    }
+    .teacher-card-wrapper.hidden {
+        display: none;
+    }
+    #teacher-search {
+        border-radius: 0.5rem;
+        border: 1px solid #dee2e6;
+        transition: border-color 0.15s ease, box-shadow 0.15s ease;
+    }
+    #teacher-search:focus {
+        border-color: #0d6efd;
+        box-shadow: 0 0 0 0.2rem rgba(13, 110, 253, 0.15);
+    }
+    #no-results-msg {
+        display: none;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+
+    <!-- Page header -->
+    <div class="d-flex justify-content-between align-items-center mb-4 mt-2">
+        <h1 class="h3 mb-0">
+            <i class="bi bi-person-workspace me-2 text-primary"></i>
+            لوحة تحكم المساعد
+        </h1>
+        <span class="text-muted small">{{ today }}</span>
+    </div>
+
+    {% if teacher_cards %}
+
+    <!-- Filters and Search -->
+    <div class="mb-4">
+        <form method="get" class="row g-2 align-items-end">
+            <!-- Client-side name search -->
+            <div class="col-md-4">
+                <label class="form-label mb-1 small fw-semibold text-muted">بحث بالاسم</label>
+                <div class="input-group">
+                    <span class="input-group-text bg-white border-end-0">
+                        <i class="bi bi-search text-muted"></i>
+                    </span>
+                    <input
+                        type="search"
+                        id="teacher-search"
+                        class="form-control border-start-0 ps-0"
+                        placeholder="ابحث عن معلم بالاسم…"
+                        autocomplete="off"
+                        aria-label="بحث عن معلم"
+                    >
+                </div>
+            </div>
+            <!-- Backend Filters -->
+            <div class="col-md-3">
+                <label class="form-label mb-1 small fw-semibold text-muted">المادة</label>
+                <select name="subject" class="form-select">
+                    <option value="">— كل المواد —</option>
+                    {% for subj in subjects %}
+                    <option value="{{ subj }}" {% if subject_q == subj %}selected{% endif %}>{{ subj }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-md-4">
+                <label class="form-label mb-1 small fw-semibold text-muted">ترتيب حسب</label>
+                <select name="sort" class="form-select">
+                    <option value="attended_desc" {% if sort_by == 'attended_desc' %}selected{% endif %}>حضور اليوم (الأعلى أولاً)</option>
+                    <option value="attended_asc" {% if sort_by == 'attended_asc' %}selected{% endif %}>حضور اليوم (الأقل أولاً)</option>
+                    <option value="students_desc" {% if sort_by == 'students_desc' %}selected{% endif %}>إجمالي الطلاب (الأعلى أولاً)</option>
+                    <option value="students_asc" {% if sort_by == 'students_asc' %}selected{% endif %}>إجمالي الطلاب (الأقل أولاً)</option>
+                    <option value="name" {% if sort_by == 'name' %}selected{% endif %}>الترتيب الافتراضي (الاسم)</option>
+                </select>
+            </div>
+            <div class="col-md-1 d-flex gap-1">
+                <button type="submit" class="btn btn-primary flex-fill" title="تطبيق">
+                    <i class="bi bi-filter"></i>
+                </button>
+                <a href="{% url 'assistant_portal:dashboard' %}" class="btn btn-outline-secondary" title="إزالة الفلتر والترتيب">
+                    <i class="bi bi-x-lg"></i>
+                </a>
+            </div>
+        </form>
+    </div>
+
+    <!-- Teacher cards grid -->
+    <div class="row g-3" id="teachers-grid">
+        {% for card in teacher_cards %}
+        <div class="col-sm-6 col-lg-4 col-xl-3 teacher-card-wrapper"
+             data-teacher-name="{{ card.teacher.full_name }}">
+            <div
+                class="card border-0 shadow-sm h-100 {% if card.is_active %}border-start border-4 border-primary{% endif %}">
+                <div class="card-body d-flex flex-column">
+                    <div class="d-flex align-items-center gap-3 mb-3">
+                        <div class="rounded-circle bg-success-subtle d-flex align-items-center justify-content-center flex-shrink-0"
+                            style="width:48px;height:48px;">
+                            <i class="bi bi-person-badge fs-5 text-success"></i>
+                        </div>
+                        <div class="overflow-hidden">
+                            <div class="fw-semibold text-truncate">{{ card.teacher.full_name }}</div>
+                            <div class="text-muted small">{{ card.teacher.subject|default:"—" }}</div>
+                        </div>
+                        {% if card.is_active %}
+                        <span class="badge bg-primary ms-auto">نشط</span>
+                        {% endif %}
+                    </div>
+
+                    <div class="row g-2 mb-3">
+                        <div class="col-6">
+                            <div class="text-center p-2 rounded bg-light">
+                                <div class="fw-bold text-primary">{{ card.student_count }}</div>
+                                <div class="text-muted" style="font-size:.72rem;">الطلاب</div>
+                            </div>
+                        </div>
+                        <div class="col-6">
+                            <div class="text-center p-2 rounded bg-light">
+                                <div class="fw-bold text-success">{{ card.today_count }}</div>
+                                <div class="text-muted" style="font-size:.72rem;">حضور اليوم</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="mt-auto">
+                        <form method="post" action="{% url 'assistant_portal:select_teacher' card.teacher.pk %}">
+                            {% csrf_token %}
+                            <button type="submit"
+                                class="btn w-100 {% if card.is_active %}btn-primary{% else %}btn-outline-primary{% endif %} btn-sm">
+                                <i class="bi bi-box-arrow-in-left me-1"></i>
+                                {% if card.is_active %}العمل بهذا الحساب{% else %}عرض{% endif %}
+                            </button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+
+    <!-- No results message -->
+    <div id="no-results-msg" class="card border-0 shadow-sm">
+        <div class="card-body text-center text-muted py-5">
+            <i class="bi bi-search display-4 d-block mb-3 opacity-25"></i>
+            <p class="mb-0">لا يوجد معلم بهذا الاسم</p>
+        </div>
+    </div>
+
+    {% else %}
+    <div class="card border-0 shadow-sm">
+        <div class="card-body text-center text-muted py-5">
+            <i class="bi bi-person-badge display-4 d-block mb-3 opacity-25"></i>
+            <p class="mb-0">لا يوجد معلمون مسجلون في النظام بعد</p>
+        </div>
+    </div>
+    {% endif %}
+
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+(function () {
+    const searchInput = document.getElementById('teacher-search');
+    if (!searchInput) return;
+
+    const cards = document.querySelectorAll('.teacher-card-wrapper');
+    const noResults = document.getElementById('no-results-msg');
+    const grid = document.getElementById('teachers-grid');
+
+    searchInput.addEventListener('input', function () {
+        const query = this.value.trim().toLowerCase();
+        let visibleCount = 0;
+
+        cards.forEach(function (card) {
+            const name = card.dataset.teacherName.toLowerCase();
+            if (!query || name.includes(query)) {
+                card.classList.remove('hidden');
+                visibleCount++;
+            } else {
+                card.classList.add('hidden');
+            }
+        });
+
+        // Toggle grid and no-results message
+        if (visibleCount === 0) {
+            grid.style.display = 'none';
+            noResults.style.display = '';
+        } else {
+            grid.style.display = '';
+            noResults.style.display = 'none';
+        }
+    });
+})();
+</script>
+{% endblock %}
+

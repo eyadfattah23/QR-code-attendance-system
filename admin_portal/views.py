@@ -6,7 +6,7 @@ from django.contrib.auth.decorators import login_required
 from django.core.exceptions import ValidationError
 from django.core.paginator import Paginator
 from django.db import models
-from django.db.models import Avg, Q
+from django.db.models import Avg, Count, OuterRef, Q, Subquery, Sum
 from django.http import HttpResponse
 from django.shortcuts import get_object_or_404, render, redirect
 from django.urls import reverse
@@ -14,9 +14,9 @@ from django.utils.timezone import localdate, localtime
 from django.views.decorators.http import require_http_methods
 from functools import wraps
 
-from core.models import Student, Teacher, User, StudentTeacherLink
+from core.models import Student, Teacher, User, StudentTeacherLink, CoursePayment
 from attendance.models import StudentAttendanceRecord, TeacherAttendanceRecord
-from .forms import StudentForm, TeacherForm, SupervisorForm
+from .forms import StudentForm, TeacherForm, SupervisorForm, AssistantForm, CoursePaymentForm
 from .models import AuditLog
 
 
@@ -81,7 +81,19 @@ def dashboard(request):
             assigned_teacher__isnull=False,
         ).exclude(original_teacher=models.F('assigned_teacher')).count(),
         'today_missing_photos_count': today_student_attendance.filter(
-            models.Q(daily_photo__isnull=True) | models.Q(daily_photo='')
+            models.Q(homework_photo__isnull=True) | models.Q(homework_photo='')
+        ).count(),
+        'this_month_unpaid_count': StudentTeacherLink.objects.filter(
+            teacher__is_course=True,
+            teacher__is_active=True
+        ).exclude(
+            student__course_payments__course=models.F('teacher'),
+            student__course_payments__year=today.year,
+            student__course_payments__month=today.month,
+            student__course_payments__status__in=[
+                CoursePayment.PaymentStatus.PAID,
+                CoursePayment.PaymentStatus.PARTIAL
+            ]
         ).count(),
         'today': today,
     }
@@ -271,11 +283,29 @@ def student_detail(request, pk):
     )
     total_records = StudentAttendanceRecord.objects.filter(
         student=student).count()
+
+    # Current-month payment status per enrolled course, linking back to
+    # that course's roster (the one canonical place payments are managed).
+    today = localdate()
+    course_links = [link for link in teachers if link.teacher.is_course]
+    course_payments_by_teacher_id = {
+        p.course_id: p
+        for p in CoursePayment.objects.filter(
+            student=student, year=today.year, month=today.month,
+            course_id__in=[link.teacher_id for link in course_links],
+        )
+    }
+    courses = [
+        {'teacher': link.teacher, 'payment': course_payments_by_teacher_id.get(link.teacher_id)}
+        for link in course_links
+    ]
+
     return render(request, 'admin_portal/student_detail.html', {
         'student': student,
         'teachers': teachers,
         'recent_records': recent_records,
         'total_records': total_records,
+        'courses': courses,
     })
 
 
@@ -748,7 +778,16 @@ def teacher_list(request):
     gender_filter = request.GET.get('gender', '').strip()
     sort = request.GET.get('sort', '').strip()
 
-    qs = Teacher.objects.select_related('user').annotate(num_students=models.Count('student_links'))
+    qs = Teacher.objects.select_related('user').annotate(
+        num_students=models.Count('student_links'))
+
+    # By default show only active teachers; ?inactive=1 shows deactivated
+    show_inactive = request.GET.get('inactive', '').strip()
+    if show_inactive == '1':
+        qs = qs.filter(is_active=False)
+    else:
+        qs = qs.filter(is_active=True)
+
     if q:
         qs = qs.filter(
             Q(full_name__icontains=q)
@@ -782,6 +821,7 @@ def teacher_list(request):
         'gender_filter': gender_filter,
         'total_count': qs.count(),
         'sort': sort,
+        'show_inactive': show_inactive,
     })
 
 
@@ -829,6 +869,7 @@ def teacher_edit(request, pk):
                 'phone': teacher.user.phone,
                 'first_name': teacher.user.first_name,
                 'last_name': teacher.user.last_name,
+                'is_course': teacher.is_course,
             },
             instance=teacher,
         )
@@ -844,13 +885,39 @@ def teacher_edit(request, pk):
 @admin_required
 @require_http_methods(['POST'])
 def teacher_delete(request, pk):
-    """Delete a teacher (and their user account) — POST only."""
+    """Delete or deactivate a teacher.
+
+    If the teacher has any related records (payments, student links,
+    attendance), soft-delete by setting is_active=False.
+    Otherwise, hard-delete the teacher and their user account.
+    """
     teacher = get_object_or_404(Teacher, pk=pk)
     name = teacher.full_name
-    _log_audit(request, AuditLog.Action.DELETE, 'معلم', name)
-    # Deleting the user cascades to the Teacher profile
-    teacher.user.delete()
-    messages.success(request, f'تم حذف المعلم "{name}" بنجاح')
+
+    has_payments = CoursePayment.objects.filter(course=teacher).exists()
+    has_links = StudentTeacherLink.objects.filter(teacher=teacher).exists()
+    has_student_attendance = StudentAttendanceRecord.objects.filter(
+        models.Q(original_teacher=teacher) | models.Q(assigned_teacher=teacher)
+    ).exists()
+    has_teacher_attendance = TeacherAttendanceRecord.objects.filter(
+        teacher=teacher
+    ).exists()
+
+    has_history = has_payments or has_links or has_student_attendance or has_teacher_attendance
+
+    if has_history:
+        teacher.is_active = False
+        teacher.save(update_fields=['is_active'])
+        _log_audit(request, AuditLog.Action.EDIT, 'معلم', f'إلغاء تفعيل: {name}')
+        messages.warning(
+            request,
+            f'تم إلغاء تفعيل "{name}" بدلاً من الحذف (توجد سجلات مرتبطة)',
+        )
+    else:
+        _log_audit(request, AuditLog.Action.DELETE, 'معلم', name)
+        teacher.user.delete()  # Cascades to Teacher
+        messages.success(request, f'تم حذف المعلم "{name}" بنجاح')
+
     return redirect(_get_return(request, 'teacher_list_return',
                                 reverse('admin_portal:teacher_list')))
 
@@ -907,6 +974,7 @@ def teacher_students(request, pk):
             return redirect('admin_portal:teacher_students', pk=pk)
 
         from django.db import transaction
+        demoted = []  # list of (student_name, other_teacher_name)
         with transaction.atomic():
             # Remove links for de-selected students
             StudentTeacherLink.objects.filter(teacher=teacher).exclude(
@@ -916,6 +984,22 @@ def teacher_students(request, pk):
             # Upsert links for selected students
             for sid in existing_ids_str:
                 is_primary = sid in primary_ids
+                if is_primary:
+                    # A student can only have one primary teacher. Demote any
+                    # existing primary link with a *different* teacher rather
+                    # than silently conflicting or crashing on the unique
+                    # constraint.
+                    other_primary_links = (
+                        StudentTeacherLink.objects
+                        .filter(student_id=sid, is_primary=True)
+                        .exclude(teacher=teacher)
+                        .select_related('teacher', 'student')
+                    )
+                    for link in other_primary_links:
+                        demoted.append(
+                            (link.student.full_name, link.teacher.full_name))
+                    other_primary_links.update(is_primary=False)
+
                 StudentTeacherLink.objects.update_or_create(
                     teacher=teacher,
                     student_id=sid,
@@ -925,6 +1009,14 @@ def teacher_students(request, pk):
         count = len(existing_ids_str)
         messages.success(
             request, f'تم تحديث قائمة طلاب "{teacher.full_name}" — {count} طالب مرتبط')
+        if demoted:
+            details = '، '.join(
+                f'{sname} (كان أساسياً لدى {tname})' for sname, tname in demoted)
+            messages.warning(
+                request,
+                'تنبيه: لا يمكن أن يكون للطالب أكثر من معلم أساسي واحد، لذلك تم '
+                f'إلغاء صفة "أساسي" تلقائياً لدى المعلم السابق للطلاب التالين: {details}'
+            )
         return redirect('admin_portal:teacher_students', pk=pk)
 
     # Build sets of currently-linked and primary student IDs for template use
@@ -932,6 +1024,21 @@ def teacher_students(request, pk):
     linked_ids = {str(link.student_id) for link in links_qs}
     primary_ids = {str(link.student_id)
                    for link in links_qs if link.is_primary}
+
+    # For every student already marked primary with a DIFFERENT teacher,
+    # surface that fact so the admin sees an obvious warning before
+    # accidentally double-marking them as primary here too.
+    other_primary_subquery = (
+        StudentTeacherLink.objects
+        .filter(student_id=OuterRef('pk'), is_primary=True)
+        .exclude(teacher=teacher)
+        .order_by('-created_at')
+    )
+    all_students = all_students.annotate(
+        other_primary_teacher=Subquery(
+            other_primary_subquery.values('teacher__full_name')[:1]
+        )
+    )
 
     return render(request, 'admin_portal/teacher_students.html', {
         'teacher': teacher,
@@ -1000,6 +1107,324 @@ def teacher_students_export(request, pk):
         content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
     )
     response['Content-Disposition'] = f'attachment; filename="students_{safe_name}.xlsx"'
+    return response
+
+
+# ---------------------------------------------------------------------------
+# Course payments (roster view — primary daily-use payment surface)
+# ---------------------------------------------------------------------------
+
+# Order status cycles through on each click of the inline toggle button.
+_PAYMENT_STATUS_CYCLE = [
+    CoursePayment.PaymentStatus.NOT_PAID,
+    CoursePayment.PaymentStatus.PARTIAL,
+    CoursePayment.PaymentStatus.PAID,
+]
+
+
+@admin_required
+def course_roster(request, pk):
+    """Roster of a course's enrolled students with the current month's
+    payment status shown inline. This is the primary, daily-use payment
+    surface (see docs/courses_plan_v3.md Phase 5 step 3)."""
+    course = get_object_or_404(Teacher, pk=pk, is_course=True)
+    today = localdate()
+    year, month = today.year, today.month
+
+    q = request.GET.get('q', '').strip()
+    links = (
+        StudentTeacherLink.objects
+        .filter(teacher=course)
+        .select_related('student')
+        .order_by('student__full_name')
+    )
+    if q:
+        links = links.filter(
+            Q(student__full_name__icontains=q)
+            | Q(student__student_code__icontains=q)
+            | Q(student__national_id__icontains=q)
+        )
+
+    student_ids = [link.student_id for link in links]
+    payments_by_student = {
+        p.student_id: p
+        for p in CoursePayment.objects.filter(
+            course=course, year=year, month=month, student_id__in=student_ids,
+        )
+    }
+
+    roster = [
+        {'student': link.student, 'payment': payments_by_student.get(link.student_id)}
+        for link in links
+    ]
+    unpaid_count = sum(
+        1 for row in roster
+        if row['payment'] is None
+        or row['payment'].status != CoursePayment.PaymentStatus.PAID
+    )
+
+    return render(request, 'admin_portal/course_roster.html', {
+        'course': course,
+        'roster': roster,
+        'year': year,
+        'month': month,
+        'q': q,
+        'total_count': len(roster),
+        'unpaid_count': unpaid_count,
+    })
+
+
+@admin_required
+@require_http_methods(['POST'])
+def course_payment_cycle(request, pk, student_pk):
+    """Cycle a student's current-month payment status for this course.
+
+    Returns the re-rendered status-button partial for an HTMX inline swap,
+    with no full page reload — the common-case interaction from the roster.
+    """
+    course = get_object_or_404(Teacher, pk=pk, is_course=True)
+    student = get_object_or_404(Student, pk=student_pk)
+    if not StudentTeacherLink.objects.filter(student=student, teacher=course).exists():
+        return HttpResponse(status=404)
+
+    today = localdate()
+    payment, _created = CoursePayment.objects.get_or_create(
+        student=student, course=course, year=today.year, month=today.month,
+    )
+    try:
+        next_index = (_PAYMENT_STATUS_CYCLE.index(payment.status) + 1) % len(_PAYMENT_STATUS_CYCLE)
+    except ValueError:
+        next_index = 0
+    payment.status = _PAYMENT_STATUS_CYCLE[next_index]
+    payment.save(update_fields=['status', 'updated_at'])
+
+    return render(request, 'admin_portal/partials/payment_status_button.html', {
+        'course': course,
+        'student': student,
+        'payment': payment,
+    })
+
+
+@admin_required
+@require_http_methods(['POST'])
+def course_mark_all_paid(request, pk):
+    """Bulk action: mark every currently unpaid/partial enrolled student as
+    PAID for the current month. Confirmed via a modal on the roster page."""
+    course = get_object_or_404(Teacher, pk=pk, is_course=True)
+    today = localdate()
+
+    student_ids = list(
+        StudentTeacherLink.objects.filter(teacher=course)
+        .values_list('student_id', flat=True)
+    )
+    existing_payments = {
+        p.student_id: p
+        for p in CoursePayment.objects.filter(
+            course=course, year=today.year, month=today.month,
+            student_id__in=student_ids,
+        )
+    }
+
+    from django.db import transaction
+    updated = 0
+    new_payments = []
+    with transaction.atomic():
+        for sid in student_ids:
+            payment = existing_payments.get(sid)
+            if payment is None:
+                new_payments.append(CoursePayment(
+                    student_id=sid, course=course,
+                    year=today.year, month=today.month,
+                    status=CoursePayment.PaymentStatus.PAID,
+                ))
+                updated += 1
+            elif payment.status != CoursePayment.PaymentStatus.PAID:
+                payment.status = CoursePayment.PaymentStatus.PAID
+                payment.save(update_fields=['status', 'updated_at'])
+                updated += 1
+        if new_payments:
+            CoursePayment.objects.bulk_create(new_payments)
+
+    messages.success(
+        request,
+        f'تم تحديد {updated} طالب كـ "تم الدفع" لشهر {today.month}/{today.year} '
+        f'في كورس "{course.full_name}"'
+    )
+    return redirect('admin_portal:course_roster', pk=course.pk)
+
+
+@admin_required
+def course_payment_history(request, pk, student_pk):
+    """12-month payment history drill-down for one student in a course.
+
+    GET  – renders the modal content (defaults to the current year).
+    POST – saves edits to any of the 12 months, then re-renders.
+    Both responses are HTMX partials swapped into the modal body.
+    """
+    course = get_object_or_404(Teacher, pk=pk, is_course=True)
+    student = get_object_or_404(Student, pk=student_pk)
+    if not StudentTeacherLink.objects.filter(student=student, teacher=course).exists():
+        return HttpResponse(status=404)
+
+    try:
+        year = int(request.POST.get('year') or request.GET.get('year') or localdate().year)
+    except (TypeError, ValueError):
+        year = localdate().year
+
+    save_errors = []
+    saved = False
+    if request.method == 'POST':
+        from django.db import transaction
+        with transaction.atomic():
+            for month in range(1, 13):
+                instance = CoursePayment.objects.filter(
+                    student=student, course=course, year=year, month=month,
+                ).first() or CoursePayment(
+                    student=student, course=course, year=year, month=month,
+                )
+                data = {
+                    'student': student.pk,
+                    'course': course.pk,
+                    'year': year,
+                    'month': month,
+                    'status': request.POST.get(
+                        f'status_{month}', CoursePayment.PaymentStatus.NOT_PAID),
+                    'amount_paid': request.POST.get(f'amount_paid_{month}', '').strip(),
+                    'note': request.POST.get(f'note_{month}', '').strip(),
+                }
+                form = CoursePaymentForm(data, instance=instance)
+                if form.is_valid():
+                    form.save()
+                else:
+                    save_errors.append(
+                        f'شهر {month}: ' + '، '.join(
+                            e for errs in form.errors.values() for e in errs)
+                    )
+        saved = not save_errors
+
+    payments_by_month = {
+        p.month: p
+        for p in CoursePayment.objects.filter(student=student, course=course, year=year)
+    }
+    months = [
+        {'month': m, 'payment': payments_by_month.get(m)}
+        for m in range(1, 13)
+    ]
+
+    return render(request, 'admin_portal/partials/payment_history_modal.html', {
+        'course': course,
+        'student': student,
+        'year': year,
+        'months': months,
+        'payment_status_choices': CoursePayment.PaymentStatus.choices,
+        'save_errors': save_errors,
+        'saved': saved,
+    })
+
+
+def _filtered_course_payments(request):
+    """Shared filter logic for the global payments report/export (GET params:
+    course, q, status, year, month)."""
+    course_id = request.GET.get('course', '').strip()
+    q = request.GET.get('q', '').strip()
+    status_filter = request.GET.get('status', '').strip()
+    year_filter = request.GET.get('year', '').strip()
+    month_filter = request.GET.get('month', '').strip()
+
+    qs = CoursePayment.objects.select_related('student', 'course')
+    if course_id:
+        qs = qs.filter(course_id=course_id)
+    if q:
+        qs = qs.filter(
+            Q(student__full_name__icontains=q)
+            | Q(student__student_code__icontains=q)
+            | Q(student__national_id__icontains=q)
+        )
+    if status_filter in dict(CoursePayment.PaymentStatus.choices):
+        qs = qs.filter(status=status_filter)
+    if year_filter.isdigit():
+        qs = qs.filter(year=int(year_filter))
+    if month_filter.isdigit():
+        qs = qs.filter(month=int(month_filter))
+
+    qs = qs.order_by('-year', '-month', 'course__full_name', 'student__full_name')
+    filters = {
+        'course_id': course_id,
+        'q': q,
+        'status_filter': status_filter,
+        'year_filter': year_filter,
+        'month_filter': month_filter,
+    }
+    return qs, filters
+
+
+@admin_required
+def payments_list(request):
+    """Global payments report: summary stats and a filterable list across all
+    courses, for reporting/audit purposes. This is NOT where payments are
+    day-to-day recorded — that happens on each course's roster page
+    (see course_roster)."""
+    qs, filters = _filtered_course_payments(request)
+
+    stats = qs.aggregate(
+        paid_count=Count('id', filter=Q(status=CoursePayment.PaymentStatus.PAID)),
+        partial_count=Count('id', filter=Q(status=CoursePayment.PaymentStatus.PARTIAL)),
+        not_paid_count=Count('id', filter=Q(status=CoursePayment.PaymentStatus.NOT_PAID)),
+        total_collected=Sum('amount_paid'),
+    )
+
+    paginator = Paginator(qs, 50)
+    page_obj = paginator.get_page(request.GET.get('page'))
+
+    courses = Teacher.objects.filter(is_course=True).order_by('full_name')
+    years = (
+        CoursePayment.objects.order_by('-year')
+        .values_list('year', flat=True).distinct()
+    )
+
+    return render(request, 'admin_portal/payments_list.html', {
+        'page_obj': page_obj,
+        'courses': courses,
+        'years': years,
+        'months': range(1, 13),
+        'payment_status_choices': CoursePayment.PaymentStatus.choices,
+        'stats': stats,
+        **filters,
+    })
+
+
+@admin_required
+def payments_export(request):
+    """Export the currently filtered global payments report to Excel."""
+    qs, _filters = _filtered_course_payments(request)
+
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws.title = 'سجلات الدفع'
+    ws.append([
+        'الطالب', 'الكورس', 'السنة', 'الشهر', 'الحالة', 'المبلغ المدفوع',
+        'ملاحظات', 'آخر تحديث',
+    ])
+    for p in qs:
+        ws.append([
+            p.student.full_name,
+            p.course.full_name,
+            p.year,
+            p.month,
+            p.get_status_display(),
+            float(p.amount_paid) if p.amount_paid is not None else '',
+            p.note,
+            localtime(p.updated_at).strftime('%Y-%m-%d %H:%M') if p.updated_at else '',
+        ])
+
+    buf = io.BytesIO()
+    wb.save(buf)
+    buf.seek(0)
+    response = HttpResponse(
+        buf.read(),
+        content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    )
+    response['Content-Disposition'] = 'attachment; filename="course_payments.xlsx"'
     return response
 
 
@@ -1088,6 +1513,142 @@ def supervisor_delete(request, pk):
 
 
 # ---------------------------------------------------------------------------
+# Assistant management
+# ---------------------------------------------------------------------------
+
+@admin_required
+def assistant_list(request):
+    """List all assistant accounts."""
+    from core.models import AssistantTeacherLink
+    _save_return(request, 'assistant_list_return')
+    q = request.GET.get('q', '').strip()
+    qs = User.objects.filter(role=User.Role.ASSISTANT).order_by('first_name')
+    if q:
+        qs = qs.filter(
+            Q(first_name__icontains=q) | Q(phone__icontains=q)
+        )
+    paginator = Paginator(qs, 25)
+    page_obj = paginator.get_page(request.GET.get('page'))
+    
+    # Pre-fetch links to show number of linked teachers
+    links = AssistantTeacherLink.objects.select_related('teacher').filter(user__in=page_obj)
+    assistant_links = {}
+    for link in links:
+        if link.user_id not in assistant_links:
+            assistant_links[link.user_id] = []
+        assistant_links[link.user_id].append(link.teacher.full_name)
+        
+    for ast in page_obj:
+        ast.teacher_link_names = assistant_links.get(ast.id, [])
+        
+    return render(request, 'admin_portal/assistants.html', {
+        'page_obj': page_obj,
+        'q': q,
+        'total_count': qs.count(),
+    })
+
+
+@admin_required
+def assistant_create(request):
+    """Create a new assistant account."""
+    if request.method == 'POST':
+        form = AssistantForm(request.POST)
+        if form.is_valid():
+            user = form.save()
+            messages.success(
+                request, f'تم إضافة المساعد "{user.first_name}" بنجاح')
+            return redirect(_get_return(request, 'assistant_list_return',
+                                        reverse('admin_portal:assistant_list')))
+    else:
+        form = AssistantForm()
+    return render(request, 'admin_portal/assistant_form.html', {
+        'form': form,
+        'title': 'إضافة مساعد جديد',
+        'submit_label': 'إضافة',
+    })
+
+
+@admin_required
+def assistant_edit(request, pk):
+    """Edit an existing assistant account."""
+    assistant = get_object_or_404(User, pk=pk, role=User.Role.ASSISTANT)
+    if request.method == 'POST':
+        form = AssistantForm(request.POST, instance=assistant)
+        if form.is_valid():
+            form.save()
+            _log_audit(request, AuditLog.Action.EDIT,
+                       'مساعد', assistant.first_name)
+            messages.success(
+                request, f'تم تحديث بيانات "{assistant.first_name}" بنجاح')
+            return redirect(_get_return(request, 'assistant_list_return',
+                                        reverse('admin_portal:assistant_list')))
+    else:
+        form = AssistantForm(
+            initial={'full_name': assistant.first_name,
+                     'phone': assistant.phone},
+            instance=assistant,
+        )
+    return render(request, 'admin_portal/assistant_form.html', {
+        'form': form,
+        'assistant': assistant,
+        'title': f'تعديل: {assistant.first_name}',
+        'submit_label': 'حفظ التغييرات',
+    })
+
+
+@admin_required
+@require_http_methods(['POST'])
+def assistant_delete(request, pk):
+    """Delete an assistant account (POST only)."""
+    assistant = get_object_or_404(User, pk=pk, role=User.Role.ASSISTANT)
+    name = assistant.first_name
+    _log_audit(request, AuditLog.Action.DELETE, 'مساعد', name)
+    assistant.delete()
+    messages.success(request, f'تم حذف المساعد "{name}" بنجاح')
+    return redirect(_get_return(request, 'assistant_list_return',
+                                reverse('admin_portal:assistant_list')))
+
+
+@admin_required
+def assistant_links(request, pk):
+    """Manage which teachers/courses an assistant is linked to."""
+    from core.models import AssistantTeacherLink
+    assistant = get_object_or_404(User, pk=pk, role=User.Role.ASSISTANT)
+    
+    if request.method == 'POST':
+        # Get list of selected teacher IDs from the form
+        selected_ids = request.POST.getlist('teachers')
+        
+        # Remove old links
+        AssistantTeacherLink.objects.filter(user=assistant).delete()
+        
+        # Create new links
+        new_links = [
+            AssistantTeacherLink(user=assistant, teacher_id=tid) 
+            for tid in selected_ids if tid
+        ]
+        if new_links:
+            AssistantTeacherLink.objects.bulk_create(new_links)
+            
+        messages.success(request, f'تم تحديث صلاحيات الوصول لـ {assistant.first_name} بنجاح')
+        return redirect('admin_portal:assistant_list')
+        
+    linked_teacher_ids = list(AssistantTeacherLink.objects.filter(user=assistant).values_list('teacher_id', flat=True))
+    # Include teachers already linked even if since deactivated, so an
+    # existing link is never silently dropped just by opening/saving this
+    # page — the admin can still see and explicitly unlink them here.
+    all_teachers = Teacher.objects.filter(
+        Q(is_active=True) | Q(pk__in=linked_teacher_ids)
+    ).order_by('full_name')
+    
+    return render(request, 'admin_portal/assistant_links.html', {
+        'assistant': assistant,
+        'all_teachers': all_teachers,
+        'linked_teacher_ids': linked_teacher_ids,
+    })
+
+
+# ---------------------------------------------------------------------------
 # Student attendance history
 # ---------------------------------------------------------------------------
 
@@ -1130,19 +1691,20 @@ def teacher_add_excused_absence(request):
     teacher_id = request.POST.get('teacher_id')
     date_str = request.POST.get('date')
     notes = request.POST.get('notes', '').strip()
-    
+
     if not teacher_id or not date_str:
         messages.error(request, 'يجب تحديد المعلم والتاريخ.')
         return redirect('/portal/admin/attendance/?tab=teachers')
-        
+
     try:
         from datetime import datetime
         d = datetime.strptime(date_str, '%Y-%m-%d').date()
         teacher = Teacher.objects.get(pk=teacher_id)
-        
+
         # Check if record already exists
         if TeacherAttendanceRecord.objects.filter(teacher=teacher, date=d).exists():
-            messages.error(request, f'يوجد سجل حضور للمعلم في هذا اليوم بالفعل ({d}).')
+            messages.error(
+                request, f'يوجد سجل حضور للمعلم في هذا اليوم بالفعل ({d}).')
         else:
             TeacherAttendanceRecord.objects.create(
                 teacher=teacher,
@@ -1151,13 +1713,13 @@ def teacher_add_excused_absence(request):
                 recorded_by=request.user,
                 notes=notes
             )
-            messages.success(request, f'تم إضافة غياب بإذن للمعلم {teacher.full_name} في يوم {d} بنجاح.')
-            
+            messages.success(
+                request, f'تم إضافة غياب بإذن للمعلم {teacher.full_name} في يوم {d} بنجاح.')
+
     except (ValueError, Teacher.DoesNotExist) as e:
         messages.error(request, 'بيانات غير صالحة.')
-        
-    return redirect('/portal/admin/attendance/?tab=teachers')
 
+    return redirect('/portal/admin/attendance/?tab=teachers')
 
 
 @admin_required
@@ -1281,13 +1843,14 @@ def export_attendance_excel(request):
         from openpyxl.styles import Alignment
 
         ws.title = 'حضور المعلمين (مجمع)'
-        
+
         # Parse date range
         d_from = None
         d_to = None
         if date_from:
             try:
-                d_from = datetime.datetime.strptime(date_from, '%Y-%m-%d').date()
+                d_from = datetime.datetime.strptime(
+                    date_from, '%Y-%m-%d').date()
             except ValueError:
                 pass
         if date_to:
@@ -1295,7 +1858,7 @@ def export_attendance_excel(request):
                 d_to = datetime.datetime.strptime(date_to, '%Y-%m-%d').date()
             except ValueError:
                 pass
-                
+
         # Base querysets
         teachers_qs = Teacher.objects.all().order_by('full_name')
         if teacher_q:
@@ -1311,19 +1874,19 @@ def export_attendance_excel(request):
             qs = qs.filter(date__lte=d_to)
         if record_type:
             qs = qs.filter(record_type=record_type)
-            
+
         # If dates not provided, find min/max in qs
         if not d_from and qs.exists():
             d_from = qs.aggregate(models.Min('date'))['date__min']
         if not d_to and qs.exists():
             d_to = qs.aggregate(models.Max('date'))['date__max']
-            
+
         # Fallback to today
         if not d_from:
             d_from = localdate()
         if not d_to:
             d_to = localdate()
-            
+
         # Build date list
         date_list = []
         curr = d_from
@@ -1342,17 +1905,27 @@ def export_attendance_excel(request):
         for d in date_list:
             header1.extend([str(d), '', ''])
             header2.extend(['الحضور', 'المغادرة', 'المدة'])
-            
+        header1.append('متوسط التقييم')
+        header2.append('')
+
         ws.append(header1)
         ws.append(header2)
-        
+
         # Merge date cells in header1 and center align
         for i, d in enumerate(date_list):
             start_col = 2 + (i * 3)
             end_col = start_col + 2
-            ws.merge_cells(start_row=1, start_column=start_col, end_row=1, end_column=end_col)
+            ws.merge_cells(start_row=1, start_column=start_col,
+                           end_row=1, end_column=end_col)
             cell = ws.cell(row=1, column=start_col)
             cell.alignment = Alignment(horizontal='center', vertical='center')
+
+        # Pre-compute average ratings per teacher from filtered records
+        avg_ratings = dict(
+            qs.values('teacher_id')
+            .annotate(avg_rating=models.Avg('rating'))
+            .values_list('teacher_id', 'avg_rating')
+        )
 
         # Populate rows
         for t in teachers_qs:
@@ -1363,12 +1936,16 @@ def export_attendance_excel(request):
                     if rec.record_type == 'excused_absence':
                         row.extend(['غياب بإذن', '', ''])
                     else:
-                        check_in = localtime(rec.check_in_time).strftime('%H:%M') if rec.check_in_time else ''
-                        check_out = localtime(rec.check_out_time).strftime('%H:%M') if rec.check_out_time else ''
+                        check_in = localtime(rec.check_in_time).strftime(
+                            '%H:%M') if rec.check_in_time else ''
+                        check_out = localtime(rec.check_out_time).strftime(
+                            '%H:%M') if rec.check_out_time else ''
                         duration = rec.duration_display if rec.check_out_time else ''
                         row.extend([check_in, check_out, duration])
                 else:
                     row.extend(['absent', '', ''])
+            avg = avg_ratings.get(t.id)
+            row.append(round(avg, 2) if avg is not None else '')
             ws.append(row)
 
         filename = 'teacher_attendance_pivot'
@@ -1390,7 +1967,7 @@ def export_attendance_excel(request):
             )
         if record_type:
             qs = qs.filter(record_type=record_type)
-            
+
         ws.append(['التاريخ', 'المعلم', 'نوع السجل', 'وقت الحضور',
                   'وقت المغادرة', 'مدة الحضور', 'التقييم', 'ملاحظات'])
         for rec in qs:
@@ -1399,7 +1976,8 @@ def export_attendance_excel(request):
                 str(rec.date),
                 rec.teacher.full_name,
                 rec_type_display,
-                localtime(rec.check_in_time).strftime('%H:%M') if rec.check_in_time else '',
+                localtime(rec.check_in_time).strftime(
+                    '%H:%M') if rec.check_in_time else '',
                 localtime(rec.check_out_time).strftime(
                     '%H:%M') if rec.check_out_time else '',
                 rec.duration_display if rec.check_out_time else '',
@@ -1482,7 +2060,8 @@ def attendance_record_edit_rating(request, pk):
     elif user.is_teacher:
         can_edit = (
             StudentTeacherLink.objects.filter(teacher__user=user, student=record.student).exists() or
-            (hasattr(user, 'teacher_profile') and record.assigned_teacher_id == user.teacher_profile.id)
+            (hasattr(user, 'teacher_profile')
+             and record.assigned_teacher_id == user.teacher_profile.id)
         )
     elif user.is_supervisor:
         teacher_pk = request.session.get('supervisor_teacher_id')
@@ -1535,16 +2114,17 @@ def attendance_record_edit_rating(request, pk):
 def attendance_record_edit_note(request, pk):
     """Admin updates the teacher note inline."""
     record = get_object_or_404(StudentAttendanceRecord, pk=pk)
-    
+
     note = request.POST.get('teacher_note', '').strip()
     record.teacher_note = note
     record.save(update_fields=['teacher_note'])
-    
+
     _log_audit(request, AuditLog.Action.EDIT, 'سجل حضور طالب (ملاحظة)',
                f'{record.student.full_name} — {record.date}')
     messages.success(request, 'تم حفظ الملاحظة بنجاح')
-    
-    next_url = request.POST.get('next') or request.META.get('HTTP_REFERER') or reverse('admin_portal:attendance_records')
+
+    next_url = request.POST.get('next') or request.META.get(
+        'HTTP_REFERER') or reverse('admin_portal:attendance_records')
     return redirect(next_url)
 
 
@@ -1554,24 +2134,31 @@ def attendance_record_edit_note(request, pk):
 
 @admin_required
 def attendance_record_edit_photo(request, pk):
-    """Upload or remove the daily_photo of a StudentAttendanceRecord."""
+    """Upload or remove a photo for a StudentAttendanceRecord."""
     record = get_object_or_404(
         StudentAttendanceRecord.objects.select_related('student'), pk=pk
     )
     if request.method == 'POST':
+        photo_field = request.POST.get('photo_field')
+        if photo_field not in ('homework_photo', 'test_photo'):
+            messages.error(request, 'حقل الصورة غير صالح')
+            return redirect('admin_portal:student_history', pk=record.student_id)
+
+        current_photo = getattr(record, photo_field)
+
         if 'remove_photo' in request.POST:
-            if record.daily_photo:
-                record.daily_photo.delete(save=False)
-            record.daily_photo = None
-            record.save(update_fields=['daily_photo'])
+            if current_photo:
+                current_photo.delete(save=False)
+            setattr(record, photo_field, None)
+            record.save(update_fields=[photo_field])
             _log_audit(request, AuditLog.Action.EDIT, 'سجل حضور طالب (صورة)',
                        f'{record.student.full_name} — {record.date}')
             messages.success(request, 'تم حذف الصورة بنجاح')
-        elif 'daily_photo' in request.FILES:
-            if record.daily_photo:
-                record.daily_photo.delete(save=False)
-            record.daily_photo = request.FILES['daily_photo']
-            record.save(update_fields=['daily_photo'])
+        elif photo_field in request.FILES:
+            if current_photo:
+                current_photo.delete(save=False)
+            setattr(record, photo_field, request.FILES[photo_field])
+            record.save(update_fields=[photo_field])
             _log_audit(request, AuditLog.Action.EDIT, 'سجل حضور طالب (صورة)',
                        f'{record.student.full_name} — {record.date}')
             messages.success(request, 'تم تحديث الصورة بنجاح')
@@ -1694,7 +2281,10 @@ def teacher_mark_absent(request, pk):
     # attendance records for the selected date keyed by student UUID string
     records_qs = (
         StudentAttendanceRecord.objects
-        .filter(student__in=linked_students, date=absence_date)
+        .filter(
+            Q(original_teacher=teacher) | Q(assigned_teacher=teacher),
+            student__in=linked_students, date=absence_date,
+        )
         .select_related('student', 'assigned_teacher', 'original_teacher')
     )
     record_by_student = {str(r.student_id): r for r in records_qs}

@@ -100,21 +100,22 @@ class AdminDashboardTestCase(TestCase):
 
     # ---------- missing photos ----------
 
-    def test_missing_photos_counts_null_records(self):
-        """Records created without a photo (daily_photo=NULL) are counted."""
+    def test_dashboard_today_missing_photos_count(self):
+        """Records created without a photo (homework_photo=NULL) are counted."""
         StudentAttendanceRecord.objects.create(
             student=self.student1, date=localdate(), check_in_time=localtime(),
-            recorded_by=self.admin_user, daily_photo=None,
+            recorded_by=self.admin_user, homework_photo=None,
         )
         self.client.login(phone='01234567890', password='adminpass123')
         response = self.client.get(self.url)
+        self.assertEqual(response.status_code, 200)
         self.assertEqual(response.context['today_missing_photos_count'], 1)
 
-    def test_missing_photos_counts_empty_string_records(self):
-        """Records where photo was cleared (daily_photo='') are also counted."""
+    def test_dashboard_today_missing_photos_empty_string(self):
+        """Records where photo was cleared (homework_photo='') are also counted."""
         StudentAttendanceRecord.objects.create(
             student=self.student1, date=localdate(), check_in_time=localtime(),
-            recorded_by=self.admin_user, daily_photo='',
+            recorded_by=self.admin_user, homework_photo='',
         )
         self.client.login(phone='01234567890', password='adminpass123')
         response = self.client.get(self.url)
@@ -487,8 +488,10 @@ class StudentImportTestCase(_StudentManagementBase):
 
     def test_import_saves_phone_and_parent_phone(self):
         upload = _make_excel_upload([
-            ('full_name', 'national_id', 'student_code', 'grade', 'phone', 'parent_phone'),
-            ('طالب هاتف', '55555555555555', 'PH001', 'الصف الأول', '01012345678', '01098765432'),
+            ('full_name', 'national_id', 'student_code',
+             'grade', 'phone', 'parent_phone'),
+            ('طالب هاتف', '55555555555555', 'PH001',
+             'الصف الأول', '01012345678', '01098765432'),
         ])
         self.client.post(self.url, {'excel_file': upload})
         student = Student.objects.get(national_id='55555555555555')
@@ -607,10 +610,12 @@ class TeacherListTestCase(_TeacherManagementBase):
     def test_filter_by_gender_male(self):
         male_user = User.objects.create_user(
             phone='01300000001', password='pass', role=User.Role.TEACHER)
-        Teacher.objects.create(user=male_user, full_name='معلم ذكر', gender='M')
+        Teacher.objects.create(
+            user=male_user, full_name='معلم ذكر', gender='M')
         female_user = User.objects.create_user(
             phone='01300000002', password='pass', role=User.Role.TEACHER)
-        Teacher.objects.create(user=female_user, full_name='معلمة أنثى', gender='F')
+        Teacher.objects.create(
+            user=female_user, full_name='معلمة أنثى', gender='F')
         response = self.client.get(self.url, {'gender': 'M'})
         teachers = list(response.context['page_obj'])
         self.assertTrue(all(t.gender == 'M' for t in teachers))
@@ -618,7 +623,8 @@ class TeacherListTestCase(_TeacherManagementBase):
     def test_filter_by_gender_female(self):
         female_user = User.objects.create_user(
             phone='01300000003', password='pass', role=User.Role.TEACHER)
-        Teacher.objects.create(user=female_user, full_name='معلمة أنثى 2', gender='F')
+        Teacher.objects.create(
+            user=female_user, full_name='معلمة أنثى 2', gender='F')
         response = self.client.get(self.url, {'gender': 'F'})
         teachers = list(response.context['page_obj'])
         self.assertTrue(all(t.gender == 'F' for t in teachers))
@@ -832,11 +838,13 @@ class TeacherImportTestCase(_TeacherManagementBase):
         ])
         self.client.post(self.url, {'excel_file': upload})
         self.assertTrue(User.objects.filter(phone='01022222222').exists())
-        self.assertTrue(Teacher.objects.filter(full_name='معلم مستورد').exists())
+        self.assertTrue(Teacher.objects.filter(
+            full_name='معلم مستورد').exists())
 
     def test_import_optional_columns_populated(self):
         upload = _make_excel_upload([
-            ('full_name', 'phone', 'password', 'subject', 'first_name', 'last_name'),
+            ('full_name', 'phone', 'password',
+             'subject', 'first_name', 'last_name'),
             ('معلم كامل', '01033333333', 'pass1234', 'لغة عربية', 'يوسف', 'علي'),
         ])
         self.client.post(self.url, {'excel_file': upload})
@@ -876,7 +884,8 @@ class TeacherImportTestCase(_TeacherManagementBase):
             ('هاتف خاطئ', '123', 'pass1234'),
         ])
         self.client.post(self.url, {'excel_file': upload})
-        self.assertFalse(Teacher.objects.filter(full_name='هاتف خاطئ').exists())
+        self.assertFalse(Teacher.objects.filter(
+            full_name='هاتف خاطئ').exists())
 
     def test_import_missing_password_produces_error(self):
         upload = _make_excel_upload([
@@ -887,7 +896,8 @@ class TeacherImportTestCase(_TeacherManagementBase):
         from django.contrib.messages import get_messages
         msgs = [str(m) for m in get_messages(response.wsgi_request)]
         self.assertTrue(any('خطأ' in m for m in msgs))
-        self.assertFalse(Teacher.objects.filter(full_name='بلا كلمة مرور').exists())
+        self.assertFalse(Teacher.objects.filter(
+            full_name='بلا كلمة مرور').exists())
 
     def test_import_no_file_redirects_with_error(self):
         response = self.client.post(self.url, {})
@@ -904,7 +914,8 @@ class TeacherImportTestCase(_TeacherManagementBase):
         self.assertFalse(User.objects.filter(phone='01077777777').exists())
 
     def test_import_template_download(self):
-        response = self.client.get(reverse('admin_portal:teacher_import_template'))
+        response = self.client.get(
+            reverse('admin_portal:teacher_import_template'))
         self.assertEqual(response.status_code, 200)
         self.assertEqual(
             response['Content-Type'],
@@ -914,11 +925,13 @@ class TeacherImportTestCase(_TeacherManagementBase):
 
     def test_import_template_contains_required_headers(self):
         import io as _io
-        response = self.client.get(reverse('admin_portal:teacher_import_template'))
+        response = self.client.get(
+            reverse('admin_portal:teacher_import_template'))
         import openpyxl as _openpyxl
         wb = _openpyxl.load_workbook(_io.BytesIO(response.content))
         ws = wb.active
-        headers = [ws.cell(row=1, column=c).value for c in range(1, ws.max_column + 1)]
+        headers = [ws.cell(row=1, column=c).value for c in range(
+            1, ws.max_column + 1)]
         for col in ('full_name', 'phone', 'password'):
             self.assertIn(col, headers)
 
@@ -1101,6 +1114,60 @@ class TeacherStudentsTestCase(TestCase):
         link = StudentTeacherLink.objects.get(
             teacher=self.teacher, student=self.student_a)
         self.assertTrue(link.is_primary)
+
+    # --- primary conflict detection & auto-demote ---
+
+    def test_get_flags_other_primary_teacher(self):
+        other_teacher = Teacher.objects.create(
+            user=User.objects.create_user(
+                phone='01933333333', email='other@link.com', password='pass',
+                role=User.Role.TEACHER,
+            ),
+            full_name='معلم آخر',
+        )
+        StudentTeacherLink.objects.create(
+            teacher=other_teacher, student=self.student_a, is_primary=True)
+        response = self.client.get(self.url)
+        students = {s.id: s for s in response.context['students']}
+        self.assertEqual(
+            students[self.student_a.id].other_primary_teacher, 'معلم آخر')
+        self.assertIsNone(students[self.student_b.id].other_primary_teacher)
+
+    def test_post_marking_primary_demotes_other_teachers_primary_link(self):
+        other_teacher = Teacher.objects.create(
+            user=User.objects.create_user(
+                phone='01933333334', email='other2@link.com', password='pass',
+                role=User.Role.TEACHER,
+            ),
+            full_name='معلم آخر ٢',
+        )
+        other_link = StudentTeacherLink.objects.create(
+            teacher=other_teacher, student=self.student_a, is_primary=True)
+
+        response = self.client.post(self.url, {
+            'students': [str(self.student_a.id)],
+            'primary':  [str(self.student_a.id)],
+        }, follow=True)
+
+        other_link.refresh_from_db()
+        self.assertFalse(other_link.is_primary)
+        new_link = StudentTeacherLink.objects.get(
+            teacher=self.teacher, student=self.student_a)
+        self.assertTrue(new_link.is_primary)
+
+        warning_msgs = [
+            str(m) for m in response.context['messages'] if m.tags == 'warning']
+        self.assertTrue(any('معلم آخر ٢' in m for m in warning_msgs))
+        self.assertTrue(any('طالب ألف' in m for m in warning_msgs))
+
+    def test_post_marking_primary_with_no_conflict_shows_no_warning(self):
+        response = self.client.post(self.url, {
+            'students': [str(self.student_a.id)],
+            'primary':  [str(self.student_a.id)],
+        }, follow=True)
+        warning_msgs = [
+            m for m in response.context['messages'] if m.tags == 'warning']
+        self.assertEqual(warning_msgs, [])
 
 
 # ---------------------------------------------------------------------------
@@ -2070,3 +2137,86 @@ class TeacherMarkAbsentTestCase(TestCase):
             update_fields=['assigned_teacher', 'original_teacher'])
         self.record.refresh_from_db()
         self.assertTrue(self.record.is_substitute_assignment)
+
+
+class TeacherSoftDeleteTestCase(TestCase):
+    """Tests for teacher soft-delete (deactivate) vs hard-delete behaviour."""
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.admin_user = User.objects.create_user(
+            phone='01099990001', password='adminpass123',
+            role=User.Role.ADMIN,
+        )
+
+    def setUp(self):
+        self.client = Client()
+        self.client.login(phone='01099990001', password='adminpass123')
+
+    def _make_teacher(self, name, phone):
+        user = User.objects.create_user(
+            phone=phone, password='teacherpass',
+            role=User.Role.TEACHER,
+        )
+        return Teacher.objects.create(user=user, full_name=name)
+
+    def test_hard_delete_when_no_history(self):
+        """Teacher with zero related records is truly deleted."""
+        teacher = self._make_teacher('معلم بدون سجلات', '01099990010')
+        pk = teacher.pk
+        user_pk = teacher.user.pk
+        url = reverse('admin_portal:teacher_delete', args=[pk])
+        self.client.post(url)
+        self.assertFalse(Teacher.objects.filter(pk=pk).exists())
+        self.assertFalse(User.objects.filter(pk=user_pk).exists())
+
+    def test_soft_delete_when_has_student_links(self):
+        """Teacher with linked students is deactivated, not deleted."""
+        teacher = self._make_teacher('معلم مع طلاب', '01099990011')
+        student = Student.objects.create(full_name='طالب ربط', student_code='SD-001')
+        StudentTeacherLink.objects.create(student=student, teacher=teacher)
+        url = reverse('admin_portal:teacher_delete', args=[teacher.pk])
+        self.client.post(url)
+        teacher.refresh_from_db()
+        self.assertFalse(teacher.is_active)
+
+    def test_soft_delete_when_has_attendance(self):
+        """Teacher with attendance records is deactivated, not deleted."""
+        teacher = self._make_teacher('معلم مع حضور', '01099990012')
+        TeacherAttendanceRecord.objects.create(
+            teacher=teacher,
+            date=localdate(),
+            check_in_time=localtime(),
+            recorded_by=self.admin_user,
+        )
+        url = reverse('admin_portal:teacher_delete', args=[teacher.pk])
+        self.client.post(url)
+        teacher.refresh_from_db()
+        self.assertFalse(teacher.is_active)
+
+    def test_teacher_list_shows_only_active(self):
+        """Default teacher list only shows active teachers."""
+        active = self._make_teacher('معلم نشط', '01099990013')
+        inactive = self._make_teacher('معلم غير نشط', '01099990014')
+        inactive.is_active = False
+        inactive.save(update_fields=['is_active'])
+
+        url = reverse('admin_portal:teacher_list')
+        response = self.client.get(url)
+        teacher_ids = [t.pk for t in response.context['page_obj']]
+        self.assertIn(active.pk, teacher_ids)
+        self.assertNotIn(inactive.pk, teacher_ids)
+
+    def test_teacher_list_inactive_param_shows_deactivated(self):
+        """?inactive=1 shows only deactivated teachers."""
+        active = self._make_teacher('معلم نشط 2', '01099990015')
+        inactive = self._make_teacher('معلم غير نشط 2', '01099990016')
+        inactive.is_active = False
+        inactive.save(update_fields=['is_active'])
+
+        url = reverse('admin_portal:teacher_list') + '?inactive=1'
+        response = self.client.get(url)
+        teacher_ids = [t.pk for t in response.context['page_obj']]
+        self.assertNotIn(active.pk, teacher_ids)
+        self.assertIn(inactive.pk, teacher_ids)
+

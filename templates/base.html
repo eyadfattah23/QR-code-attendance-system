@@ -192,6 +192,16 @@
     <script src="{% static 'js/bootstrap.bundle.min.js' %}"></script>
     <!-- HTMX -->
     <script src="{% static 'js/htmx.min.js' %}"></script>
+    <script>
+        // Attach Django's CSRF token to every HTMX request (GET requests
+        // don't need it, but this is harmless for those too).
+        document.body.addEventListener('htmx:configRequest', function (evt) {
+            var match = document.cookie.match(/(?:^|; )csrftoken=([^;]*)/);
+            if (match) {
+                evt.detail.headers['X-CSRFToken'] = decodeURIComponent(match[1]);
+            }
+        });
+    </script>
 
     {% block extra_js %}{% endblock %}
 </body>

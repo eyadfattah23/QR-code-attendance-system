@@ -210,6 +210,34 @@
         </div>
         {% endif %}
 
+        <!-- Courses / payment status card -->
+        {% if courses %}
+        <div class="col-lg-6">
+            <div class="card border-0 shadow-sm">
+                <div class="card-header bg-transparent fw-semibold">
+                    <i class="bi bi-cash-coin me-2 text-success"></i>الكورسات وحالة الدفع (هذا الشهر)
+                </div>
+                <div class="card-body p-0">
+                    <ul class="list-group list-group-flush">
+                        {% for row in courses %}
+                        <li class="list-group-item d-flex justify-content-between align-items-center">
+                            <a href="{% url 'admin_portal:course_roster' row.teacher.id %}" class="text-decoration-none">
+                                <i class="bi bi-mortarboard me-2 text-muted"></i>{{ row.teacher.full_name }}
+                            </a>
+                            <span class="badge
+                                {% if row.payment and row.payment.status == 'paid' %}bg-success
+                                {% elif row.payment and row.payment.status == 'partial' %}bg-warning text-dark
+                                {% else %}bg-danger{% endif %}">
+                                {% if row.payment %}{{ row.payment.get_status_display }}{% else %}لم يُدفع{% endif %}
+                            </span>
+                        </li>
+                        {% endfor %}
+                    </ul>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+
         <!-- Attendance summary card -->
         <div class="col-lg-6">
             <div class="card border-0 shadow-sm">

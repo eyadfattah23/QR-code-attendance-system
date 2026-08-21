@@ -150,8 +150,33 @@
             <div class="scan-card-body">
                 <form id="scan-form" method="post">
                     {% csrf_token %}
+
+                    {% if courses %}
+                    <div class="mb-3">
+                        <label for="id_session_teacher" class="form-label fw-semibold">
+                            <i class="bi bi-book me-1"></i>الكورس / الحصة
+                        </label>
+                        <select id="id_session_teacher" name="session_teacher" class="form-select">
+                            <option value="">--- تلقائي (تسجيل مع المعلم/الكورس الأساسي المرتبط بهذا الطالب) ---</option>
+                            {% for course in courses %}
+                            <option value="{{ course.id }}" {% if session_teacher_id == course.id|stringformat:"s" %}selected{% endif %}>
+                                {{ course.full_name }}{% if course.subject %} ({{ course.subject }}){% endif %}
+                            </option>
+                            {% endfor %}
+                        </select>
+                        <small class="text-muted">اختر الكورس لتسجيل الحضور فيه، أو اتركه تلقائي.</small>
+                    </div>
+                    <div class="form-check mb-3">
+                        <input class="form-check-input" type="checkbox" name="allow_unenrolled" id="id_allow_unenrolled"
+                            {% if allow_unenrolled %}checked{% endif %}>
+                        <label class="form-check-label" for="id_allow_unenrolled">
+                            السماح بتسجيل حضور طلاب غير مسجلين في هذه الحصة
+                        </label>
+                    </div>
+                    {% endif %}
+
                     <label for="id_scanned_codes" class="form-label fw-semibold">الأكواد (كل كود في سطر)</label>
-                    <textarea id="id_scanned_codes" name="scanned_codes" class="form-control scan-textarea" placeholder="الصق أو امسح الأكواد هنا (UUID أو كود الطالب أو الرقم الوطني)
+                    <textarea id="id_scanned_codes" name="scanned_codes" class="form-control scan-textarea" placeholder="الصق أو امسح الأكواد هنا (UUID أو كود الطالب/المعلم أو الرقم الوطني)
 STU0001
 550e8400-e29b-41d4-a716-446655440000" autofocus=""
                         style="height: auto; min-height: 150px; resize: vertical;"></textarea>
@@ -168,7 +193,7 @@ STU0001
                     </div>
 
                     <small class="text-muted d-block mt-2">
-                        Enter = إرسال سريع, Shift + Enter = سطر جديد | يدعم UUID و student_code و national_id
+                        Enter = إرسال سريع, Shift + Enter = سطر جديد | يدعم UUID و student_code و teacher_code و national_id
                     </small>
                 </form>
             </div>
@@ -193,20 +218,32 @@ STU0001
                     {% for result in results %}
                     <article class="result-item {{ result.row_class }} d-flex align-items-center gap-3">
                         {% if 'image_url' in result %}
-                            {% if result.image_url %}
-                            <img src="{{ result.image_url }}" alt="صورة" class="rounded-circle border border-white shadow-sm" style="width: 55px; height: 55px; object-fit: cover; flex-shrink: 0;">
-                            {% else %}
-                            <div class="rounded-circle bg-white border shadow-sm d-flex align-items-center justify-content-center text-secondary" style="width: 55px; height: 55px; font-size: 1.5rem; flex-shrink: 0;">
-                                <i class="bi bi-person-fill"></i>
-                            </div>
-                            {% endif %}
+                        {% if result.image_url %}
+                        <img src="{{ result.image_url }}" alt="صورة"
+                            class="rounded-circle border border-white shadow-sm"
+                            style="width: 55px; height: 55px; object-fit: cover; flex-shrink: 0;">
+                        {% else %}
+                        <div class="rounded-circle bg-white border shadow-sm d-flex align-items-center justify-content-center text-secondary"
+                            style="width: 55px; height: 55px; font-size: 1.5rem; flex-shrink: 0;">
+                            <i class="bi bi-person-fill"></i>
+                        </div>
                         {% endif %}
-                        <div>
+                        {% endif %}
+                        <div class="flex-grow-1">
                             <div class="fw-semibold mb-1">
                                 <i class="bi {{ result.icon }} me-1"></i>
                                 {{ result.label }}
                             </div>
                             <div>{{ result.message }}</div>
+                            {% if result.action == 'force_enroll' %}
+                            <button type="button" onclick="forceCheckIn('{{ result.action_code }}')" class="btn btn-sm btn-danger mt-2">
+                                <i class="bi bi-shield-exclamation me-1"></i> تسجيل كحضور استثنائي (تأكيد)
+                            </button>
+                            {% elif result.action == 'ambiguous' %}
+                            <button type="button" onclick="document.getElementById('id_session_teacher').focus()" class="btn btn-sm btn-warning mt-2 border-dark">
+                                <i class="bi bi-list-task me-1"></i> اختر الكورس من القائمة
+                            </button>
+                            {% endif %}
                         </div>
                     </article>
                     {% endfor %}
@@ -319,5 +356,11 @@ STU0001
             beep(280, 180);
         }
     })();
+
+    function forceCheckIn(code) {
+        document.getElementById('id_allow_unenrolled').checked = true;
+        document.getElementById('id_scanned_codes').value = code;
+        document.getElementById('scan-form').submit();
+    }
 </script>
 {% endblock %}

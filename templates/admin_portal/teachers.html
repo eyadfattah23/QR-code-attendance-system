@@ -31,12 +31,12 @@
     <div class="card border-0 shadow-sm mb-4">
         <div class="card-body py-3">
             <form method="get" class="row g-2 align-items-end">
-                <div class="col-md-3">
+                <div class="col-md-2">
                     <label class="form-label mb-1 small fw-semibold">بحث</label>
                     <input type="text" name="q" value="{{ q }}" class="form-control"
-                        placeholder="الاسم، المجموعة، الهاتف…">
+                        placeholder="الاسم، الهاتف…">
                 </div>
-                <div class="col-md-3">
+                <div class="col-md-2">
                     <label class="form-label mb-1 small fw-semibold">ترتيب حسب</label>
                     <select name="sort" class="form-select">
                         <option value="">— الافتراضي —</option>
@@ -57,11 +57,18 @@
                     </select>
                 </div>
                 <div class="col-md-2">
+                    <label class="form-label mb-1 small fw-semibold">الحالة</label>
+                    <select name="inactive" class="form-select">
+                        <option value="">نشط فقط</option>
+                        <option value="1" {% if show_inactive == '1' %}selected{% endif %}>غير نشط فقط</option>
+                    </select>
+                </div>
+                <div class="col-md-2">
                     <button type="submit" class="btn btn-outline-primary w-100">
-                        <i class="bi bi-search me-1"></i>بحث
+                        <i class="bi bi-funnel me-1"></i>تطبيق الفرز
                     </button>
                 </div>
-                {% if q or gender_filter or sort %}
+                {% if q or gender_filter or sort or show_inactive %}
                 <div class="col-md-2">
                     <a href="{% url 'admin_portal:teacher_list' %}" class="btn btn-outline-secondary w-100">
                         <i class="bi bi-x-lg me-1"></i>مسح
@@ -127,6 +134,12 @@
                                         class="btn btn-outline-success" title="إدارة الطلاب">
                                         <i class="bi bi-diagram-3"></i>
                                     </a>
+                                    {% if teacher.is_course %}
+                                    <a href="{% url 'admin_portal:course_roster' teacher.id %}"
+                                        class="btn btn-outline-success" title="سجلات الدفع">
+                                        <i class="bi bi-cash-coin"></i>
+                                    </a>
+                                    {% endif %}
                                     <a href="{% url 'admin_portal:teacher_mark_absent' teacher.id %}"
                                         class="btn btn-outline-warning" title="تسجيل غياب">
                                         <i class="bi bi-person-x"></i>

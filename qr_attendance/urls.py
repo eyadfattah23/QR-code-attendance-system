@@ -32,6 +32,7 @@ urlpatterns = [
     path('portal/admin/', include('admin_portal.urls')),
     path('portal/teacher/', include('teacher_portal.urls')),
     path('portal/supervisor/', include('supervisor_portal.urls')),
+    path('portal/assistant/', include('assistant_portal.urls')),
     path('qr-cards/', include('qr_generator.urls')),
     re_path(r'^media/(?P<path>.+)$', serve_media),
 ]

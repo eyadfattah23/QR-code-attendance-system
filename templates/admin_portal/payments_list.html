@@ -1,0 +1,173 @@
+{% extends 'base.html' %}
+
+{% block title %}سجلات الدفع - نظام الحضور{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+
+    <div class="d-flex justify-content-between align-items-center mb-3 mt-2 flex-wrap gap-2">
+        <h1 class="h4 mb-0"><i class="bi bi-cash-stack me-2 text-success"></i>سجلات الدفع (تقرير عام)</h1>
+        <a href="{% url 'admin_portal:payments_export' %}?course={{ course_id }}&q={{ q }}&status={{ status_filter }}&year={{ year_filter }}&month={{ month_filter }}"
+           class="btn btn-outline-success btn-sm">
+            <i class="bi bi-file-earmark-excel me-1"></i>تصدير Excel
+        </a>
+    </div>
+
+    <!-- Summary stats -->
+    <div class="row g-3 mb-3">
+        <div class="col-lg-3 col-6">
+            <div class="card border-0 shadow-sm h-100">
+                <div class="card-body text-center">
+                    <h6 class="text-muted mb-1">تم الدفع</h6>
+                    <h3 class="mb-0 text-success">{{ stats.paid_count }}</h3>
+                </div>
+            </div>
+        </div>
+        <div class="col-lg-3 col-6">
+            <div class="card border-0 shadow-sm h-100">
+                <div class="card-body text-center">
+                    <h6 class="text-muted mb-1">دفع جزئي</h6>
+                    <h3 class="mb-0 text-warning">{{ stats.partial_count }}</h3>
+                </div>
+            </div>
+        </div>
+        <div class="col-lg-3 col-6">
+            <div class="card border-0 shadow-sm h-100">
+                <div class="card-body text-center">
+                    <h6 class="text-muted mb-1">لم يُدفع</h6>
+                    <h3 class="mb-0 text-danger">{{ stats.not_paid_count }}</h3>
+                </div>
+            </div>
+        </div>
+        <div class="col-lg-3 col-6">
+            <div class="card border-0 shadow-sm h-100">
+                <div class="card-body text-center">
+                    <h6 class="text-muted mb-1">إجمالي المحصّل</h6>
+                    <h3 class="mb-0">{{ stats.total_collected|default:0 }}</h3>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="card border-0 shadow-sm">
+        <div class="card-body">
+            <!-- Filters -->
+            <form method="get" class="row g-2 mb-3 align-items-end">
+                <div class="col-lg-3 col-md-6">
+                    <label class="form-label small text-muted mb-1">الكورس</label>
+                    <select name="course" class="form-select form-select-sm">
+                        <option value="">— كل الكورسات —</option>
+                        {% for c in courses %}
+                        <option value="{{ c.id }}" {% if course_id == c.id|stringformat:'s' %}selected{% endif %}>
+                            {{ c.full_name }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-lg-3 col-md-6">
+                    <label class="form-label small text-muted mb-1">بحث عن طالب</label>
+                    <input type="text" name="q" value="{{ q }}" class="form-control form-control-sm" placeholder="الاسم / الكود / الرقم القومي">
+                </div>
+                <div class="col-lg-2 col-md-4 col-6">
+                    <label class="form-label small text-muted mb-1">السنة</label>
+                    <select name="year" class="form-select form-select-sm">
+                        <option value="">— الكل —</option>
+                        {% for y in years %}
+                        <option value="{{ y }}" {% if year_filter == y|stringformat:'s' %}selected{% endif %}>{{ y }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-lg-2 col-md-4 col-6">
+                    <label class="form-label small text-muted mb-1">الشهر</label>
+                    <select name="month" class="form-select form-select-sm">
+                        <option value="">— الكل —</option>
+                        {% for m in months %}
+                        <option value="{{ m }}" {% if month_filter == m|stringformat:'s' %}selected{% endif %}>{{ m }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-lg-2 col-md-4 col-6">
+                    <label class="form-label small text-muted mb-1">الحالة</label>
+                    <select name="status" class="form-select form-select-sm">
+                        <option value="">— الكل —</option>
+                        {% for value, label in payment_status_choices %}
+                        <option value="{{ value }}" {% if status_filter == value %}selected{% endif %}>{{ label }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-12">
+                    <button type="submit" class="btn btn-primary btn-sm"><i class="bi bi-search me-1"></i>تصفية</button>
+                    <a href="{% url 'admin_portal:payments_list' %}" class="btn btn-outline-secondary btn-sm">إعادة تعيين</a>
+                </div>
+            </form>
+
+            {% if page_obj %}
+            <div class="table-responsive">
+                <table class="table table-hover align-middle mb-0">
+                    <thead class="table-light">
+                        <tr>
+                            <th>الطالب</th>
+                            <th>الكورس</th>
+                            <th>الشهر/السنة</th>
+                            <th>الحالة</th>
+                            <th>المبلغ المدفوع</th>
+                            <th>ملاحظات</th>
+                            <th>آخر تحديث</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for payment in page_obj %}
+                        <tr>
+                            <td>
+                                <a href="{% url 'admin_portal:student_detail' payment.student.id %}" class="text-decoration-none">
+                                    {{ payment.student.full_name }}
+                                </a>
+                            </td>
+                            <td>
+                                <a href="{% url 'admin_portal:course_roster' payment.course.id %}" class="text-decoration-none">
+                                    {{ payment.course.full_name }}
+                                </a>
+                            </td>
+                            <td>{{ payment.month }}/{{ payment.year }}</td>
+                            <td>
+                                <span class="badge
+                                    {% if payment.status == 'paid' %}bg-success
+                                    {% elif payment.status == 'partial' %}bg-warning text-dark
+                                    {% else %}bg-danger{% endif %}">
+                                    {{ payment.get_status_display }}
+                                </span>
+                            </td>
+                            <td>{{ payment.amount_paid|default:"—" }}</td>
+                            <td class="small text-muted">{{ payment.note|default:"—"|truncatechars:40 }}</td>
+                            <td class="small text-muted">{{ payment.updated_at|date:"Y-m-d H:i" }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Pagination -->
+            {% if page_obj.has_other_pages %}
+            <nav class="mt-3">
+                <ul class="pagination pagination-sm justify-content-center mb-0">
+                    {% if page_obj.has_previous %}
+                    <li class="page-item">
+                        <a class="page-link" href="?page={{ page_obj.previous_page_number }}&course={{ course_id }}&q={{ q }}&status={{ status_filter }}&year={{ year_filter }}&month={{ month_filter }}">السابق</a>
+                    </li>
+                    {% endif %}
+                    <li class="page-item disabled"><span class="page-link">صفحة {{ page_obj.number }} من {{ page_obj.paginator.num_pages }}</span></li>
+                    {% if page_obj.has_next %}
+                    <li class="page-item">
+                        <a class="page-link" href="?page={{ page_obj.next_page_number }}&course={{ course_id }}&q={{ q }}&status={{ status_filter }}&year={{ year_filter }}&month={{ month_filter }}">التالي</a>
+                    </li>
+                    {% endif %}
+                </ul>
+            </nav>
+            {% endif %}
+            {% else %}
+            <p class="text-muted text-center py-4 mb-0">لا توجد سجلات دفع مطابقة.</p>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}

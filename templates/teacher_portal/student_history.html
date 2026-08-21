@@ -48,7 +48,7 @@
                                 <th>المعلم المكلف</th>
                                 <th>التقييم</th>
                                 <th>ملاحظة المعلم</th>
-                                <th>صورة اليوم</th>
+                                <th>الصور</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -105,15 +105,25 @@
                                     {% endif %}
                                 </td>
                                 <td>
-                                    {% if record.daily_photo %}
-                                    <a href="{{ record.daily_photo.url }}" target="_blank" title="عرض الصورة"
-                                        class="d-inline-block">
-                                        <img src="{{ record.daily_photo.url }}" alt="صورة {{ record.date }}"
-                                            class="rounded" style="width:48px;height:48px;object-fit:cover;">
-                                    </a>
-                                    {% else %}
-                                    <span class="text-muted small">لا توجد</span>
-                                    {% endif %}
+                                    <div class="d-flex gap-1">
+                                        {% if record.homework_photo %}
+                                        <a href="{{ record.homework_photo.url }}" target="_blank" title="الواجب"
+                                            class="d-inline-block border border-success rounded">
+                                            <img src="{{ record.homework_photo.url }}" alt="واجب {{ record.date }}"
+                                                class="rounded" style="width:40px;height:40px;object-fit:cover;">
+                                        </a>
+                                        {% endif %}
+                                        {% if record.test_photo %}
+                                        <a href="{{ record.test_photo.url }}" target="_blank" title="الاختبار"
+                                            class="d-inline-block border border-info rounded">
+                                            <img src="{{ record.test_photo.url }}" alt="اختبار {{ record.date }}"
+                                                class="rounded" style="width:40px;height:40px;object-fit:cover;">
+                                        </a>
+                                        {% endif %}
+                                        {% if not record.homework_photo and not record.test_photo %}
+                                        <span class="text-muted small">لا توجد</span>
+                                        {% endif %}
+                                    </div>
                                 </td>
                                 </tr>
                                 {% endfor %}

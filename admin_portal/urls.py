@@ -60,6 +60,17 @@ urlpatterns = [
     path('teachers/<uuid:pk>/mark-absent/',
          views.teacher_mark_absent, name='teacher_mark_absent'),
 
+    # Course payments
+    path('courses/<uuid:pk>/roster/', views.course_roster, name='course_roster'),
+    path('courses/<uuid:pk>/roster/mark-all-paid/',
+         views.course_mark_all_paid, name='course_mark_all_paid'),
+    path('courses/<uuid:pk>/roster/students/<uuid:student_pk>/cycle/',
+         views.course_payment_cycle, name='course_payment_cycle'),
+    path('courses/<uuid:pk>/roster/students/<uuid:student_pk>/history/',
+         views.course_payment_history, name='course_payment_history'),
+    path('payments/', views.payments_list, name='payments_list'),
+    path('payments/export/', views.payments_export, name='payments_export'),
+
     # Supervisor management
     path('supervisors/', views.supervisor_list, name='supervisor_list'),
     path('supervisors/create/', views.supervisor_create, name='supervisor_create'),
@@ -67,6 +78,16 @@ urlpatterns = [
          views.supervisor_edit, name='supervisor_edit'),
     path('supervisors/<int:pk>/delete/',
          views.supervisor_delete, name='supervisor_delete'),
+
+    # Assistant management
+    path('assistants/', views.assistant_list, name='assistant_list'),
+    path('assistants/create/', views.assistant_create, name='assistant_create'),
+    path('assistants/<int:pk>/edit/',
+         views.assistant_edit, name='assistant_edit'),
+    path('assistants/<int:pk>/delete/',
+         views.assistant_delete, name='assistant_delete'),
+    path('assistants/<int:pk>/links/',
+         views.assistant_links, name='assistant_links'),
 
     # Audit log
     path('audit-log/', views.audit_log, name='audit_log'),

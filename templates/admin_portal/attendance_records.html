@@ -107,7 +107,7 @@
                         <th>التقييم</th>
                         <th>نيابة</th>
                         <th>ملاحظات</th>
-                        <th>صورة</th>
+                        <th>الصور</th>
                         <th></th>
                     </tr>
                 </thead>
@@ -188,12 +188,21 @@
                             </div>
                         </td>
                         <td class="text-center">
-                            {% if rec.daily_photo %}
-                            <a href="{{ rec.daily_photo.url }}" target="_blank" title="عرض الصورة">
-                                <img src="{{ rec.daily_photo.url }}" alt="صورة" class="rounded"
-                                    style="width:36px;height:36px;object-fit:cover;">
-                            </a>
-                            {% else %}<span class="text-muted small">—</span>{% endif %}
+                            <div class="d-flex justify-content-center gap-1">
+                                {% if rec.homework_photo %}
+                                <a href="{{ rec.homework_photo.url }}" target="_blank" title="صورة الواجب">
+                                    <img src="{{ rec.homework_photo.url }}" alt="واجب" class="rounded border border-success"
+                                        style="width:32px;height:32px;object-fit:cover;">
+                                </a>
+                                {% else %}<span class="text-muted small" title="لا يوجد واجب">—</span>{% endif %}
+                                
+                                {% if rec.test_photo %}
+                                <a href="{{ rec.test_photo.url }}" target="_blank" title="صورة الاختبار">
+                                    <img src="{{ rec.test_photo.url }}" alt="اختبار" class="rounded border border-info"
+                                        style="width:32px;height:32px;object-fit:cover;">
+                                </a>
+                                {% else %}<span class="text-muted small" title="لا يوجد اختبار">—</span>{% endif %}
+                            </div>
                         </td>
                         <td>
                             <form method="post" action="{% url 'admin_portal:student_attendance_record_delete' rec.pk %}"
