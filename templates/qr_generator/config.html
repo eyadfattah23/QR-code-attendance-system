@@ -22,18 +22,32 @@
                 <div class="card-body">
                     <form method="get" id="filterForm">
                         <div class="mb-3">
-                            <label for="grade" class="form-label">الصف</label>
-                            <select name="grade" id="grade" class="form-select">
-                                <option value="">-- جميع الصفوف --</option>
+                            <label class="form-label">الصفوف</label>
+                            <div class="border rounded p-2" style="max-height: 150px; overflow-y: auto;">
                                 {% for g in grades %}
-                                <option value="{{ g }}" {% if g == grade_filter %}selected{% endif %}>{{ g }}</option>
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" name="grade" value="{{ g }}" id="grade_{{ forloop.counter }}" {% if g in grade_filters %}checked{% endif %}>
+                                    <label class="form-check-label" for="grade_{{ forloop.counter }}">
+                                        {{ g }}
+                                    </label>
+                                </div>
                                 {% endfor %}
-                            </select>
+                            </div>
                         </div>
                         <div class="mb-3">
-                            <label for="name" class="form-label">اسم الطالب</label>
+                            <label for="name" class="form-label">اسم الطالب أو الكود</label>
                             <input type="text" id="name" name="name" value="{{ name_filter }}"
-                                   class="form-control" placeholder="ابحث بالاسم...">
+                                   class="form-control" placeholder="ابحث بالاسم أو الكود...">
+                        </div>
+                        <div class="mb-3">
+                            <label for="sort" class="form-label">الترتيب</label>
+                            <select name="sort" id="sort" class="form-select">
+                                <option value="">-- الافتراضي --</option>
+                                <option value="name_asc" {% if sort == 'name_asc' %}selected{% endif %}>الاسم (أ - ي)</option>
+                                <option value="name_desc" {% if sort == 'name_desc' %}selected{% endif %}>الاسم (ي - أ)</option>
+                                <option value="code_asc" {% if sort == 'code_asc' %}selected{% endif %}>الكود (تصاعدي)</option>
+                                <option value="code_desc" {% if sort == 'code_desc' %}selected{% endif %}>الكود (تنازلي)</option>
+                            </select>
                         </div>
                         <div class="d-grid gap-2">
                             <button type="submit" class="btn btn-primary">
@@ -77,7 +91,11 @@
                             <div class="col-auto">
                                 <button type="submit" class="btn btn-success"
                                         onclick="return validateSelection()">
-                                    <i class="bi bi-printer me-1"></i> معاينة وطباعة
+                                    <i class="bi bi-qr-code me-1"></i> طباعة QR
+                                </button>
+                                <button type="submit" name="print_photos" value="1" class="btn btn-info"
+                                        onclick="return validateSelection()">
+                                    <i class="bi bi-image me-1"></i> طباعة الصور
                                 </button>
                             </div>
                         </div>

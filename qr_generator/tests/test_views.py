@@ -91,8 +91,9 @@ class QrCardsConfigTestCase(TestCase):
         })
         self.assertEqual(response.status_code, 302)
         self.assertIn(reverse('qr_generator:qr_cards_print'), response.url)
-        self.assertIn('sid=', response.url)
-        self.assertIn('cpp=4', response.url)
+        # Data stored in session, not URL params
+        self.assertEqual(self.client.session['qr_student_ids'], [str(self.student1.id)])
+        self.assertEqual(self.client.session['qr_cards_per_page'], '4')
 
     def test_post_multiple_students_appends_all_ids(self):
         self.client.login(phone='01800000000', password='adminpass')
@@ -101,8 +102,9 @@ class QrCardsConfigTestCase(TestCase):
             'cards_per_page': '8',
         })
         self.assertEqual(response.status_code, 302)
-        self.assertIn(str(self.student1.id), response.url)
-        self.assertIn(str(self.student2.id), response.url)
+        session_ids = self.client.session['qr_student_ids']
+        self.assertIn(str(self.student1.id), session_ids)
+        self.assertIn(str(self.student2.id), session_ids)
 
 
 class QrCardsPrintTestCase(TestCase):
@@ -220,6 +222,165 @@ class QrCardsPrintTestCase(TestCase):
         self.assertEqual(len(response.context['pages']), 0)
 
 
+class QrCardsPhotoPrintRedirectTestCase(TestCase):
+    """Tests that the 'print_photos' button redirects to the photo print page."""
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.admin = User.objects.create_user(
+            phone='01800000010', password='adminpass',
+            role=User.Role.ADMIN,
+        )
+        cls.teacher_user = User.objects.create_user(
+            phone='01900000010', password='teacherpass',
+            role=User.Role.TEACHER,
+        )
+        cls.teacher = Teacher.objects.create(user=cls.teacher_user, full_name='معلم')
+        cls.student = Student.objects.create(
+            full_name='طالب فوتو', national_id='30000000001234',
+            student_code='PHO001',
+        )
+        cls.url = reverse('qr_generator:qr_cards_config')
+
+    def setUp(self):
+        self.client = Client()
+
+    def test_print_photos_button_redirects_to_photo_print(self):
+        self.client.login(phone='01800000010', password='adminpass')
+        response = self.client.post(self.url, {
+            'student_ids': [str(self.student.id)],
+            'cards_per_page': '8',
+            'print_photos': '1',
+        })
+        self.assertEqual(response.status_code, 302)
+        self.assertIn(reverse('qr_generator:qr_cards_photo_print'), response.url)
+        self.assertEqual(self.client.session['qr_student_ids'], [str(self.student.id)])
+
+    def test_default_submit_redirects_to_qr_print(self):
+        self.client.login(phone='01800000010', password='adminpass')
+        response = self.client.post(self.url, {
+            'student_ids': [str(self.student.id)],
+            'cards_per_page': '8',
+        })
+        self.assertEqual(response.status_code, 302)
+        self.assertIn(reverse('qr_generator:qr_cards_print'), response.url)
+
+
+class QrCardsPhotoPrintTestCase(TestCase):
+    """Tests for the photo cards print view."""
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.admin = User.objects.create_user(
+            phone='01800000011', password='adminpass',
+            role=User.Role.ADMIN,
+        )
+        cls.teacher_user = User.objects.create_user(
+            phone='01900000011', password='teacherpass',
+            role=User.Role.TEACHER,
+        )
+        cls.teacher = Teacher.objects.create(user=cls.teacher_user, full_name='معلم')
+        cls.students = [
+            Student.objects.create(
+                full_name=f'طالب صور {i}', national_id=f'3100000000{i:04d}',
+                student_code=f'PHT{i:03d}',
+            )
+            for i in range(1, 7)
+        ]
+        cls.url = reverse('qr_generator:qr_cards_photo_print')
+
+    def setUp(self):
+        self.client = Client()
+
+    def _sid_params(self, students):
+        return '&'.join(f'sid={s.id}' for s in students)
+
+    def test_admin_can_access_photo_print(self):
+        self.client.login(phone='01800000011', password='adminpass')
+        url = f"{self.url}?{self._sid_params(self.students[:2])}&cpp=4"
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, 200)
+
+    def test_unauthenticated_redirected(self):
+        url = f"{self.url}?{self._sid_params(self.students[:1])}"
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, 302)
+        self.assertIn('/login/', response.url)
+
+    def test_teacher_cannot_access_photo_print(self):
+        self.client.login(phone='01900000011', password='teacherpass')
+        url = f"{self.url}?{self._sid_params(self.students[:1])}"
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, 302)
+
+    def test_student_names_in_photo_output(self):
+        self.client.login(phone='01800000011', password='adminpass')
+        url = f"{self.url}?{self._sid_params(self.students[:2])}&cpp=4"
+        response = self.client.get(url)
+        self.assertContains(response, 'طالب صور 1')
+        self.assertContains(response, 'طالب صور 2')
+
+    def test_no_photo_fallback_shown(self):
+        """Students without images should show 'لا توجد صورة' placeholder."""
+        self.client.login(phone='01800000011', password='adminpass')
+        url = f"{self.url}?{self._sid_params(self.students[:1])}&cpp=1"
+        response = self.client.get(url)
+        self.assertContains(response, 'لا توجد صورة')
+
+    def test_grid_layout_matches_qr_grid(self):
+        """Photo print uses the same cols/rows as QR print for same cards_per_page."""
+        self.client.login(phone='01800000011', password='adminpass')
+        chosen = self.students[:4]
+        sid_params = self._sid_params(chosen)
+
+        qr_url = f"{reverse('qr_generator:qr_cards_print')}?{sid_params}&cpp=4"
+        photo_url = f"{self.url}?{sid_params}&cpp=4"
+
+        qr_resp = self.client.get(qr_url)
+        photo_resp = self.client.get(photo_url)
+
+        self.assertEqual(qr_resp.context['cols'], photo_resp.context['cols'])
+        self.assertEqual(qr_resp.context['rows'], photo_resp.context['rows'])
+        self.assertEqual(qr_resp.context['cards_per_page'], photo_resp.context['cards_per_page'])
+        self.assertEqual(len(qr_resp.context['pages']), len(photo_resp.context['pages']))
+
+    def test_ordering_matches_qr_ordering(self):
+        """Photo print ordering must match QR print ordering."""
+        self.client.login(phone='01800000011', password='adminpass')
+        sid_params = self._sid_params(self.students)
+
+        qr_url = f"{reverse('qr_generator:qr_cards_print')}?{sid_params}&cpp=6"
+        photo_url = f"{self.url}?{sid_params}&cpp=6"
+
+        qr_resp = self.client.get(qr_url)
+        photo_resp = self.client.get(photo_url)
+
+        qr_names = [c['student'].full_name for p in qr_resp.context['pages'] for c in p['cards']]
+        photo_names = [c['student'].full_name for p in photo_resp.context['pages'] for c in p['cards']]
+
+        self.assertEqual(qr_names, photo_names)
+
+    def test_page_count_correct(self):
+        self.client.login(phone='01800000011', password='adminpass')
+        url = f"{self.url}?{self._sid_params(self.students)}&cpp=4"
+        response = self.client.get(url)
+        # 6 students / 4 per page = 2 pages
+        self.assertEqual(len(response.context['pages']), 2)
+        self.assertEqual(response.context['total_cards'], 6)
+
+    def test_session_based_access(self):
+        """Photo print should work with session data (not just URL params)."""
+        self.client.login(phone='01800000011', password='adminpass')
+        session = self.client.session
+        session['qr_student_ids'] = [str(s.id) for s in self.students[:3]]
+        session['qr_cards_per_page'] = '6'
+        session.save()
+
+        response = self.client.get(self.url)
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.context['total_cards'], 3)
+
+
 class TeacherQrCardsConfigTestCase(TestCase):
     """Tests for the teacher QR cards configuration view."""
 
@@ -308,8 +469,9 @@ class TeacherQrCardsConfigTestCase(TestCase):
         })
         self.assertEqual(response.status_code, 302)
         self.assertIn(reverse('qr_generator:teacher_qr_cards_print'), response.url)
-        self.assertIn('tid=', response.url)
-        self.assertIn('cpp=4', response.url)
+        # Data stored in session, not URL params
+        self.assertEqual(self.client.session['qr_teacher_ids'], [str(self.teacher1.id)])
+        self.assertEqual(self.client.session['qr_teacher_cards_per_page'], '4')
 
     def test_post_multiple_teachers_appends_all_ids(self):
         self.client.login(phone='02800000000', password='adminpass')
@@ -318,8 +480,9 @@ class TeacherQrCardsConfigTestCase(TestCase):
             'cards_per_page': '8',
         })
         self.assertEqual(response.status_code, 302)
-        self.assertIn(str(self.teacher1.id), response.url)
-        self.assertIn(str(self.teacher2.id), response.url)
+        session_ids = self.client.session['qr_teacher_ids']
+        self.assertIn(str(self.teacher1.id), session_ids)
+        self.assertIn(str(self.teacher2.id), session_ids)
 
 
 class TeacherQrCardsPrintTestCase(TestCase):
