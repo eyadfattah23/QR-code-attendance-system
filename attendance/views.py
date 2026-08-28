@@ -137,7 +137,7 @@ def station_view(request):
                 if student is not None:
                     with _tx.atomic():
                         open_records = list(
-                            StudentAttendanceRecord.objects.select_for_update()
+                            StudentAttendanceRecord.objects.select_for_update(of=("self",))
                             .filter(student=student, date=today,
                                     check_out_time__isnull=True)
                             .select_related("original_teacher")
