@@ -7,6 +7,7 @@ import qrcode
 from django.contrib.auth.decorators import login_required
 from django.shortcuts import render, redirect
 from django.contrib import messages
+from django.db.models import Q
 
 from core.models import Student, Teacher
 
@@ -79,21 +80,40 @@ def qr_cards_config(request):
             from django.urls import reverse
             return redirect(reverse('qr_generator:qr_cards_print'))
 
-    # GET – render config page with optional grade / name filters
-    grade_filter = request.GET.get('grade', '').strip()
+    # GET – render config page with optional grade / name / sort filters
+    grade_filters = request.GET.getlist('grade')
+    # Filter out empty strings from grade_filters (e.g. if the user selects the default empty option)
+    grade_filters = [g for g in grade_filters if g.strip()]
+    
     name_filter = request.GET.get('name', '').strip()
+    sort = request.GET.get('sort', '')
 
-    students = Student.objects.all().order_by('grade', 'full_name')
-    if grade_filter:
-        students = students.filter(grade=grade_filter)
+    students = Student.objects.all()
+    
+    if grade_filters:
+        students = students.filter(grade__in=grade_filters)
     if name_filter:
-        students = students.filter(full_name__icontains=name_filter)
+        students = students.filter(
+            Q(full_name__icontains=name_filter) | Q(student_code__icontains=name_filter)
+        )
+
+    if sort == 'name_asc':
+        students = students.order_by('full_name')
+    elif sort == 'name_desc':
+        students = students.order_by('-full_name')
+    elif sort == 'code_asc':
+        students = students.order_by('student_code')
+    elif sort == 'code_desc':
+        students = students.order_by('-student_code')
+    else:
+        students = students.order_by('grade', 'full_name')
 
     return render(request, 'qr_generator/config.html', {
         'students': students,
         'grades': grades,
-        'grade_filter': grade_filter,
+        'grade_filters': grade_filters,
         'name_filter': name_filter,
+        'sort': sort,
         'cards_per_page_range': range(1, 13),
     })
 
