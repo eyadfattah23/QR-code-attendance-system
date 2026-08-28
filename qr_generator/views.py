@@ -7,6 +7,7 @@ import qrcode
 from django.contrib.auth.decorators import login_required
 from django.shortcuts import render, redirect
 from django.contrib import messages
+from django.db.models import Q
 
 from core.models import Student, Teacher
 
@@ -77,23 +78,44 @@ def qr_cards_config(request):
             request.session['qr_student_ids'] = student_ids
             request.session['qr_cards_per_page'] = cards_per_page
             from django.urls import reverse
+            if 'print_photos' in request.POST:
+                return redirect(reverse('qr_generator:qr_cards_photo_print'))
             return redirect(reverse('qr_generator:qr_cards_print'))
 
-    # GET – render config page with optional grade / name filters
-    grade_filter = request.GET.get('grade', '').strip()
+    # GET – render config page with optional grade / name / sort filters
+    grade_filters = request.GET.getlist('grade')
+    # Filter out empty strings from grade_filters (e.g. if the user selects the default empty option)
+    grade_filters = [g for g in grade_filters if g.strip()]
+    
     name_filter = request.GET.get('name', '').strip()
+    sort = request.GET.get('sort', '')
 
-    students = Student.objects.all().order_by('grade', 'full_name')
-    if grade_filter:
-        students = students.filter(grade=grade_filter)
+    students = Student.objects.all()
+    
+    if grade_filters:
+        students = students.filter(grade__in=grade_filters)
     if name_filter:
-        students = students.filter(full_name__icontains=name_filter)
+        students = students.filter(
+            Q(full_name__icontains=name_filter) | Q(student_code__icontains=name_filter)
+        )
+
+    if sort == 'name_asc':
+        students = students.order_by('full_name')
+    elif sort == 'name_desc':
+        students = students.order_by('-full_name')
+    elif sort == 'code_asc':
+        students = students.order_by('student_code')
+    elif sort == 'code_desc':
+        students = students.order_by('-student_code')
+    else:
+        students = students.order_by('grade', 'student_code')
 
     return render(request, 'qr_generator/config.html', {
         'students': students,
         'grades': grades,
-        'grade_filter': grade_filter,
+        'grade_filters': grade_filters,
         'name_filter': name_filter,
+        'sort': sort,
         'cards_per_page_range': range(1, 13),
     })
 
@@ -101,14 +123,14 @@ def qr_cards_config(request):
 @admin_required
 def qr_cards_print(request):
     """Step 2 – render a printable A4 page (or multiple pages) with QR cards."""
-    student_ids = request.session.pop('qr_student_ids', None) or request.GET.getlist('sid')
+    student_ids = request.session.get('qr_student_ids', None) or request.GET.getlist('sid')
     try:
-        cpp_raw = request.session.pop('qr_cards_per_page', None) or request.GET.get('cpp', 8)
+        cpp_raw = request.session.get('qr_cards_per_page', None) or request.GET.get('cpp', 8)
         cards_per_page = max(1, min(12, int(cpp_raw)))
     except (ValueError, TypeError):
         cards_per_page = 8
 
-    students = Student.objects.filter(id__in=student_ids).order_by('grade', 'full_name')
+    students = Student.objects.filter(id__in=student_ids).order_by('grade', 'student_code')
 
     # Build list of (student, qr_data_uri) pairs
     cards = [
@@ -128,6 +150,39 @@ def qr_cards_print(request):
         pages.append({'cards': chunk, 'empty_range': range(padding)})
 
     return render(request, 'qr_generator/print.html', {
+        'pages': pages,
+        'cols': cols,
+        'rows': rows,
+        'cards_per_page': cards_per_page,
+        'total_cards': len(cards),
+    })
+
+
+@admin_required
+def qr_cards_photo_print(request):
+    """Render a printable A4 page with student photos in the same order/layout as QR cards."""
+    student_ids = request.session.get('qr_student_ids', None) or request.GET.getlist('sid')
+    try:
+        cpp_raw = request.session.get('qr_cards_per_page', None) or request.GET.get('cpp', 8)
+        cards_per_page = max(1, min(12, int(cpp_raw)))
+    except (ValueError, TypeError):
+        cards_per_page = 8
+
+    students = Student.objects.filter(id__in=student_ids).order_by('grade', 'student_code')
+
+    cards = [{'student': s} for s in students]
+
+    cols = CARDS_GRID_COLS.get(cards_per_page, 3)
+    rows = math.ceil(cards_per_page / cols)
+
+    raw_pages = [cards[i: i + cards_per_page] for i in range(0, len(cards), cards_per_page)]
+    pages = []
+    total_slots = cols * rows
+    for chunk in raw_pages:
+        padding = total_slots - len(chunk)
+        pages.append({'cards': chunk, 'empty_range': range(padding)})
+
+    return render(request, 'qr_generator/photo_print.html', {
         'pages': pages,
         'cols': cols,
         'rows': rows,
