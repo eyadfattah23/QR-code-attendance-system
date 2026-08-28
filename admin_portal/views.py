@@ -788,6 +788,13 @@ def teacher_list(request):
     else:
         qs = qs.filter(is_active=True)
 
+    # Filter by teacher type (teacher vs course)
+    teacher_type = request.GET.get('type', '').strip()
+    if teacher_type == 'course':
+        qs = qs.filter(is_course=True)
+    elif teacher_type == 'teacher':
+        qs = qs.filter(is_course=False)
+
     if q:
         qs = qs.filter(
             Q(full_name__icontains=q)
@@ -822,6 +829,7 @@ def teacher_list(request):
         'total_count': qs.count(),
         'sort': sort,
         'show_inactive': show_inactive,
+        'teacher_type': teacher_type,
     })
 
 

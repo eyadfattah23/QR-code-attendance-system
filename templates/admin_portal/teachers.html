@@ -57,6 +57,14 @@
                     </select>
                 </div>
                 <div class="col-md-2">
+                    <label class="form-label mb-1 small fw-semibold">النوع</label>
+                    <select name="type" class="form-select">
+                        <option value="">— الكل —</option>
+                        <option value="teacher" {% if teacher_type == 'teacher' %}selected{% endif %}>معلم فقط</option>
+                        <option value="course" {% if teacher_type == 'course' %}selected{% endif %}>كورس فقط</option>
+                    </select>
+                </div>
+                <div class="col-md-2">
                     <label class="form-label mb-1 small fw-semibold">الحالة</label>
                     <select name="inactive" class="form-select">
                         <option value="">نشط فقط</option>
@@ -68,7 +76,7 @@
                         <i class="bi bi-funnel me-1"></i>تطبيق الفرز
                     </button>
                 </div>
-                {% if q or gender_filter or sort or show_inactive %}
+                {% if q or gender_filter or sort or show_inactive or teacher_type %}
                 <div class="col-md-2">
                     <a href="{% url 'admin_portal:teacher_list' %}" class="btn btn-outline-secondary w-100">
                         <i class="bi bi-x-lg me-1"></i>مسح

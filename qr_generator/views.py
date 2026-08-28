@@ -106,7 +106,7 @@ def qr_cards_config(request):
     elif sort == 'code_desc':
         students = students.order_by('-student_code')
     else:
-        students = students.order_by('grade', 'full_name')
+        students = students.order_by('grade', 'student_code')
 
     return render(request, 'qr_generator/config.html', {
         'students': students,
