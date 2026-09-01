@@ -204,6 +204,7 @@ def student_create(request):
         'form': form,
         'title': 'إضافة طالب جديد',
         'submit_label': 'إضافة',
+        'back_url': _get_return(request, 'student_list_return', reverse('admin_portal:student_list')),
     })
 
 
@@ -230,6 +231,7 @@ def student_edit(request, pk):
         'student': student,
         'title': f'تعديل: {student.full_name}',
         'submit_label': 'حفظ التغييرات',
+        'back_url': _get_return(request, 'student_list_return', reverse('admin_portal:student_list')),
     })
 
 
@@ -306,6 +308,7 @@ def student_detail(request, pk):
         'recent_records': recent_records,
         'total_records': total_records,
         'courses': courses,
+        'back_url': _get_return(request, 'student_list_return', reverse('admin_portal:student_list')),
     })
 
 
@@ -851,6 +854,7 @@ def teacher_create(request):
         'form': form,
         'title': 'إضافة معلم جديد',
         'submit_label': 'إضافة',
+        'back_url': _get_return(request, 'teacher_list_return', reverse('admin_portal:teacher_list')),
     })
 
 
@@ -887,6 +891,7 @@ def teacher_edit(request, pk):
         'teacher': teacher,
         'title': f'تعديل: {teacher.full_name}',
         'submit_label': 'حفظ التغييرات',
+        'back_url': _get_return(request, 'teacher_list_return', reverse('admin_portal:teacher_list')),
     })
 
 
@@ -1057,6 +1062,7 @@ def teacher_students(request, pk):
         'grade_filter': grade_filter,
         'grades': grades,
         'linked_count': len(linked_ids),
+        'back_url': _get_return(request, 'teacher_list_return', reverse('admin_portal:teacher_list')),
     })
 
 
@@ -1685,6 +1691,7 @@ def student_history(request, pk):
         'teachers': teachers,
         'oldest_record': oldest_record,
         'avg_rating': avg_rating,
+        'back_url': _get_return(request, 'student_list_return', reverse('admin_portal:student_list')),
     })
 
 
