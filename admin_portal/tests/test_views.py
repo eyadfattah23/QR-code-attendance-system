@@ -152,6 +152,79 @@ class AdminDashboardTestCase(TestCase):
         response = self.client.get(self.url)
         self.assertEqual(response.context['today_substitute_count'], 0)
 
+    # ---------- gender breakdown ----------
+
+    def test_context_today_attendance_gender_breakdown(self):
+        female_student = Student.objects.create(
+            full_name='Female Student', national_id='12345678901236',
+            student_code='STU003', gender=Student.Gender.FEMALE,
+        )
+        male_teacher_user = User.objects.create_user(
+            phone='01234567893', email='mt@test.com', password='mtpass',
+            role=User.Role.TEACHER, first_name='Male', last_name='Teacher'
+        )
+        male_teacher = Teacher.objects.create(
+            user=male_teacher_user, full_name='Male Teacher', gender=Teacher.Gender.MALE,
+        )
+        female_teacher_user = User.objects.create_user(
+            phone='01234567894', email='ft@test.com', password='ftpass',
+            role=User.Role.TEACHER, first_name='Female', last_name='Teacher'
+        )
+        female_teacher = Teacher.objects.create(
+            user=female_teacher_user, full_name='Female Teacher', gender=Teacher.Gender.FEMALE,
+        )
+        # self.student1 has no gender set, so it should not count as male or female.
+        StudentAttendanceRecord.objects.create(
+            student=female_student, date=localdate(), check_in_time=localtime(),
+            recorded_by=self.admin_user,
+        )
+        TeacherAttendanceRecord.objects.create(
+            teacher=male_teacher, date=localdate(), check_in_time=localtime(),
+            recorded_by=self.admin_user,
+        )
+        TeacherAttendanceRecord.objects.create(
+            teacher=female_teacher, date=localdate(), check_in_time=localtime(),
+            recorded_by=self.admin_user,
+        )
+        self.client.login(phone='01234567890', password='adminpass123')
+        response = self.client.get(self.url)
+        self.assertEqual(response.context['today_student_attendance_male_count'], 0)
+        self.assertEqual(response.context['today_student_attendance_female_count'], 1)
+        self.assertEqual(response.context['today_teacher_attendance_male_count'], 1)
+        self.assertEqual(response.context['today_teacher_attendance_female_count'], 1)
+
+    # ---------- active courses today ----------
+
+    def test_active_courses_today_count(self):
+        course_user = User.objects.create_user(
+            phone='01234567895', email='course@test.com', password='cpass',
+            role=User.Role.TEACHER, first_name='Course', last_name='One'
+        )
+        course = Teacher.objects.create(
+            user=course_user, full_name='Course One', is_course=True, is_active=True,
+        )
+        other_course_user = User.objects.create_user(
+            phone='01234567896', email='course2@test.com', password='cpass2',
+            role=User.Role.TEACHER, first_name='Course', last_name='Two'
+        )
+        Teacher.objects.create(
+            user=other_course_user, full_name='Course Two', is_course=True, is_active=True,
+        )
+        StudentAttendanceRecord.objects.create(
+            student=self.student1, date=localdate(), check_in_time=localtime(),
+            recorded_by=self.admin_user, original_teacher=course,
+        )
+        self.client.login(phone='01234567890', password='adminpass123')
+        response = self.client.get(self.url)
+        self.assertEqual(response.context['total_courses_count'], 2)
+        self.assertEqual(response.context['active_courses_today_count'], 1)
+
+    def test_active_courses_today_zero_when_no_course_attendance(self):
+        self.client.login(phone='01234567890', password='adminpass123')
+        response = self.client.get(self.url)
+        self.assertEqual(response.context['total_courses_count'], 0)
+        self.assertEqual(response.context['active_courses_today_count'], 0)
+
 
 # ---------------------------------------------------------------------------
 # Student management tests

@@ -75,7 +75,20 @@ def dashboard(request):
         'total_teachers': Teacher.objects.count(),
         'total_users': User.objects.count(),
         'today_student_attendance_count': today_student_attendance.count(),
+        'today_student_attendance_male_count': today_student_attendance.filter(
+            student__gender=Student.Gender.MALE).count(),
+        'today_student_attendance_female_count': today_student_attendance.filter(
+            student__gender=Student.Gender.FEMALE).count(),
         'today_teacher_attendance_count': today_teacher_attendance.count(),
+        'today_teacher_attendance_male_count': today_teacher_attendance.filter(
+            teacher__gender=Teacher.Gender.MALE).count(),
+        'today_teacher_attendance_female_count': today_teacher_attendance.filter(
+            teacher__gender=Teacher.Gender.FEMALE).count(),
+        'total_courses_count': Teacher.objects.filter(
+            is_course=True, is_active=True).count(),
+        'active_courses_today_count': today_student_attendance.filter(
+            original_teacher__is_course=True
+        ).values('original_teacher').distinct().count(),
         'today_substitute_count': today_student_attendance.filter(
             original_teacher__isnull=False,
             assigned_teacher__isnull=False,
@@ -96,6 +109,7 @@ def dashboard(request):
             ]
         ).count(),
         'today': today,
+        'today_str': today.strftime('%Y-%m-%d'),
     }
     return render(request, 'admin_portal/dashboard.html', context)
 
@@ -1749,6 +1763,8 @@ def attendance_records(request):
     grade = request.GET.get('grade', '').strip()
     teacher_q = request.GET.get('teacher_q', '').strip()
     record_type = request.GET.get('record_type', '').strip()
+    image_filter = request.GET.get('image_filter', '').strip()
+    gender = request.GET.get('gender', '').strip()
 
     # --- student records ---
     student_qs = (
@@ -1773,6 +1789,14 @@ def attendance_records(request):
         )
     if grade:
         student_qs = student_qs.filter(student__grade=grade)
+    if gender:
+        student_qs = student_qs.filter(student__gender=gender)
+
+    if image_filter == 'missing':
+        student_qs = student_qs.filter(
+            Q(homework_photo__exact='') | Q(homework_photo__isnull=True),
+            Q(test_photo__exact='') | Q(test_photo__isnull=True)
+        )
 
     # --- teacher records ---
     teacher_qs = (
@@ -1791,6 +1815,8 @@ def attendance_records(request):
         )
     if record_type:
         teacher_qs = teacher_qs.filter(record_type=record_type)
+    if gender:
+        teacher_qs = teacher_qs.filter(teacher__gender=gender)
 
     student_total = student_qs.count()
     teacher_total = teacher_qs.count()
@@ -1826,6 +1852,8 @@ def attendance_records(request):
         'grade': grade,
         'teacher_q': teacher_q,
         'record_type': record_type,
+        'image_filter': image_filter,
+        'gender': gender,
     })
 
 
@@ -1847,6 +1875,8 @@ def export_attendance_excel(request):
     grade = request.GET.get('grade', '').strip()
     teacher_q = request.GET.get('teacher_q', '').strip()
     record_type = request.GET.get('record_type', '').strip()
+    image_filter = request.GET.get('image_filter', '').strip()
+    gender = request.GET.get('gender', '').strip()
 
     wb = openpyxl.Workbook()
     ws = wb.active
@@ -1889,6 +1919,9 @@ def export_attendance_excel(request):
             qs = qs.filter(date__lte=d_to)
         if record_type:
             qs = qs.filter(record_type=record_type)
+        if gender:
+            teachers_qs = teachers_qs.filter(gender=gender)
+            qs = qs.filter(teacher__gender=gender)
 
         # If dates not provided, find min/max in qs
         if not d_from and qs.exists():
@@ -1982,6 +2015,8 @@ def export_attendance_excel(request):
             )
         if record_type:
             qs = qs.filter(record_type=record_type)
+        if gender:
+            qs = qs.filter(teacher__gender=gender)
 
         ws.append(['التاريخ', 'المعلم', 'نوع السجل', 'وقت الحضور',
                   'وقت المغادرة', 'مدة الحضور', 'التقييم', 'ملاحظات'])
@@ -2024,6 +2059,14 @@ def export_attendance_excel(request):
             )
         if grade:
             qs = qs.filter(student__grade=grade)
+        
+        if image_filter == 'missing':
+            qs = qs.filter(
+                Q(homework_photo__exact='') | Q(homework_photo__isnull=True),
+                Q(test_photo__exact='') | Q(test_photo__isnull=True)
+            )
+        if gender:
+            qs = qs.filter(student__gender=gender)
         ws.append([
             'التاريخ', 'اسم الطالب', 'الرقم القومي', 'الكود', 'الصف',
             'وقت الحضور', 'وقت المغادرة', 'مدة الحضور', 'المعلم المكلف', 'التقييم', 'نيابة', 'ملاحظات', 'ملاحظة المعلم',
