@@ -1,4 +1,5 @@
 {% extends 'base.html' %}
+{% load query_helpers %}
 
 {% block title %}سجلات الحضور - نظام الحضور{% endblock %}
 
@@ -221,33 +222,31 @@
         </div>
         {% if student_page.has_other_pages %}
         <div class="d-flex justify-content-between align-items-center px-3 py-3 border-top">
-            <small class="text-muted">عرض {{ student_page.start_index }}–{{ student_page.end_index }} من {{
-                student_total }}</small>
+            <small class="text-muted">عرض {{ student_page.start_index }}–{{ student_page.end_index }} من {{ student_total }}</small>
             <nav>
                 <ul class="pagination pagination-sm mb-0">
                     {% if student_page.has_previous %}
                     <li class="page-item">
                         <a class="page-link"
-                            href="?tab=students&page={{ student_page.previous_page_number }}{% if date_from %}&date_from={{ date_from }}{% endif %}{% if date_to %}&date_to={{ date_to }}{% endif %}{% if teacher_id %}&teacher={{ teacher_id }}{% endif %}{% if student_q %}&student={{ student_q }}{% endif %}{% if grade %}&grade={{ grade }}{% endif %}">&laquo;</a>
+                            href="?{% querystring page=student_page.previous_page_number %}">&laquo;</a>
                     </li>
                     {% endif %}
                     {% for num in student_page.paginator.page_range %}
                     {% if student_page.number == num %}
                     <li class="page-item active"><span class="page-link">{{ num }}</span></li>
-                    {% elif num > student_page.number|add:"-3" and num < student_page.number|add:"3" %} <li
-                        class="page-item">
+                    {% elif num > student_page.number|add:"-3" and num < student_page.number|add:"3" %}
+                    <li class="page-item">
                         <a class="page-link"
-                            href="?tab=students&page={{ num }}{% if date_from %}&date_from={{ date_from }}{% endif %}{% if date_to %}&date_to={{ date_to }}{% endif %}{% if teacher_id %}&teacher={{ teacher_id }}{% endif %}{% if student_q %}&student={{ student_q }}{% endif %}{% if grade %}&grade={{ grade }}{% endif %}">{{
-                            num }}</a>
-                        </li>
-                        {% endif %}
-                        {% endfor %}
-                        {% if student_page.has_next %}
-                        <li class="page-item">
-                            <a class="page-link"
-                                href="?tab=students&page={{ student_page.next_page_number }}{% if date_from %}&date_from={{ date_from }}{% endif %}{% if date_to %}&date_to={{ date_to }}{% endif %}{% if teacher_id %}&teacher={{ teacher_id }}{% endif %}{% if student_q %}&student={{ student_q }}{% endif %}{% if grade %}&grade={{ grade }}{% endif %}">&raquo;</a>
-                        </li>
-                        {% endif %}
+                            href="?{% querystring page=num %}">{{ num }}</a>
+                    </li>
+                    {% endif %}
+                    {% endfor %}
+                    {% if student_page.has_next %}
+                    <li class="page-item">
+                        <a class="page-link"
+                            href="?{% querystring page=student_page.next_page_number %}">&raquo;</a>
+                    </li>
+                    {% endif %}
                 </ul>
             </nav>
         </div>
@@ -393,33 +392,31 @@
         </div>
         {% if teacher_page.has_other_pages %}
         <div class="d-flex justify-content-between align-items-center px-3 py-3 border-top">
-            <small class="text-muted">عرض {{ teacher_page.start_index }}–{{ teacher_page.end_index }} من {{
-                teacher_total }}</small>
+            <small class="text-muted">عرض {{ teacher_page.start_index }}–{{ teacher_page.end_index }} من {{ teacher_total }}</small>
             <nav>
                 <ul class="pagination pagination-sm mb-0">
                     {% if teacher_page.has_previous %}
                     <li class="page-item">
                         <a class="page-link"
-                            href="?tab=teachers&page={{ teacher_page.previous_page_number }}{% if date_from %}&date_from={{ date_from }}{% endif %}{% if date_to %}&date_to={{ date_to }}{% endif %}{% if teacher_q %}&teacher_q={{ teacher_q }}{% endif %}{% if record_type %}&record_type={{ record_type }}{% endif %}">&laquo;</a>
+                            href="?{% querystring page=teacher_page.previous_page_number %}">&laquo;</a>
                     </li>
                     {% endif %}
                     {% for num in teacher_page.paginator.page_range %}
                     {% if teacher_page.number == num %}
                     <li class="page-item active"><span class="page-link">{{ num }}</span></li>
-                    {% elif num > teacher_page.number|add:"-3" and num < teacher_page.number|add:"3" %} <li
-                        class="page-item">
+                    {% elif num > teacher_page.number|add:"-3" and num < teacher_page.number|add:"3" %}
+                    <li class="page-item">
                         <a class="page-link"
-                            href="?tab=teachers&page={{ num }}{% if date_from %}&date_from={{ date_from }}{% endif %}{% if date_to %}&date_to={{ date_to }}{% endif %}{% if teacher_q %}&teacher_q={{ teacher_q }}{% endif %}{% if record_type %}&record_type={{ record_type }}{% endif %}">{{
-                            num }}</a>
-                        </li>
-                        {% endif %}
-                        {% endfor %}
-                        {% if teacher_page.has_next %}
-                        <li class="page-item">
-                            <a class="page-link"
-                                href="?tab=teachers&page={{ teacher_page.next_page_number }}{% if date_from %}&date_from={{ date_from }}{% endif %}{% if date_to %}&date_to={{ date_to }}{% endif %}{% if teacher_q %}&teacher_q={{ teacher_q }}{% endif %}{% if record_type %}&record_type={{ record_type }}{% endif %}">&raquo;</a>
-                        </li>
-                        {% endif %}
+                            href="?{% querystring page=num %}">{{ num }}</a>
+                    </li>
+                    {% endif %}
+                    {% endfor %}
+                    {% if teacher_page.has_next %}
+                    <li class="page-item">
+                        <a class="page-link"
+                            href="?{% querystring page=teacher_page.next_page_number %}">&raquo;</a>
+                    </li>
+                    {% endif %}
                 </ul>
             </nav>
         </div>

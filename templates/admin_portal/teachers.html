@@ -1,4 +1,5 @@
 {% extends 'base.html' %}
+{% load query_helpers %}
 
 {% block title %}إدارة المعلمين - نظام الحضور{% endblock %}
 
@@ -179,7 +180,7 @@
                         {% if page_obj.has_previous %}
                         <li class="page-item">
                             <a class="page-link"
-                                href="?page={{ page_obj.previous_page_number }}{% if q %}&q={{ q }}{% endif %}{% if gender_filter %}&gender={{ gender_filter }}{% endif %}{% if sort %}&sort={{ sort }}{% endif %}">
+                                href="?{% querystring page=page_obj.previous_page_number %}">
                                 &laquo;
                             </a>
                         </li>
@@ -188,21 +189,21 @@
                         {% for num in page_obj.paginator.page_range %}
                         {% if num == page_obj.number %}
                         <li class="page-item active"><span class="page-link">{{ num }}</span></li>
-                        {% elif num >= page_obj.number|add:"-2" and num <= page_obj.number|add:"2" %} <li
-                            class="page-item">
-                            <a class="page-link" href="?page={{ num }}{% if q %}&q={{ q }}{% endif %}{% if gender_filter %}&gender={{ gender_filter }}{% endif %}{% if sort %}&sort={{ sort }}{% endif %}">{{ num }}</a>
-                            </li>
-                            {% endif %}
-                            {% endfor %}
+                        {% elif num >= page_obj.number|add:"-2" and num <= page_obj.number|add:"2" %}
+                        <li class="page-item">
+                            <a class="page-link" href="?{% querystring page=num %}">{{ num }}</a>
+                        </li>
+                        {% endif %}
+                        {% endfor %}
 
-                            {% if page_obj.has_next %}
-                            <li class="page-item">
-                                <a class="page-link"
-                                    href="?page={{ page_obj.next_page_number }}{% if q %}&q={{ q }}{% endif %}{% if gender_filter %}&gender={{ gender_filter }}{% endif %}{% if sort %}&sort={{ sort }}{% endif %}">
-                                    &raquo;
-                                </a>
-                            </li>
-                            {% endif %}
+                        {% if page_obj.has_next %}
+                        <li class="page-item">
+                            <a class="page-link"
+                                href="?{% querystring page=page_obj.next_page_number %}">
+                                &raquo;
+                            </a>
+                        </li>
+                        {% endif %}
                     </ul>
                 </nav>
             </div>

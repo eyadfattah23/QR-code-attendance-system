@@ -1,4 +1,5 @@
 {% extends 'base.html' %}
+{% load query_helpers %}
 
 {% block title %}سجلات الدفع - نظام الحضور{% endblock %}
 
@@ -152,13 +153,13 @@
                 <ul class="pagination pagination-sm justify-content-center mb-0">
                     {% if page_obj.has_previous %}
                     <li class="page-item">
-                        <a class="page-link" href="?page={{ page_obj.previous_page_number }}&course={{ course_id }}&q={{ q }}&status={{ status_filter }}&year={{ year_filter }}&month={{ month_filter }}">السابق</a>
+                        <a class="page-link" href="?{% querystring page=page_obj.previous_page_number %}">السابق</a>
                     </li>
                     {% endif %}
                     <li class="page-item disabled"><span class="page-link">صفحة {{ page_obj.number }} من {{ page_obj.paginator.num_pages }}</span></li>
                     {% if page_obj.has_next %}
                     <li class="page-item">
-                        <a class="page-link" href="?page={{ page_obj.next_page_number }}&course={{ course_id }}&q={{ q }}&status={{ status_filter }}&year={{ year_filter }}&month={{ month_filter }}">التالي</a>
+                        <a class="page-link" href="?{% querystring page=page_obj.next_page_number %}">التالي</a>
                     </li>
                     {% endif %}
                 </ul>
