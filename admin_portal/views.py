@@ -48,6 +48,17 @@ def _get_return(request, key, fallback_url):
     return fallback_url
 
 
+def _get_per_page(request, default=50):
+    """Parse per_page from GET params with validation. Allowed: 25, 50, 100."""
+    try:
+        per_page = int(request.GET.get('per_page', default))
+    except (ValueError, TypeError):
+        per_page = default
+    if per_page not in (25, 50, 100):
+        per_page = default
+    return per_page
+
+
 def admin_required(view_func):
     """Decorator to ensure user is an admin."""
     @wraps(view_func)
@@ -182,7 +193,8 @@ def student_list(request):
         .order_by('hall_name')
     )
 
-    paginator = Paginator(qs, 25)
+    per_page = _get_per_page(request, default=25)
+    paginator = Paginator(qs, per_page)
     page_obj = paginator.get_page(request.GET.get('page'))
 
     return render(request, 'admin_portal/students.html', {
@@ -197,6 +209,7 @@ def student_list(request):
         'halls': halls,
         'total_count': qs.count(),
         'sort': sort,
+        'per_page': per_page,
     })
 
 
@@ -836,7 +849,8 @@ def teacher_list(request):
     else:
         qs = qs.order_by('full_name')
 
-    paginator = Paginator(qs, 25)
+    per_page = _get_per_page(request, default=25)
+    paginator = Paginator(qs, per_page)
     page_obj = paginator.get_page(request.GET.get('page'))
 
     return render(request, 'admin_portal/teachers.html', {
@@ -847,6 +861,7 @@ def teacher_list(request):
         'sort': sort,
         'show_inactive': show_inactive,
         'teacher_type': teacher_type,
+        'per_page': per_page,
     })
 
 
@@ -1754,6 +1769,7 @@ def teacher_add_excused_absence(request):
 @admin_required
 def attendance_records(request):
     """Filterable table of student and teacher attendance records (tabbed)."""
+    _save_return(request, 'attendance_records_return')
     tab = request.GET.get('tab', 'students')  # 'students' | 'teachers'
 
     date_from = request.GET.get('date_from', '').strip()
@@ -1821,12 +1837,14 @@ def attendance_records(request):
     student_total = student_qs.count()
     teacher_total = teacher_qs.count()
 
+    per_page = _get_per_page(request, default=50)
+
     if tab == 'teachers':
-        paginator = Paginator(teacher_qs, 50)
+        paginator = Paginator(teacher_qs, per_page)
         teacher_page = paginator.get_page(request.GET.get('page'))
         student_page = None
     else:
-        paginator = Paginator(student_qs, 50)
+        paginator = Paginator(student_qs, per_page)
         student_page = paginator.get_page(request.GET.get('page'))
         teacher_page = None
 
@@ -1854,6 +1872,7 @@ def attendance_records(request):
         'record_type': record_type,
         'image_filter': image_filter,
         'gender': gender,
+        'per_page': per_page,
     })
 
 
@@ -2237,7 +2256,8 @@ def teacher_attendance_record_edit(request, pk):
     record = get_object_or_404(
         TeacherAttendanceRecord.objects.select_related('teacher'), pk=pk
     )
-    back_url = reverse('admin_portal:attendance_records') + '?tab=teachers'
+    back_url = _get_return(request, 'attendance_records_return',
+                           reverse('admin_portal:attendance_records') + '?tab=teachers')
 
     if request.method == 'POST':
         notes = request.POST.get('notes', '').strip()
