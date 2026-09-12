@@ -1,0 +1,94 @@
+{% extends 'base.html' %}
+{% load query_helpers %}
+
+{% block title %}سجلات دفع: {{ student.full_name }} - نظام الحضور{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+
+    <div class="d-flex align-items-center mb-3 mt-2 gap-3 flex-wrap">
+        <a href="{% url 'admin_portal:student_detail' student.id %}" class="btn btn-outline-secondary btn-sm" title="رجوع">
+            <i class="bi bi-arrow-right"></i>
+        </a>
+        <div class="flex-grow-1">
+            <h1 class="h4 mb-0"><i class="bi bi-cash-coin me-2 text-success"></i>سجلات دفع: {{ student.full_name }}</h1>
+            <div class="text-muted small mt-1">
+                شهر {{ month }}/{{ year }} — {{ total_count }} كورس مسجل
+                {% if unpaid_count %}
+                <span class="text-danger fw-semibold">({{ unpaid_count }} غير مسدد)</span>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <div class="card border-0 shadow-sm">
+        <div class="card-body">
+            {% if roster %}
+            <div class="table-responsive">
+                <table class="table table-hover align-middle mb-0">
+                    <thead class="table-light">
+                        <tr>
+                            <th style="width: 3rem">#</th>
+                            <th>الكورس</th>
+                            <th style="width: 10rem" class="text-center">حالة الدفع (هذا الشهر)</th>
+                            <th style="width: 7rem" class="text-center">السجل الكامل</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for row in roster %}
+                        <tr>
+                            <td class="text-muted small">{{ forloop.counter }}</td>
+                            <td class="fw-semibold">
+                                <a href="{% url 'admin_portal:course_roster' row.course.id %}" class="text-decoration-none">
+                                    <i class="bi bi-mortarboard me-1 text-muted"></i>{{ row.course.full_name }}
+                                </a>
+                                {% if row.course.subject %}
+                                <small class="text-muted ms-1">— {{ row.course.subject }}</small>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% include 'admin_portal/partials/payment_status_button.html' with course=row.course payment=row.payment student=student %}
+                            </td>
+                            <td class="text-center">
+                                <button type="button" class="btn btn-sm btn-outline-info"
+                                        data-bs-toggle="modal" data-bs-target="#historyModal{{ row.course.id }}"
+                                        hx-get="{% url 'admin_portal:course_payment_history' row.course.pk student.id %}"
+                                        hx-target="#historyModalBody{{ row.course.id }}"
+                                        hx-trigger="click"
+                                        title="عرض السجل الكامل">
+                                    <i class="bi bi-clock-history"></i>
+                                </button>
+
+                                <div class="modal fade" id="historyModal{{ row.course.id }}" tabindex="-1" aria-hidden="true">
+                                    <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
+                                        <div class="modal-content">
+                                            <div class="modal-header">
+                                                <h5 class="modal-title fs-6">
+                                                    السجل الكامل: {{ student.full_name }} — {{ row.course.full_name }}
+                                                </h5>
+                                                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="إغلاق"></button>
+                                            </div>
+                                            <div class="modal-body" id="historyModalBody{{ row.course.id }}">
+                                                <div class="text-center text-muted py-4">
+                                                    <div class="spinner-border spinner-border-sm"></div> جارِ التحميل...
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% else %}
+            <div class="text-center py-5">
+                <i class="bi bi-mortarboard display-1 text-muted"></i>
+                <p class="text-muted mt-3 mb-0">هذا الطالب غير مسجل في أي كورس بعد.</p>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}

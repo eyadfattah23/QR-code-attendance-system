@@ -340,6 +340,55 @@ def student_detail(request, pk):
 
 
 @admin_required
+def student_payments(request, pk):
+    """All payment records for a single student, grouped by course.
+
+    Mirrors the course-roster UX but viewed from the student's perspective:
+    current-month status buttons (HTMX cycle) + full 12-month history modals.
+    """
+    student = get_object_or_404(Student, pk=pk)
+    today = localdate()
+    year, month = today.year, today.month
+
+    course_links = (
+        StudentTeacherLink.objects
+        .filter(student=student, teacher__is_course=True)
+        .select_related('teacher')
+        .order_by('teacher__full_name')
+    )
+
+    course_ids = [link.teacher_id for link in course_links]
+    payments_by_course = {
+        p.course_id: p
+        for p in CoursePayment.objects.filter(
+            student=student, year=year, month=month,
+            course_id__in=course_ids,
+        )
+    }
+
+    roster = [
+        {
+            'course': link.teacher,
+            'payment': payments_by_course.get(link.teacher_id),
+        }
+        for link in course_links
+    ]
+    unpaid_count = sum(
+        1 for row in roster
+        if row['payment'] is None
+        or row['payment'].status != CoursePayment.PaymentStatus.PAID
+    )
+
+    return render(request, 'admin_portal/student_payments.html', {
+        'student': student,
+        'roster': roster,
+        'year': year,
+        'month': month,
+        'total_count': len(roster),
+        'unpaid_count': unpaid_count,
+    })
+
+@admin_required
 @require_http_methods(['POST'])
 def student_import(request):
     """Bulk-import students from an uploaded Excel file."""

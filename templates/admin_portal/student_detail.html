@@ -214,8 +214,11 @@
         {% if courses %}
         <div class="col-lg-6">
             <div class="card border-0 shadow-sm">
-                <div class="card-header bg-transparent fw-semibold">
-                    <i class="bi bi-cash-coin me-2 text-success"></i>الكورسات وحالة الدفع (هذا الشهر)
+                <div class="card-header bg-transparent fw-semibold d-flex justify-content-between align-items-center">
+                    <span><i class="bi bi-cash-coin me-2 text-success"></i>الكورسات وحالة الدفع (هذا الشهر)</span>
+                    <a href="{% url 'admin_portal:student_payments' student.id %}" class="btn btn-outline-success btn-sm">
+                        <i class="bi bi-receipt me-1"></i>سجل الدفع الكامل
+                    </a>
                 </div>
                 <div class="card-body p-0">
                     <ul class="list-group list-group-flush">
