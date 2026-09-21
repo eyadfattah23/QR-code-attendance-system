@@ -1,4 +1,5 @@
 {% extends 'base.html' %}
+{% load static %}
 {% load query_helpers %}
 
 {% block title %}إدارة الطلاب - نظام الحضور{% endblock %}
@@ -111,12 +112,18 @@
                 <small class="text-muted fw-normal ms-1">(نتائج مصفاة)</small>
                 {% endif %}
             </span>
-            <!-- Bulk action toolbar (hidden until rows selected) -->
+            <!-- Bulk action toolbar (hidden until rows selected, persists across pages) -->
             <div id="bulk-toolbar" class="d-none align-items-center gap-2">
                 <span class="text-muted small" id="bulk-count-label"></span>
+                <button type="button" class="btn btn-outline-secondary btn-sm" id="bulk-export-btn">
+                    <i class="bi bi-download me-1"></i>تصدير المحدد
+                </button>
                 <button type="button" class="btn btn-danger btn-sm" data-bs-toggle="modal"
                     data-bs-target="#bulkDeleteModal">
                     <i class="bi bi-trash me-1"></i>حذف المحدد
+                </button>
+                <button type="button" class="btn btn-outline-secondary btn-sm" id="bulk-clear-btn">
+                    <i class="bi bi-x-lg me-1"></i>إلغاء التحديد
                 </button>
             </div>
         </div>
@@ -148,8 +155,8 @@
                             {% for student in page_obj %}
                             <tr>
                                 <td>
-                                    <input type="checkbox" class="form-check-input row-cb" name="student_ids"
-                                        value="{{ student.id }}">
+                                    <input type="checkbox" class="form-check-input row-cb"
+                                        data-id="{{ student.id }}">
                                 </td>
                                 <td class="text-muted small">{{ forloop.counter|add:page_obj.start_index|add:"-1" }}
                                 </td>
@@ -399,6 +406,7 @@
 {% endblock %}
 
 {% block extra_js %}
+<script src="{% static 'js/bulk_select.js' %}"></script>
 <script>
     // ── single-row delete modal ───────────────────────────────────────────────
     document.getElementById('deleteModal').addEventListener('show.bs.modal', function (event) {
@@ -407,47 +415,39 @@
         document.getElementById('delete-form').action = btn.dataset.deleteUrl;
     });
 
-    // ── bulk selection ────────────────────────────────────────────────────────
-    const checkAll = document.getElementById('check-all');
-    const toolbar = document.getElementById('bulk-toolbar');
-    const countLabel = document.getElementById('bulk-count-label');
-
-    function getChecked() {
-        return document.querySelectorAll('.row-cb:checked');
-    }
-
-    function updateToolbar() {
-        const checked = getChecked();
-        const n = checked.length;
-        if (n > 0) {
-            toolbar.classList.remove('d-none');
-            toolbar.classList.add('d-flex');
-            countLabel.textContent = 'تم تحديد ' + n + ' طالب';
-        } else {
-            toolbar.classList.add('d-none');
-            toolbar.classList.remove('d-flex');
-        }
-        // sync check-all state
-        const all = document.querySelectorAll('.row-cb');
-        checkAll.indeterminate = n > 0 && n < all.length;
-        checkAll.checked = n === all.length && all.length > 0;
-    }
-
-    document.querySelectorAll('.row-cb').forEach(cb => cb.addEventListener('change', updateToolbar));
-
-    checkAll.addEventListener('change', function () {
-        document.querySelectorAll('.row-cb').forEach(cb => cb.checked = this.checked);
-        updateToolbar();
+    // ── bulk selection (persists across pages via sessionStorage) ──────────────
+    const bulkSelect = initBulkSelect({
+        storageKey: 'admin_student_selected_ids',
+        idFieldName: 'student_ids',
+        itemLabel: 'طالب',
     });
 
     // ── bulk delete confirm ───────────────────────────────────────────────────
     document.getElementById('bulkDeleteModal').addEventListener('show.bs.modal', function () {
-        const n = getChecked().length;
+        const n = bulkSelect.getSelectedIds().length;
         document.getElementById('bulk-modal-count').textContent = n + ' طالب';
     });
 
     document.getElementById('bulk-delete-confirm').addEventListener('click', function () {
-        document.getElementById('bulk-form').submit();
+        const form = document.getElementById('bulk-form');
+        bulkSelect.buildHiddenInputs();
+        form.action = "{% url 'admin_portal:student_bulk_delete' %}";
+        bulkSelect.clear();
+        form.submit();
+    });
+
+    // ── bulk export selected ─────────────────────────────────────────────────
+    document.getElementById('bulk-export-btn').addEventListener('click', function () {
+        if (bulkSelect.getSelectedIds().length === 0) return;
+        const form = document.getElementById('bulk-form');
+        bulkSelect.buildHiddenInputs();
+        form.action = "{% url 'admin_portal:student_export' %}";
+        form.submit();
+    });
+
+    // ── clear selection ───────────────────────────────────────────────────────
+    document.getElementById('bulk-clear-btn').addEventListener('click', function () {
+        bulkSelect.clear();
     });
 </script>
 {% endblock %}

@@ -697,21 +697,34 @@ def teacher_import_template(request):
 
 
 @admin_required
-@require_http_methods(['GET'])
+@require_http_methods(['GET', 'POST'])
 def teacher_export(request):
-    """Export all teacher records to Excel."""
-    q = request.GET.get('q', '').strip()
-    gender_filter = request.GET.get('gender', '').strip()
+    """Export teacher records to Excel.
 
-    qs = Teacher.objects.select_related('user').all().order_by('full_name')
-    if q:
-        qs = qs.filter(
-            Q(full_name__icontains=q)
-            | Q(subject__icontains=q)
-            | Q(user__phone__icontains=q)
-        )
-    if gender_filter:
-        qs = qs.filter(gender=gender_filter)
+    GET  – exports all teachers matching the current list filters (q,
+           gender), same as before.
+    POST – exports only the explicitly selected teachers (``teacher_ids``),
+           used by the multi-page checkbox selection on the teacher list so
+           the export isn't limited to a single page or the active filters.
+    """
+    if request.method == 'POST':
+        ids = request.POST.getlist('teacher_ids')
+        qs = Teacher.objects.select_related('user').filter(
+            pk__in=ids).order_by('full_name')
+    else:
+        q = request.GET.get('q', '').strip()
+        gender_filter = request.GET.get('gender', '').strip()
+
+        qs = Teacher.objects.select_related('user').all().order_by('full_name')
+        if q:
+            qs = qs.filter(
+                Q(full_name__icontains=q)
+                | Q(subject__icontains=q)
+                | Q(user__phone__icontains=q)
+            )
+        if gender_filter:
+            qs = qs.filter(gender=gender_filter)
+
 
     wb = openpyxl.Workbook()
     ws = wb.active
@@ -780,25 +793,36 @@ def student_import_template(request):
 
 
 @admin_required
-@require_http_methods(['GET'])
+@require_http_methods(['GET', 'POST'])
 def student_export(request):
-    """Export all student records (with parent data) to Excel."""
-    q = request.GET.get('q', '').strip()
-    grade_filter = request.GET.get('grade', '').strip()
-    gender_filter = request.GET.get('gender', '').strip()
+    """Export student records (with parent data) to Excel.
 
-    qs = Student.objects.all().order_by('full_name')
-    if q:
-        qs = qs.filter(
-            Q(full_name__icontains=q)
-            | Q(national_id__icontains=q)
-            | Q(student_code__icontains=q)
-            | Q(nickname__icontains=q)
-        )
-    if grade_filter:
-        qs = qs.filter(grade=grade_filter)
-    if gender_filter:
-        qs = qs.filter(gender=gender_filter)
+    GET  – exports all students matching the current list filters (q,
+           grade, gender), same as before.
+    POST – exports only the explicitly selected students (``student_ids``),
+           used by the multi-page checkbox selection on the student list so
+           the export isn't limited to a single page or the active filters.
+    """
+    if request.method == 'POST':
+        ids = request.POST.getlist('student_ids')
+        qs = Student.objects.filter(pk__in=ids).order_by('full_name')
+    else:
+        q = request.GET.get('q', '').strip()
+        grade_filter = request.GET.get('grade', '').strip()
+        gender_filter = request.GET.get('gender', '').strip()
+
+        qs = Student.objects.all().order_by('full_name')
+        if q:
+            qs = qs.filter(
+                Q(full_name__icontains=q)
+                | Q(national_id__icontains=q)
+                | Q(student_code__icontains=q)
+                | Q(nickname__icontains=q)
+            )
+        if grade_filter:
+            qs = qs.filter(grade=grade_filter)
+        if gender_filter:
+            qs = qs.filter(gender=gender_filter)
 
     wb = openpyxl.Workbook()
     ws = wb.active
@@ -1013,9 +1037,62 @@ def teacher_delete(request, pk):
                                 reverse('admin_portal:teacher_list')))
 
 
-# ---------------------------------------------------------------------------
-# Student-Teacher linking
-# ---------------------------------------------------------------------------
+@admin_required
+@require_http_methods(['POST'])
+def teacher_bulk_delete(request):
+    """Bulk-delete (or deactivate) selected teachers (POST only).
+
+    Applies the same per-teacher rule as `teacher_delete`: teachers with
+    related history (payments, student links, attendance) are deactivated
+    instead of hard-deleted.
+    """
+    ids = request.POST.getlist('teacher_ids')
+    if not ids:
+        messages.warning(request, 'لم يتم تحديد أي معلم')
+        return redirect('admin_portal:teacher_list')
+
+    teachers = list(Teacher.objects.select_related('user').filter(pk__in=ids))
+    deleted_count = 0
+    deactivated_count = 0
+
+    for teacher in teachers:
+        name = teacher.full_name
+        has_payments = CoursePayment.objects.filter(course=teacher).exists()
+        has_links = StudentTeacherLink.objects.filter(teacher=teacher).exists()
+        has_student_attendance = StudentAttendanceRecord.objects.filter(
+            models.Q(original_teacher=teacher) | models.Q(assigned_teacher=teacher)
+        ).exists()
+        has_teacher_attendance = TeacherAttendanceRecord.objects.filter(
+            teacher=teacher
+        ).exists()
+        has_history = has_payments or has_links or has_student_attendance or has_teacher_attendance
+
+        if has_history:
+            teacher.is_active = False
+            teacher.save(update_fields=['is_active'])
+            _log_audit(request, AuditLog.Action.EDIT, 'معلم', f'إلغاء تفعيل: {name}')
+            deactivated_count += 1
+        else:
+            _log_audit(request, AuditLog.Action.DELETE, 'معلم', name)
+            teacher.user.delete()  # Cascades to Teacher
+            deleted_count += 1
+
+    if deleted_count and deactivated_count:
+        messages.success(
+            request,
+            f'تم حذف {deleted_count} معلم وإلغاء تفعيل {deactivated_count} معلم '
+            '(توجد سجلات مرتبطة)',
+        )
+    elif deactivated_count:
+        messages.warning(
+            request,
+            f'تم إلغاء تفعيل {deactivated_count} معلم بدلاً من الحذف (توجد سجلات مرتبطة)',
+        )
+    else:
+        messages.success(request, f'تم حذف {deleted_count} معلم بنجاح')
+
+    return redirect(_get_return(request, 'teacher_list_return',
+                                reverse('admin_portal:teacher_list')))
 
 @admin_required
 def teacher_students(request, pk):

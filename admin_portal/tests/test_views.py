@@ -484,6 +484,64 @@ class StudentDeleteTestCase(_StudentManagementBase):
         self.assertEqual(response.status_code, 405)
 
 
+class StudentBulkDeleteTestCase(_StudentManagementBase):
+    """Tests for student_bulk_delete view."""
+
+    def setUp(self):
+        super().setUp()
+        self.url = reverse('admin_portal:student_bulk_delete')
+        self.s1 = Student.objects.create(
+            full_name='Bulk Del 1', national_id='11111111111111', student_code='BD001')
+        self.s2 = Student.objects.create(
+            full_name='Bulk Del 2', national_id='22222222222222', student_code='BD002')
+
+    def test_bulk_delete_removes_selected_students(self):
+        response = self.client.post(
+            self.url, {'student_ids': [str(self.s1.id), str(self.s2.id)]})
+        self.assertRedirects(response, reverse('admin_portal:student_list'))
+        self.assertFalse(Student.objects.filter(pk=self.s1.pk).exists())
+        self.assertFalse(Student.objects.filter(pk=self.s2.pk).exists())
+        # untouched
+        self.assertTrue(Student.objects.filter(pk=self.student.pk).exists())
+
+    def test_bulk_delete_no_ids_shows_warning(self):
+        response = self.client.post(self.url, {})
+        self.assertRedirects(response, reverse('admin_portal:student_list'))
+        self.assertTrue(Student.objects.filter(pk=self.s1.pk).exists())
+
+    def test_bulk_delete_requires_post(self):
+        response = self.client.get(self.url)
+        self.assertEqual(response.status_code, 405)
+
+
+class StudentExportTestCase(_StudentManagementBase):
+    """Tests for student_export view (GET filtered export vs. POST selected export)."""
+
+    def setUp(self):
+        super().setUp()
+        self.url = reverse('admin_portal:student_export')
+        self.other = Student.objects.create(
+            full_name='Other Student', national_id='33333333333333', student_code='OTH001')
+
+    def test_get_exports_all_matching_filters(self):
+        response = self.client.get(self.url)
+        self.assertEqual(response.status_code, 200)
+        wb = openpyxl.load_workbook(BytesIO(response.content))
+        ws = wb.active
+        names = [row[0] for row in ws.iter_rows(min_row=2, values_only=True)]
+        self.assertIn(self.student.full_name, names)
+        self.assertIn(self.other.full_name, names)
+
+    def test_post_exports_only_selected_ids(self):
+        response = self.client.post(self.url, {'student_ids': [str(self.student.id)]})
+        self.assertEqual(response.status_code, 200)
+        wb = openpyxl.load_workbook(BytesIO(response.content))
+        ws = wb.active
+        names = [row[0] for row in ws.iter_rows(min_row=2, values_only=True)]
+        self.assertIn(self.student.full_name, names)
+        self.assertNotIn(self.other.full_name, names)
+
+
 class StudentImportTestCase(_StudentManagementBase):
     """Tests for student_import and student_import_template views."""
 
@@ -895,6 +953,80 @@ class TeacherDeleteTestCase(_TeacherManagementBase):
         url = reverse('admin_portal:teacher_delete', args=[self.teacher.id])
         response = self.client.get(url)
         self.assertEqual(response.status_code, 405)
+
+
+class TeacherBulkDeleteTestCase(_TeacherManagementBase):
+    """Tests for teacher_bulk_delete view."""
+
+    def setUp(self):
+        super().setUp()
+        self.url = reverse('admin_portal:teacher_bulk_delete')
+
+        def _make_teacher(phone, name):
+            user = User.objects.create_user(
+                phone=phone, password='pass1234', role=User.Role.TEACHER)
+            return Teacher.objects.create(user=user, full_name=name)
+
+        self.t1 = _make_teacher('01799999901', 'Bulk Del Teacher 1')
+        self.t2 = _make_teacher('01799999902', 'Bulk Del Teacher 2')
+
+    def test_bulk_delete_removes_teachers_with_no_history(self):
+        response = self.client.post(
+            self.url, {'teacher_ids': [str(self.t1.id), str(self.t2.id)]})
+        self.assertRedirects(response, reverse('admin_portal:teacher_list'))
+        self.assertFalse(Teacher.objects.filter(pk=self.t1.pk).exists())
+        self.assertFalse(Teacher.objects.filter(pk=self.t2.pk).exists())
+
+    def test_bulk_delete_deactivates_teacher_with_history(self):
+        # link t1 to a student so it has history
+        student = Student.objects.create(
+            full_name='Linked Student', national_id='40000000000000',
+            student_code='LNK001')
+        StudentTeacherLink.objects.create(teacher=self.t1, student=student)
+
+        response = self.client.post(self.url, {'teacher_ids': [str(self.t1.id)]})
+        self.assertRedirects(response, reverse('admin_portal:teacher_list'))
+        self.t1.refresh_from_db()
+        self.assertFalse(self.t1.is_active)
+        self.assertTrue(Teacher.objects.filter(pk=self.t1.pk).exists())
+
+    def test_bulk_delete_no_ids_shows_warning(self):
+        response = self.client.post(self.url, {})
+        self.assertRedirects(response, reverse('admin_portal:teacher_list'))
+        self.assertTrue(Teacher.objects.filter(pk=self.t1.pk).exists())
+
+    def test_bulk_delete_requires_post(self):
+        response = self.client.get(self.url)
+        self.assertEqual(response.status_code, 405)
+
+
+class TeacherExportTestCase(_TeacherManagementBase):
+    """Tests for teacher_export view (GET filtered export vs. POST selected export)."""
+
+    def setUp(self):
+        super().setUp()
+        self.url = reverse('admin_portal:teacher_export')
+        other_user = User.objects.create_user(
+            phone='01799999903', password='pass1234', role=User.Role.TEACHER)
+        self.other = Teacher.objects.create(user=other_user, full_name='Other Teacher')
+
+    def test_get_exports_all_matching_filters(self):
+        response = self.client.get(self.url)
+        self.assertEqual(response.status_code, 200)
+        wb = openpyxl.load_workbook(BytesIO(response.content))
+        ws = wb.active
+        names = [row[0] for row in ws.iter_rows(min_row=2, values_only=True)]
+        self.assertIn(self.teacher.full_name, names)
+        self.assertIn(self.other.full_name, names)
+
+    def test_post_exports_only_selected_ids(self):
+        response = self.client.post(self.url, {'teacher_ids': [str(self.teacher.id)]})
+        self.assertEqual(response.status_code, 200)
+        wb = openpyxl.load_workbook(BytesIO(response.content))
+        ws = wb.active
+        names = [row[0] for row in ws.iter_rows(min_row=2, values_only=True)]
+        self.assertIn(self.teacher.full_name, names)
+        self.assertNotIn(self.other.full_name, names)
 
 
 class TeacherImportTestCase(_TeacherManagementBase):

@@ -1,4 +1,5 @@
 {% extends 'base.html' %}
+{% load static %}
 {% load query_helpers %}
 
 {% block title %}إدارة المعلمين - نظام الحضور{% endblock %}
@@ -98,27 +99,50 @@
                 <small class="text-muted fw-normal ms-1">(نتائج مصفاة)</small>
                 {% endif %}
             </span>
+            <!-- Bulk action toolbar (hidden until rows selected, persists across pages) -->
+            <div id="bulk-toolbar" class="d-none align-items-center gap-2">
+                <span class="text-muted small" id="bulk-count-label"></span>
+                <button type="button" class="btn btn-outline-secondary btn-sm" id="bulk-export-btn">
+                    <i class="bi bi-download me-1"></i>تصدير المحدد
+                </button>
+                <button type="button" class="btn btn-danger btn-sm" data-bs-toggle="modal"
+                    data-bs-target="#bulkDeleteModal">
+                    <i class="bi bi-trash me-1"></i>حذف المحدد
+                </button>
+                <button type="button" class="btn btn-outline-secondary btn-sm" id="bulk-clear-btn">
+                    <i class="bi bi-x-lg me-1"></i>إلغاء التحديد
+                </button>
+            </div>
         </div>
         <div class="card-body p-0">
             {% if page_obj.object_list %}
             <div class="table-responsive">
-                <table class="table table-hover align-middle mb-0 text-center">
-                    <thead class="table-light">
-                        <tr>
-                            <th style="width:3rem">#</th>
-                            <th>الاسم الكامل</th>
-                            <th>كود المعلم</th>
-                            <th>رقم الهاتف</th>
-                            <th>المجموعة</th>
-                            <th>الجنس</th>
-                            <th>عدد الطلاب</th>
-                            <th style="width:8rem">إجراءات</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% for teacher in page_obj %}
-                        <tr>
-                            <td class="text-muted small">{{ forloop.counter|add:page_obj.start_index|add:"-1" }}</td>
+                <form id="bulk-form" method="post" action="{% url 'admin_portal:teacher_bulk_delete' %}">
+                    {% csrf_token %}
+                    <table class="table table-hover align-middle mb-0 text-center">
+                        <thead class="table-light">
+                            <tr>
+                                <th style="width:2.5rem">
+                                    <input type="checkbox" class="form-check-input" id="check-all" title="تحديد الكل">
+                                </th>
+                                <th style="width:3rem">#</th>
+                                <th>الاسم الكامل</th>
+                                <th>كود المعلم</th>
+                                <th>رقم الهاتف</th>
+                                <th>المجموعة</th>
+                                <th>الجنس</th>
+                                <th>عدد الطلاب</th>
+                                <th style="width:8rem">إجراءات</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for teacher in page_obj %}
+                            <tr>
+                                <td>
+                                    <input type="checkbox" class="form-check-input row-cb"
+                                        data-id="{{ teacher.id }}">
+                                </td>
+                                <td class="text-muted small">{{ forloop.counter|add:page_obj.start_index|add:"-1" }}</td>
                             <td class="fw-semibold">{{ teacher.full_name }}</td>
                             <td class="font-monospace small text-muted">{{ teacher.teacher_code|default:"—" }}</td>
                             <td class="font-monospace small text-muted" dir="ltr">{{ teacher.user.phone }}</td>
@@ -170,6 +194,7 @@
                         {% endfor %}
                     </tbody>
                 </table>
+                </form>
             </div>
 
             <!-- Pagination -->
@@ -249,6 +274,33 @@
     </div>
 </div>
 
+<!-- Bulk Delete Confirmation Modal -->
+<div class="modal fade" id="bulkDeleteModal" tabindex="-1" aria-labelledby="bulkDeleteModalLabel">
+    <div class="modal-dialog modal-sm">
+        <div class="modal-content">
+            <div class="modal-header border-0 pb-0">
+                <h5 class="modal-title text-danger" id="bulkDeleteModalLabel">
+                    <i class="bi bi-exclamation-triangle me-2"></i>تأكيد الحذف
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <p class="mb-1">هل أنت متأكد من حذف <strong id="bulk-modal-count"></strong>؟</p>
+                <p class="text-danger small mb-0">
+                    <i class="bi bi-exclamation-circle me-1"></i>
+                    المعلمون الذين لديهم سجلات مرتبطة (طلاب، حضور، مدفوعات) سيتم إلغاء تفعيلهم بدلاً من حذفهم.
+                </p>
+            </div>
+            <div class="modal-footer border-0 pt-0">
+                <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">إلغاء</button>
+                <button type="button" class="btn btn-danger btn-sm" id="bulk-delete-confirm">
+                    <i class="bi bi-trash me-1"></i>حذف
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
 <!-- Delete Confirmation Modal -->
 <div class="modal fade" id="deleteModal" tabindex="-1" aria-labelledby="deleteModalLabel">
     <div class="modal-dialog modal-sm">
@@ -320,6 +372,7 @@
 {% endblock %}
 
 {% block extra_js %}
+<script src="{% static 'js/bulk_select.js' %}"></script>
 <script>
     document.getElementById('deleteModal').addEventListener('show.bs.modal', function (event) {
         const btn = event.relatedTarget;
@@ -331,6 +384,41 @@
                 '<i class="bi bi-exclamation-circle me-1"></i>' +
                 'سيتم حذف حساب المعلم وجميع سجلاته. يرتبط به <strong>' + count + '</strong> طالب.';
         }
+    });
+
+    // ── bulk selection (persists across pages via sessionStorage) ──────────────
+    const bulkSelect = initBulkSelect({
+        storageKey: 'admin_teacher_selected_ids',
+        idFieldName: 'teacher_ids',
+        itemLabel: 'معلم',
+    });
+
+    // ── bulk delete confirm ──────────────────────────────────────────────────
+    document.getElementById('bulkDeleteModal').addEventListener('show.bs.modal', function () {
+        const n = bulkSelect.getSelectedIds().length;
+        document.getElementById('bulk-modal-count').textContent = n + ' معلم';
+    });
+
+    document.getElementById('bulk-delete-confirm').addEventListener('click', function () {
+        const form = document.getElementById('bulk-form');
+        bulkSelect.buildHiddenInputs();
+        form.action = "{% url 'admin_portal:teacher_bulk_delete' %}";
+        bulkSelect.clear();
+        form.submit();
+    });
+
+    // ── bulk export selected ─────────────────────────────────────────────────
+    document.getElementById('bulk-export-btn').addEventListener('click', function () {
+        if (bulkSelect.getSelectedIds().length === 0) return;
+        const form = document.getElementById('bulk-form');
+        bulkSelect.buildHiddenInputs();
+        form.action = "{% url 'admin_portal:teacher_export' %}";
+        form.submit();
+    });
+
+    // ── clear selection ──────────────────────────────────────────────────────
+    document.getElementById('bulk-clear-btn').addEventListener('click', function () {
+        bulkSelect.clear();
     });
 </script>
 {% endblock %}
