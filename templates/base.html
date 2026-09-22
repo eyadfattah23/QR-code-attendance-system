@@ -109,6 +109,13 @@
                             محطة المسح
                         </a>
                     </li>
+                    <li class="nav-item">
+                        <a class="nav-link {% if '/portal/supervisor/' in request.path %}active{% endif %}"
+                            href="{% url 'supervisor_portal:dashboard' %}">
+                            <i class="bi bi-shield-check me-1"></i>
+                            لوحة المشرف
+                        </a>
+                    </li>
                     <li class="nav-item dropdown">
                         <a class="nav-link dropdown-toggle {% if '/qr-cards/' in request.path %}active{% endif %}"
                             href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false">

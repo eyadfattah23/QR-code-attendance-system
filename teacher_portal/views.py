@@ -32,13 +32,13 @@ def _log_audit(request, action, object_type, object_repr):
 
 
 def teacher_required(view_func):
-    """Decorator to ensure user is a teacher, a supervisor, or an assistant."""
+    """Decorator to ensure user is a teacher, a supervisor, an admin, or an assistant."""
     @wraps(view_func)
     @login_required
     def wrapper(request, *args, **kwargs):
         if request.user.is_teacher:
             return view_func(request, *args, **kwargs)
-        if request.user.is_supervisor:
+        if request.user.is_supervisor or request.user.is_admin:
             if not request.session.get('supervisor_teacher_id'):
                 return redirect('supervisor_portal:dashboard')
             return view_func(request, *args, **kwargs)
@@ -55,11 +55,11 @@ def get_acting_teacher(request):
     """Return the Teacher this request is acting as.
 
     For teachers: their own Teacher profile.
-    For supervisors: the teacher stored in session.
+    For supervisors and admins: the teacher stored in session.
     For assistants: the teacher stored in session, IF the link still exists.
     Returns None if the teacher cannot be resolved.
     """
-    if request.user.is_supervisor:
+    if request.user.is_supervisor or request.user.is_admin:
         pk = request.session.get('supervisor_teacher_id')
         if not pk:
             return None

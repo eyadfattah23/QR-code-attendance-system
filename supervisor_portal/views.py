@@ -11,11 +11,11 @@ from attendance.models import StudentAttendanceRecord
 
 
 def supervisor_required(view_func):
-    """Decorator to ensure the user has the supervisor role."""
+    """Decorator to ensure the user has the supervisor role (admins are also allowed)."""
     @wraps(view_func)
     @login_required
     def wrapper(request, *args, **kwargs):
-        if not request.user.is_supervisor:
+        if not (request.user.is_supervisor or request.user.is_admin):
             messages.error(request, 'ليس لديك صلاحية الوصول لهذه الصفحة')
             return redirect('dashboard')
         return view_func(request, *args, **kwargs)

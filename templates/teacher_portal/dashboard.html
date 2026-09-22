@@ -5,7 +5,7 @@
 {% block content %}
 <div class="container-fluid">
 
-    {% if request.user.is_supervisor %}
+    {% if request.user.is_supervisor or request.user.is_admin %}
     <div class="alert alert-primary d-flex align-items-center justify-content-between py-2 mb-3" role="alert">
         <div>
             <i class="bi bi-shield-check me-2"></i>
