@@ -39,8 +39,9 @@
                             {% include "admin_portal/_form_field.html" with field=fc.image col="col-12" %}
                             {% include "admin_portal/_form_field.html" with field=fc.national_id col="col-md-6" %}
                             {% include "admin_portal/_form_field.html" with field=fc.student_code col="col-md-6" %}
-                            {% include "admin_portal/_form_field.html" with field=fc.grade col="col-md-6" %}
-                            {% include "admin_portal/_form_field.html" with field=fc.gender col="col-md-6" %}
+                            {% include "admin_portal/_form_field.html" with field=fc.grade col="col-md-4" %}
+                            {% include "admin_portal/_form_field.html" with field=fc.education_type col="col-md-4" %}
+                            {% include "admin_portal/_form_field.html" with field=fc.gender col="col-md-4" %}
                             {% include "admin_portal/_form_field.html" with field=fc.phone col="col-md-6" %}
                             {% include "admin_portal/_form_field.html" with field=fc.date_of_birth col="col-md-6" %}
                             {% include "admin_portal/_form_field.html" with field=fc.joining_date col="col-md-6" %}
@@ -59,12 +60,12 @@
                         <div class="row g-3">
                             {% include "admin_portal/_form_field.html" with field=fc.parent_full_name col="col-md-8" %}
                             {% include "admin_portal/_form_field.html" with field=fc.parent_marital_status col="col-md-4" %}
-                            {% include "admin_portal/_form_field.html" with field=fc.parent_qualification col="col-md-6" %}
+                            {% include "admin_portal/_form_field.html" with field=fc.parent_qualification col="col-md-6"%}
                             {% include "admin_portal/_form_field.html" with field=fc.parent_job col="col-md-6" %}
                             {% include "admin_portal/_form_field.html" with field=fc.parent_spouse_job col="col-md-6" %}
                             {% include "admin_portal/_form_field.html" with field=fc.parent_phone col="col-md-6" %}
-                            {% include "admin_portal/_form_field.html" with field=fc.parent_calls_phone col="col-md-6" %}
-                            {% include "admin_portal/_form_field.html" with field=fc.child_pickup_person col="col-md-6" %}
+                            {% include "admin_portal/_form_field.html" with field=fc.parent_calls_phone col="col-md-6"%}
+                            {% include "admin_portal/_form_field.html" with field=fc.child_pickup_person col="col-md-6"%}
                             {% include "admin_portal/_form_field.html" with field=fc.parent_address col="col-12" %}
                         </div>
                     </div>

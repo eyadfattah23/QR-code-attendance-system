@@ -18,7 +18,7 @@
                 <i class="bi bi-file-earmark-excel me-1"></i>
                 استيراد Excel
             </button>
-            <a href="{% url 'admin_portal:student_export' %}{% if q or grade_filter or gender_filter %}?{% if q %}q={{ q }}{% endif %}{% if grade_filter %}&grade={{ grade_filter }}{% endif %}{% if gender_filter %}&gender={{ gender_filter }}{% endif %}{% endif %}"
+            <a href="{% url 'admin_portal:student_export' %}{% if q or grade_filter or gender_filter or education_types_filter %}?{% if q %}q={{ q }}{% endif %}{% if grade_filter %}&grade={{ grade_filter }}{% endif %}{% if gender_filter %}&gender={{ gender_filter }}{% endif %}{% for et in education_types_filter %}&education_type={{ et }}{% endfor %}{% endif %}"
                 class="btn btn-outline-secondary">
                 <i class="bi bi-download me-1"></i>
                 تصدير Excel
@@ -64,6 +64,26 @@
                         <option value="{{ yr }}" {% if yr|stringformat:"s" == birth_year_filter %}selected{% endif %}>{{ yr }}</option>
                         {% endfor %}
                     </select>
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label mb-1 small fw-semibold">نوع التعليم</label>
+                    <div class="dropdown">
+                        <button class="btn border dropdown-toggle w-100 text-end d-flex justify-content-between align-items-center form-select" type="button" data-bs-toggle="dropdown" data-bs-auto-close="outside" aria-expanded="false" style="background-color: #fff; text-align: right;">
+                            <span class="text-truncate">اختر...</span>
+                        </button>
+                        <ul class="dropdown-menu w-100 px-2 shadow-sm" style="max-height: 200px; overflow-y: auto;">
+                            {% for val, label in education_types_choices %}
+                            <li>
+                                <div class="form-check position-relative">
+                                    <input class="form-check-input" type="checkbox" name="education_type" value="{{ val }}" id="edu_{{ forloop.counter }}" {% if val in education_types_filter %}checked{% endif %}>
+                                    <label class="form-check-label w-100 stretched-link" for="edu_{{ forloop.counter }}">
+                                        {{ label }}
+                                    </label>
+                                </div>
+                            </li>
+                            {% endfor %}
+                        </ul>
+                    </div>
                 </div>
                 <div class="col-md-2">
                     <label class="form-label mb-1 small fw-semibold">القاعة</label>
@@ -144,6 +164,7 @@
                                 <th>الرقم القومي</th>
                                 <th>الصف</th>
                                 <th>الجنس</th>
+                                <th>نوع التعليم</th>
                                 <th>السن</th>
                                 <th>هاتف الطالب</th>
                                 <th>هاتف ولي الأمر</th>
@@ -172,6 +193,9 @@
                                     {% if student.gender == 'M' %}ذكر
                                     {% elif student.gender == 'F' %}أنثى
                                     {% else %}—{% endif %}
+                                </td>
+                                <td>
+                                    <span class="badge bg-light text-dark border">{{ student.get_education_type_display|default:"—" }}</span>
                                 </td>
                                 <td class="small">
                                     {% if student.age is not None %}{{ student.age }}
@@ -319,7 +343,7 @@
                 <div class="modal-body">
                     <p class="text-muted small mb-3">
                         أعمدة <strong>مطلوبة</strong>: <code>full_name</code>، <code>national_id</code><br>
-                        أعمدة <strong>اختيارية</strong>: <code>student_code</code>، <code>grade</code>،
+                        أعمدة <strong>اختيارية</strong>: <code>student_code</code>، <code>grade</code>، <code>education_type</code>،
                         <code>gender</code>، <code>phone</code>، <code>nickname</code>، <code>date_of_birth</code>،
                         <code>joining_date</code>، <code>hall_name</code>، <code>notes</code>،
                         <code>parent_phone</code>، <code>parent_full_name</code>، <code>parent_qualification</code>،

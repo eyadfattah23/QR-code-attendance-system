@@ -377,7 +377,7 @@ def upload_photo(request, pk):
         _log_audit(request, AuditLog.Action.EDIT, 'سجل حضور طالب (صورة)',
                    f'{record.student.full_name} — {record.date}')
         messages.success(request, 'تم رفع الصورة بنجاح')
-        return redirect('teacher_portal:dashboard')
+        return redirect('teacher_portal:upload_photo', pk=pk)
 
     return render(request, 'teacher_portal/upload_photo.html', {
         'record': record,

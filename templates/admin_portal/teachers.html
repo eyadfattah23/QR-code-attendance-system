@@ -18,7 +18,7 @@
                 <i class="bi bi-file-earmark-excel me-1"></i>
                 استيراد Excel
             </button>
-            <a href="{% url 'admin_portal:teacher_export' %}{% if q or gender_filter %}?{% if q %}q={{ q }}{% endif %}{% if gender_filter %}&gender={{ gender_filter }}{% endif %}{% endif %}" class="btn btn-outline-info">
+            <a href="{% url 'admin_portal:teacher_export' %}{% if q or gender_filter or hall_filter %}?{% if q %}q={{ q }}{% endif %}{% if gender_filter %}&gender={{ gender_filter }}{% endif %}{% if hall_filter %}&hall={{ hall_filter }}{% endif %}{% endif %}" class="btn btn-outline-info">
                 <i class="bi bi-file-earmark-excel me-1"></i>
                 تصدير Excel
             </a>
@@ -59,6 +59,15 @@
                     </select>
                 </div>
                 <div class="col-md-2">
+                    <label class="form-label mb-1 small fw-semibold">القاعة</label>
+                    <select name="hall" class="form-select">
+                        <option value="">— الكل —</option>
+                        {% for h in halls %}
+                        <option value="{{ h }}" {% if h == hall_filter %}selected{% endif %}>{{ h }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-2">
                     <label class="form-label mb-1 small fw-semibold">النوع</label>
                     <select name="type" class="form-select">
                         <option value="">— الكل —</option>
@@ -78,7 +87,7 @@
                         <i class="bi bi-funnel me-1"></i>تطبيق الفرز
                     </button>
                 </div>
-                {% if q or gender_filter or sort or show_inactive or teacher_type %}
+                {% if q or gender_filter or sort or show_inactive or teacher_type or hall_filter %}
                 <div class="col-md-2">
                     <a href="{% url 'admin_portal:teacher_list' %}" class="btn btn-outline-secondary w-100">
                         <i class="bi bi-x-lg me-1"></i>مسح
@@ -130,6 +139,7 @@
                                 <th>كود المعلم</th>
                                 <th>رقم الهاتف</th>
                                 <th>المجموعة</th>
+                                <th>القاعة</th>
                                 <th>الجنس</th>
                                 <th>عدد الطلاب</th>
                                 <th style="width:8rem">إجراءات</th>
@@ -149,6 +159,11 @@
                             <td>
                                 {% if teacher.subject %}
                                 <span class="badge bg-light text-dark border">{{ teacher.subject }}</span>
+                                {% else %}—{% endif %}
+                            </td>
+                            <td>
+                                {% if teacher.hall_name %}
+                                <span class="badge bg-light text-dark border">{{ teacher.hall_name }}</span>
                                 {% else %}—{% endif %}
                             </td>
                             <td>
@@ -348,7 +363,7 @@
                 <div class="modal-body">
                     <p class="text-muted small mb-3">
                         أعمدة <strong>مطلوبة</strong>: <code>full_name</code>، <code>phone</code>، <code>password</code><br>
-                        أعمدة <strong>اختيارية</strong>: <code>teacher_code</code>، <code>subject</code>، <code>first_name</code>، <code>last_name</code>، <code>gender</code>
+                        أعمدة <strong>اختيارية</strong>: <code>teacher_code</code>، <code>subject</code>، <code>hall_name</code>، <code>first_name</code>، <code>last_name</code>، <code>gender</code>
                     </p>
                     <div class="mb-3">
                         <label class="form-label fw-semibold">ملف Excel (.xlsx)</label>

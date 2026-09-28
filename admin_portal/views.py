@@ -138,6 +138,7 @@ def student_list(request):
     gender_filter = request.GET.get('gender', '').strip()
     birth_year_filter = request.GET.get('birth_year', '').strip()
     hall_filter = request.GET.get('hall', '').strip()
+    education_types_filter = request.GET.getlist('education_type')
     sort = request.GET.get('sort', '').strip()
 
     qs = Student.objects.annotate(avg_rating=Avg('attendance_records__rating'))
@@ -158,6 +159,8 @@ def student_list(request):
         qs = qs.filter(date_of_birth__year=birth_year_filter)
     if hall_filter:
         qs = qs.filter(hall_name=hall_filter)
+    if education_types_filter:
+        qs = qs.filter(education_type__in=education_types_filter)
 
     if sort == 'avg_rating_desc':
         qs = qs.order_by(models.F('avg_rating').desc(nulls_last=True))
@@ -204,6 +207,8 @@ def student_list(request):
         'gender_filter': gender_filter,
         'birth_year_filter': birth_year_filter,
         'hall_filter': hall_filter,
+        'education_types_filter': education_types_filter,
+        'education_types_choices': Student.EducationType.choices,
         'grades': grades,
         'birth_years': birth_years,
         'halls': halls,
@@ -464,6 +469,11 @@ def student_import(request):
             gender_val = None
 
         # New fields
+        education_type = _cell('education_type') or Student.EducationType.UNSPECIFIED
+        valid_edu_types = {k for k, _ in Student.EducationType.choices}
+        if education_type not in valid_edu_types:
+            education_type = Student.EducationType.UNSPECIFIED
+            
         nickname = _cell('nickname') or ''
         hall_name = _cell('hall_name') or ''
         notes = _cell('notes') or ''
@@ -510,6 +520,7 @@ def student_import(request):
                 parent_phone=parent_phone,
                 gender=gender_val,
                 nickname=nickname,
+                education_type=education_type,
                 hall_name=hall_name,
                 notes=notes,
                 date_of_birth=date_of_birth,
@@ -634,6 +645,7 @@ def teacher_import(request):
             gender_val = gender_val.upper()
         else:
             gender_val = None
+        hall_name = _cell('hall_name') or ''
 
         try:
             with transaction.atomic():
@@ -650,6 +662,7 @@ def teacher_import(request):
                     subject=subject,
                     gender=gender_val,
                     teacher_code=teacher_code,
+                    hall_name=hall_name,
                 )
             created += 1
         except Exception as exc:
@@ -679,10 +692,10 @@ def teacher_import_template(request):
     wb = openpyxl.Workbook()
     ws = wb.active
     ws.title = 'Teachers'
-    ws.append(['full_name', 'phone', 'password', 'teacher_code', 'subject',
+    ws.append(['full_name', 'phone', 'password', 'teacher_code', 'subject', 'hall_name',
               'first_name', 'last_name', 'gender'])
     ws.append(['أحمد محمد', '01012345678', 'password123', 'TCH001',
-              'رياضيات', 'أحمد', 'محمد', 'M'])
+              'رياضيات', 'قاعة 1', 'أحمد', 'محمد', 'M'])
 
     buf = io.BytesIO()
     wb.save(buf)
@@ -714,6 +727,7 @@ def teacher_export(request):
     else:
         q = request.GET.get('q', '').strip()
         gender_filter = request.GET.get('gender', '').strip()
+        hall_filter = request.GET.get('hall', '').strip()
 
         qs = Teacher.objects.select_related('user').all().order_by('full_name')
         if q:
@@ -724,13 +738,15 @@ def teacher_export(request):
             )
         if gender_filter:
             qs = qs.filter(gender=gender_filter)
+        if hall_filter:
+            qs = qs.filter(hall_name=hall_filter)
 
 
     wb = openpyxl.Workbook()
     ws = wb.active
     ws.title = 'Teachers'
     ws.append([
-        'الاسم الكامل', 'كود المعلم', 'رقم الهاتف', 'المجموعة',
+        'الاسم الكامل', 'كود المعلم', 'رقم الهاتف', 'المجموعة', 'القاعة',
         'الاسم الأول', 'الاسم الأخير', 'الجنس'
     ])
     for t in qs:
@@ -739,6 +755,7 @@ def teacher_export(request):
             t.teacher_code or '',
             t.user.phone,
             t.subject or '',
+            t.hall_name or '',
             t.user.first_name,
             t.user.last_name,
             t.gender or '',
@@ -763,14 +780,14 @@ def student_import_template(request):
     ws = wb.active
     ws.title = 'Students'
     ws.append([
-        'full_name', 'national_id', 'student_code', 'grade', 'gender', 'phone',
+        'full_name', 'national_id', 'student_code', 'grade', 'education_type', 'gender', 'phone',
         'nickname', 'date_of_birth', 'joining_date', 'hall_name', 'notes',
         'parent_phone', 'parent_full_name', 'parent_qualification', 'parent_job',
         'parent_calls_phone', 'parent_marital_status', 'parent_spouse_job',
         'parent_address', 'child_pickup_person',
     ])
     ws.append([
-        'أحمد محمد علي', '12345678901234', 'STU001', 'السنة الأولى', 'M', '',
+        'أحمد محمد علي', '12345678901234', 'STU001', 'السنة الأولى', 'عام', 'M', '',
         'أحمد', '2010-05-15', '2024-09-01', 'قاعة 1', '',
         '01012345678', 'محمد علي حسن سالم', 'بكالوريوس', 'مهندس',
         '01098765432', 'married', '', 'القاهرة', '',
@@ -810,6 +827,7 @@ def student_export(request):
         q = request.GET.get('q', '').strip()
         grade_filter = request.GET.get('grade', '').strip()
         gender_filter = request.GET.get('gender', '').strip()
+        education_types_filter = request.GET.getlist('education_type')
 
         qs = Student.objects.all().order_by('full_name')
         if q:
@@ -823,12 +841,14 @@ def student_export(request):
             qs = qs.filter(grade=grade_filter)
         if gender_filter:
             qs = qs.filter(gender=gender_filter)
+        if education_types_filter:
+            qs = qs.filter(education_type__in=education_types_filter)
 
     wb = openpyxl.Workbook()
     ws = wb.active
     ws.title = 'Students'
     ws.append([
-        'full_name', 'national_id', 'student_code', 'grade', 'gender', 'phone',
+        'full_name', 'national_id', 'student_code', 'grade', 'education_type', 'gender', 'phone',
         'nickname', 'date_of_birth', 'joining_date', 'hall_name', 'notes',
         'parent_phone', 'parent_full_name', 'parent_qualification', 'parent_job',
         'parent_calls_phone', 'parent_marital_status', 'parent_spouse_job',
@@ -840,6 +860,7 @@ def student_export(request):
             s.national_id,
             s.student_code or '',
             s.grade or '',
+            s.get_education_type_display(),
             s.gender or '',
             s.phone or '',
             s.nickname,
@@ -879,6 +900,7 @@ def teacher_list(request):
     _save_return(request, 'teacher_list_return')
     q = request.GET.get('q', '').strip()
     gender_filter = request.GET.get('gender', '').strip()
+    hall_filter = request.GET.get('hall', '').strip()
     sort = request.GET.get('sort', '').strip()
 
     qs = Teacher.objects.select_related('user').annotate(
@@ -906,6 +928,8 @@ def teacher_list(request):
         )
     if gender_filter:
         qs = qs.filter(gender=gender_filter)
+    if hall_filter:
+        qs = qs.filter(hall_name=hall_filter)
 
     if sort == 'name_asc':
         qs = qs.order_by('full_name')
@@ -922,6 +946,14 @@ def teacher_list(request):
     else:
         qs = qs.order_by('full_name')
 
+    halls = (
+        Teacher.objects
+        .exclude(hall_name='').exclude(hall_name__isnull=True)
+        .values_list('hall_name', flat=True)
+        .distinct()
+        .order_by('hall_name')
+    )
+
     per_page = _get_per_page(request, default=25)
     paginator = Paginator(qs, per_page)
     page_obj = paginator.get_page(request.GET.get('page'))
@@ -930,6 +962,8 @@ def teacher_list(request):
         'page_obj': page_obj,
         'q': q,
         'gender_filter': gender_filter,
+        'hall_filter': hall_filter,
+        'halls': halls,
         'total_count': qs.count(),
         'sort': sort,
         'show_inactive': show_inactive,

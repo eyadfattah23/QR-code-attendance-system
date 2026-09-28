@@ -178,6 +178,20 @@ class Student(models.Model):
         help_text="Grade or class (e.g., 'Grade 5', 'Year 2')"
     )
 
+    class EducationType(models.TextChoices):
+        GENERAL = 'عام', 'عام'
+        AZHAR = 'أزهر', 'أزهر'
+        LANGUAGES = 'لغات', 'لغات'
+        EXPERIMENTAL = 'تجريبي', 'تجريبي'
+        UNSPECIFIED = 'غير محدد بعد', 'غير محدد بعد'
+
+    education_type = models.CharField(
+        max_length=20,
+        choices=EducationType.choices,
+        default=EducationType.UNSPECIFIED,
+        help_text="نوع التعليم",
+    )
+
     class Gender(models.TextChoices):
         MALE = 'M', 'ذكر'
         FEMALE = 'F', 'أنثى'
@@ -392,6 +406,12 @@ class Teacher(models.Model):
         blank=True,
         null=True,
         help_text="Primary subject taught"
+    )
+    hall_name = models.CharField(
+        max_length=100,
+        blank=True,
+        default='',
+        help_text="القاعة"
     )
 
     class Gender(models.TextChoices):

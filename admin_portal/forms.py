@@ -17,7 +17,7 @@ class StudentForm(forms.ModelForm):
         model = Student
         fields = [
             'full_name', 'nickname', 'national_id', 'student_code',
-            'image', 'grade', 'gender', 'phone', 'parent_phone',
+            'image', 'grade', 'education_type', 'gender', 'phone', 'parent_phone',
             'date_of_birth', 'joining_date', 'hall_name', 'notes',
             # Parent / Guardian
             'parent_full_name', 'parent_qualification', 'parent_job',
@@ -31,6 +31,7 @@ class StudentForm(forms.ModelForm):
             'student_code': 'كود الطالب',
             'image': 'صورة الطالب',
             'grade': 'الصف / المستوى',
+            'education_type': 'نوع التعليم',
             'gender': 'الجنس',
             'phone': 'هاتف الطالب',
             'parent_phone': 'واتساب ولي الأمر',
@@ -66,6 +67,7 @@ class StudentForm(forms.ModelForm):
             'student_code': forms.TextInput(attrs={'class': 'form-control'}),
             'image': forms.FileInput(attrs={'class': 'form-control', 'accept': 'image/*'}),
             'grade': forms.TextInput(attrs={'class': 'form-control'}),
+            'education_type': forms.Select(attrs={'class': 'form-select'}),
             'gender': forms.Select(attrs={'class': 'form-select'}),
             'phone': forms.TextInput(attrs={'class': 'form-control', 'dir': 'ltr', 'placeholder': '01XXXXXXXXX'}),
             'parent_phone': forms.TextInput(attrs={'class': 'form-control', 'dir': 'ltr', 'placeholder': '01XXXXXXXXX'}),
@@ -112,6 +114,13 @@ class TeacherForm(forms.Form):
         label='كود المعلم',
         widget=forms.TextInput(attrs={'class': 'form-control'}),
         help_text='كود تعريفي للمعلم',
+    )
+    hall_name = forms.CharField(
+        max_length=100,
+        required=False,
+        label='القاعة',
+        widget=forms.TextInput(attrs={'class': 'form-control'}),
+        help_text='اختياري',
     )
     gender = forms.ChoiceField(
         choices=[('', '— غير محدد —'), ('M', 'ذكر'), ('F', 'أنثى')],
@@ -176,6 +185,7 @@ class TeacherForm(forms.Form):
             self.fields['teacher_code'].initial = instance.teacher_code or ''
             self.fields['is_course'].initial = instance.is_course
             self.fields['is_active'].initial = instance.is_active
+            self.fields['hall_name'].initial = instance.hall_name or ''
             self.fields['description'].initial = instance.description or ''
 
     def clean_phone(self):
@@ -220,6 +230,7 @@ class TeacherForm(forms.Form):
                 teacher_code=data.get('teacher_code') or None,
                 is_course=data.get('is_course', False),
                 is_active=data.get('is_active', True),
+                hall_name=data.get('hall_name', ''),
                 description=data.get('description', ''),
             )
         else:
@@ -237,6 +248,7 @@ class TeacherForm(forms.Form):
             self.instance.teacher_code = data.get('teacher_code') or None
             self.instance.is_course = data.get('is_course', False)
             self.instance.is_active = data.get('is_active', True)
+            self.instance.hall_name = data.get('hall_name', '')
             self.instance.description = data.get('description', '')
             self.instance.save()
             teacher = self.instance

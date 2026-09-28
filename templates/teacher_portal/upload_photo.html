@@ -7,7 +7,7 @@
 
     <!-- Back button -->
     <div class="mb-3">
-        <a href="{% url 'teacher_portal:dashboard' %}" class="btn btn-outline-secondary btn-sm">
+        <a href="javascript:history.back()" class="btn btn-outline-secondary btn-sm">
             <i class="bi bi-arrow-right me-1"></i>
             العودة للوحة التحكم
         </a>
@@ -117,7 +117,7 @@
 
                 <div class="mt-2 text-center">
                     <small class="text-muted">
-                        <a href="{% url 'teacher_portal:dashboard' %}" class="text-decoration-none">العودة للوحة التحكم</a>
+                        <a href="javascript:history.back()" class="text-decoration-none">العودة للوحة التحكم</a>
                     </small>
                 </div>
             </form>
@@ -289,7 +289,7 @@
             body: fd,
             headers: { 'X-Requested-With': 'XMLHttpRequest' },
         }).then(function (resp) {
-            window.location.href = resp.url;
+            window.location.replace(resp.url);
         }).catch(function () {
             btnSubmit.disabled = false;
             btnSubmit.innerHTML = '<i class="bi bi-cloud-upload me-2"></i>اعتماد ورفع الصورة';
