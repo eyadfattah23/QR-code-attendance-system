@@ -30,6 +30,14 @@ def dashboard(request):
     subject = request.GET.get('subject', '').strip()
     sort_by = request.GET.get('sort', '').strip()
 
+    avg_days_param = request.GET.get('avg_days', '4').strip()
+    try:
+        avg_days = int(avg_days_param)
+        if avg_days not in [4, 8, 12, 16]:
+            avg_days = 4
+    except ValueError:
+        avg_days = 4
+
     teachers = (
         Teacher.objects
         .select_related('user')
@@ -61,11 +69,28 @@ def dashboard(request):
 
     teacher_cards = []
     for t in teachers:
+        counts_by_date = (
+            StudentAttendanceRecord.objects
+            .filter(assigned_teacher=t)
+            .values('date')
+            .annotate(cnt=Count('id'))
+            .order_by('-date')[:avg_days]
+        )
+        if counts_by_date:
+            total_attendance = sum(item['cnt'] for item in counts_by_date)
+            average_attendance = round(total_attendance / len(counts_by_date), 1)
+            actual_days = len(counts_by_date)
+        else:
+            average_attendance = 0
+            actual_days = 0
+
         teacher_cards.append({
             'teacher': t,
             'student_count': t.student_count,
             'today_count': t.today_count,
             'is_active': str(t.pk) == request.session.get('supervisor_teacher_id', ''),
+            'average_attendance': average_attendance,
+            'actual_days': actual_days,
         })
         
     subjects = Teacher.objects.exclude(subject__isnull=True).exclude(subject='').values_list('subject', flat=True).distinct().order_by('subject')
@@ -76,6 +101,7 @@ def dashboard(request):
         'active_teacher_id': request.session.get('supervisor_teacher_id', ''),
         'subject_q': subject,
         'sort_by': sort_by,
+        'avg_days': avg_days,
         'subjects': subjects,
     })
 

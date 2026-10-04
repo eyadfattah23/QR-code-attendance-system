@@ -43,7 +43,7 @@
     <div class="mb-4">
         <form method="get" class="row g-2 align-items-end">
             <!-- Client-side name search -->
-            <div class="col-md-4">
+            <div class="col-md-3">
                 <label class="form-label mb-1 small fw-semibold text-muted">بحث بالاسم</label>
                 <div class="input-group">
                     <span class="input-group-text bg-white border-end-0">
@@ -53,7 +53,7 @@
                         type="search"
                         id="teacher-search"
                         class="form-control border-start-0 ps-0"
-                        placeholder="ابحث عن معلم بالاسم…"
+                        placeholder="ابحث..."
                         autocomplete="off"
                         aria-label="بحث عن معلم"
                     >
@@ -69,7 +69,16 @@
                     {% endfor %}
                 </select>
             </div>
-            <div class="col-md-4">
+            <div class="col-md-2">
+                <label class="form-label mb-1 small fw-semibold text-muted">متوسط آخر (أيام)</label>
+                <select name="avg_days" class="form-select">
+                    <option value="4" {% if avg_days == 4 %}selected{% endif %}>4 أيام</option>
+                    <option value="8" {% if avg_days == 8 %}selected{% endif %}>8 أيام</option>
+                    <option value="12" {% if avg_days == 12 %}selected{% endif %}>12 يوماً</option>
+                    <option value="16" {% if avg_days == 16 %}selected{% endif %}>16 يوماً</option>
+                </select>
+            </div>
+            <div class="col-md-3">
                 <label class="form-label mb-1 small fw-semibold text-muted">ترتيب حسب</label>
                 <select name="sort" class="form-select">
                     <option value="attended_desc" {% if sort_by == 'attended_desc' %}selected{% endif %}>حضور اليوم (الأعلى أولاً)</option>
@@ -113,16 +122,22 @@
                     </div>
 
                     <div class="row g-2 mb-3">
-                        <div class="col-6">
-                            <div class="text-center p-2 rounded bg-light">
+                        <div class="col-4">
+                            <div class="text-center p-2 rounded bg-light h-100">
                                 <div class="fw-bold text-primary">{{ card.student_count }}</div>
                                 <div class="text-muted" style="font-size:.72rem;">الطلاب</div>
                             </div>
                         </div>
-                        <div class="col-6">
-                            <div class="text-center p-2 rounded bg-light">
+                        <div class="col-4">
+                            <div class="text-center p-2 rounded bg-light h-100">
                                 <div class="fw-bold text-success">{{ card.today_count }}</div>
                                 <div class="text-muted" style="font-size:.72rem;">حضور اليوم</div>
+                            </div>
+                        </div>
+                        <div class="col-4">
+                            <div class="text-center p-2 rounded bg-light h-100" title="متوسط آخر {{ card.actual_days }} أيام عمل">
+                                <div class="fw-bold text-info">{{ card.average_attendance }}</div>
+                                <div class="text-muted" style="font-size:.72rem;">متوسط ({{ card.actual_days }})</div>
                             </div>
                         </div>
                     </div>
