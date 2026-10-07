@@ -142,8 +142,8 @@
                         </div>
                     </div>
 
-                    <div class="mt-auto">
-                        <form method="post" action="{% url 'supervisor_portal:select_teacher' card.teacher.pk %}">
+                    <div class="mt-auto d-flex gap-2">
+                        <form method="post" action="{% url 'supervisor_portal:select_teacher' card.teacher.pk %}" class="flex-fill mb-0">
                             {% csrf_token %}
                             <button type="submit"
                                 class="btn w-100 {% if card.is_active %}btn-primary{% else %}btn-outline-primary{% endif %} btn-sm">
@@ -151,6 +151,9 @@
                                 {% if card.is_active %}العمل بهذا الحساب{% else %}عرض{% endif %}
                             </button>
                         </form>
+                        <a href="{% url 'admin_portal:attendance_records' %}?teacher={{ card.teacher.id }}" class="btn btn-outline-info btn-sm flex-fill d-flex align-items-center justify-content-center" title="سجل حضور الطلاب">
+                            <i class="bi bi-card-list me-1"></i>السجل
+                        </a>
                     </div>
                 </div>
             </div>
