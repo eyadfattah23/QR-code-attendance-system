@@ -71,6 +71,37 @@ def admin_required(view_func):
     return wrapper
 
 
+def admin_or_supervisor_required(view_func):
+    """Decorator allowing admins and supervisors (supervisors get read-only views)."""
+    @wraps(view_func)
+    @login_required
+    def wrapper(request, *args, **kwargs):
+        if not (request.user.is_admin or request.user.is_supervisor):
+            messages.error(request, 'ليس لديك صلاحية الوصول لهذه الصفحة')
+            return redirect('dashboard')
+        return view_func(request, *args, **kwargs)
+    return wrapper
+
+
+def _parse_selected_dates(request):
+    """Parse the comma-separated `dates` GET param into a sorted list of unique dates.
+
+    Invalid entries are silently ignored.
+    """
+    import datetime
+    raw = request.GET.get('dates', '')
+    result = set()
+    for part in raw.split(','):
+        part = part.strip()
+        if not part:
+            continue
+        try:
+            result.add(datetime.datetime.strptime(part, '%Y-%m-%d').date())
+        except ValueError:
+            continue
+    return sorted(result)
+
+
 @admin_required
 def dashboard(request):
     """Admin dashboard with summary statistics."""
@@ -330,7 +361,8 @@ def student_detail(request, pk):
         )
     }
     courses = [
-        {'teacher': link.teacher, 'payment': course_payments_by_teacher_id.get(link.teacher_id)}
+        {'teacher': link.teacher,
+            'payment': course_payments_by_teacher_id.get(link.teacher_id)}
         for link in course_links
     ]
 
@@ -392,6 +424,7 @@ def student_payments(request, pk):
         'total_count': len(roster),
         'unpaid_count': unpaid_count,
     })
+
 
 @admin_required
 @require_http_methods(['POST'])
@@ -469,11 +502,12 @@ def student_import(request):
             gender_val = None
 
         # New fields
-        education_type = _cell('education_type') or Student.EducationType.UNSPECIFIED
+        education_type = _cell(
+            'education_type') or Student.EducationType.UNSPECIFIED
         valid_edu_types = {k for k, _ in Student.EducationType.choices}
         if education_type not in valid_edu_types:
             education_type = Student.EducationType.UNSPECIFIED
-            
+
         nickname = _cell('nickname') or ''
         hall_name = _cell('hall_name') or ''
         notes = _cell('notes') or ''
@@ -740,7 +774,6 @@ def teacher_export(request):
             qs = qs.filter(gender=gender_filter)
         if hall_filter:
             qs = qs.filter(hall_name=hall_filter)
-
 
     wb = openpyxl.Workbook()
     ws = wb.active
@@ -1057,7 +1090,8 @@ def teacher_delete(request, pk):
     if has_history:
         teacher.is_active = False
         teacher.save(update_fields=['is_active'])
-        _log_audit(request, AuditLog.Action.EDIT, 'معلم', f'إلغاء تفعيل: {name}')
+        _log_audit(request, AuditLog.Action.EDIT,
+                   'معلم', f'إلغاء تفعيل: {name}')
         messages.warning(
             request,
             f'تم إلغاء تفعيل "{name}" بدلاً من الحذف (توجد سجلات مرتبطة)',
@@ -1094,7 +1128,8 @@ def teacher_bulk_delete(request):
         has_payments = CoursePayment.objects.filter(course=teacher).exists()
         has_links = StudentTeacherLink.objects.filter(teacher=teacher).exists()
         has_student_attendance = StudentAttendanceRecord.objects.filter(
-            models.Q(original_teacher=teacher) | models.Q(assigned_teacher=teacher)
+            models.Q(original_teacher=teacher) | models.Q(
+                assigned_teacher=teacher)
         ).exists()
         has_teacher_attendance = TeacherAttendanceRecord.objects.filter(
             teacher=teacher
@@ -1104,7 +1139,8 @@ def teacher_bulk_delete(request):
         if has_history:
             teacher.is_active = False
             teacher.save(update_fields=['is_active'])
-            _log_audit(request, AuditLog.Action.EDIT, 'معلم', f'إلغاء تفعيل: {name}')
+            _log_audit(request, AuditLog.Action.EDIT,
+                       'معلم', f'إلغاء تفعيل: {name}')
             deactivated_count += 1
         else:
             _log_audit(request, AuditLog.Action.DELETE, 'معلم', name)
@@ -1127,6 +1163,7 @@ def teacher_bulk_delete(request):
 
     return redirect(_get_return(request, 'teacher_list_return',
                                 reverse('admin_portal:teacher_list')))
+
 
 @admin_required
 def teacher_students(request, pk):
@@ -1357,7 +1394,8 @@ def course_roster(request, pk):
     }
 
     roster = [
-        {'student': link.student, 'payment': payments_by_student.get(link.student_id)}
+        {'student': link.student,
+            'payment': payments_by_student.get(link.student_id)}
         for link in links
     ]
     unpaid_count = sum(
@@ -1395,7 +1433,8 @@ def course_payment_cycle(request, pk, student_pk):
         student=student, course=course, year=today.year, month=today.month,
     )
     try:
-        next_index = (_PAYMENT_STATUS_CYCLE.index(payment.status) + 1) % len(_PAYMENT_STATUS_CYCLE)
+        next_index = (_PAYMENT_STATUS_CYCLE.index(
+            payment.status) + 1) % len(_PAYMENT_STATUS_CYCLE)
     except ValueError:
         next_index = 0
     payment.status = _PAYMENT_STATUS_CYCLE[next_index]
@@ -1470,7 +1509,8 @@ def course_payment_history(request, pk, student_pk):
         return HttpResponse(status=404)
 
     try:
-        year = int(request.POST.get('year') or request.GET.get('year') or localdate().year)
+        year = int(request.POST.get('year')
+                   or request.GET.get('year') or localdate().year)
     except (TypeError, ValueError):
         year = localdate().year
 
@@ -1550,7 +1590,8 @@ def _filtered_course_payments(request):
     if month_filter.isdigit():
         qs = qs.filter(month=int(month_filter))
 
-    qs = qs.order_by('-year', '-month', 'course__full_name', 'student__full_name')
+    qs = qs.order_by('-year', '-month', 'course__full_name',
+                     'student__full_name')
     filters = {
         'course_id': course_id,
         'q': q,
@@ -1570,9 +1611,12 @@ def payments_list(request):
     qs, filters = _filtered_course_payments(request)
 
     stats = qs.aggregate(
-        paid_count=Count('id', filter=Q(status=CoursePayment.PaymentStatus.PAID)),
-        partial_count=Count('id', filter=Q(status=CoursePayment.PaymentStatus.PARTIAL)),
-        not_paid_count=Count('id', filter=Q(status=CoursePayment.PaymentStatus.NOT_PAID)),
+        paid_count=Count('id', filter=Q(
+            status=CoursePayment.PaymentStatus.PAID)),
+        partial_count=Count('id', filter=Q(
+            status=CoursePayment.PaymentStatus.PARTIAL)),
+        not_paid_count=Count('id', filter=Q(
+            status=CoursePayment.PaymentStatus.NOT_PAID)),
         total_collected=Sum('amount_paid'),
     )
 
@@ -1617,7 +1661,8 @@ def payments_export(request):
             p.get_status_display(),
             float(p.amount_paid) if p.amount_paid is not None else '',
             p.note,
-            localtime(p.updated_at).strftime('%Y-%m-%d %H:%M') if p.updated_at else '',
+            localtime(p.updated_at).strftime(
+                '%Y-%m-%d %H:%M') if p.updated_at else '',
         ])
 
     buf = io.BytesIO()
@@ -1732,18 +1777,19 @@ def assistant_list(request):
         )
     paginator = Paginator(qs, 25)
     page_obj = paginator.get_page(request.GET.get('page'))
-    
+
     # Pre-fetch links to show number of linked teachers
-    links = AssistantTeacherLink.objects.select_related('teacher').filter(user__in=page_obj)
+    links = AssistantTeacherLink.objects.select_related(
+        'teacher').filter(user__in=page_obj)
     assistant_links = {}
     for link in links:
         if link.user_id not in assistant_links:
             assistant_links[link.user_id] = []
         assistant_links[link.user_id].append(link.teacher.full_name)
-        
+
     for ast in page_obj:
         ast.teacher_link_names = assistant_links.get(ast.id, [])
-        
+
     return render(request, 'admin_portal/assistants.html', {
         'page_obj': page_obj,
         'q': q,
@@ -1817,33 +1863,35 @@ def assistant_links(request, pk):
     """Manage which teachers/courses an assistant is linked to."""
     from core.models import AssistantTeacherLink
     assistant = get_object_or_404(User, pk=pk, role=User.Role.ASSISTANT)
-    
+
     if request.method == 'POST':
         # Get list of selected teacher IDs from the form
         selected_ids = request.POST.getlist('teachers')
-        
+
         # Remove old links
         AssistantTeacherLink.objects.filter(user=assistant).delete()
-        
+
         # Create new links
         new_links = [
-            AssistantTeacherLink(user=assistant, teacher_id=tid) 
+            AssistantTeacherLink(user=assistant, teacher_id=tid)
             for tid in selected_ids if tid
         ]
         if new_links:
             AssistantTeacherLink.objects.bulk_create(new_links)
-            
-        messages.success(request, f'تم تحديث صلاحيات الوصول لـ {assistant.first_name} بنجاح')
+
+        messages.success(
+            request, f'تم تحديث صلاحيات الوصول لـ {assistant.first_name} بنجاح')
         return redirect('admin_portal:assistant_list')
-        
-    linked_teacher_ids = list(AssistantTeacherLink.objects.filter(user=assistant).values_list('teacher_id', flat=True))
+
+    linked_teacher_ids = list(AssistantTeacherLink.objects.filter(
+        user=assistant).values_list('teacher_id', flat=True))
     # Include teachers already linked even if since deactivated, so an
     # existing link is never silently dropped just by opening/saving this
     # page — the admin can still see and explicitly unlink them here.
     all_teachers = Teacher.objects.filter(
         Q(is_active=True) | Q(pk__in=linked_teacher_ids)
     ).order_by('full_name')
-    
+
     return render(request, 'admin_portal/assistant_links.html', {
         'assistant': assistant,
         'all_teachers': all_teachers,
@@ -1926,14 +1974,20 @@ def teacher_add_excused_absence(request):
     return redirect('/portal/admin/attendance/?tab=teachers')
 
 
-@admin_required
+@admin_or_supervisor_required
 def attendance_records(request):
-    """Filterable table of student and teacher attendance records (tabbed)."""
-    _save_return(request, 'attendance_records_return')
+    """Filterable table of student and teacher attendance records (tabbed).
+
+    Supervisors get a read-only view (no edit/delete/add actions).
+    """
+    read_only = not request.user.is_admin
+    if not read_only:
+        _save_return(request, 'attendance_records_return')
     tab = request.GET.get('tab', 'students')  # 'students' | 'teachers'
 
     date_from = request.GET.get('date_from', '').strip()
     date_to = request.GET.get('date_to', '').strip()
+    selected_dates = _parse_selected_dates(request)
     teacher_id = request.GET.get('teacher', '').strip()
     student_q = request.GET.get('student', '').strip()
     grade = request.GET.get('grade', '').strip()
@@ -1952,6 +2006,8 @@ def attendance_records(request):
         student_qs = student_qs.filter(date__gte=date_from)
     if date_to:
         student_qs = student_qs.filter(date__lte=date_to)
+    if selected_dates:
+        student_qs = student_qs.filter(date__in=selected_dates)
     if teacher_id:
         student_qs = student_qs.filter(
             Q(assigned_teacher_id=teacher_id) | Q(
@@ -1984,6 +2040,8 @@ def attendance_records(request):
         teacher_qs = teacher_qs.filter(date__gte=date_from)
     if date_to:
         teacher_qs = teacher_qs.filter(date__lte=date_to)
+    if selected_dates:
+        teacher_qs = teacher_qs.filter(date__in=selected_dates)
     if teacher_q:
         teacher_qs = teacher_qs.filter(
             Q(teacher__full_name__icontains=teacher_q)
@@ -2025,6 +2083,8 @@ def attendance_records(request):
         'grades': grades,
         'date_from': date_from,
         'date_to': date_to,
+        'selected_dates': [d.isoformat() for d in selected_dates],
+        'dates_param': ','.join(d.isoformat() for d in selected_dates),
         'teacher_id': teacher_id,
         'student_q': student_q,
         'grade': grade,
@@ -2033,6 +2093,7 @@ def attendance_records(request):
         'image_filter': image_filter,
         'gender': gender,
         'per_page': per_page,
+        'read_only': read_only,
     })
 
 
@@ -2040,7 +2101,7 @@ def attendance_records(request):
 # Excel export for attendance records
 # ---------------------------------------------------------------------------
 
-@admin_required
+@admin_or_supervisor_required
 def export_attendance_excel(request):
     """Download filtered attendance records as .xlsx.
 
@@ -2049,6 +2110,7 @@ def export_attendance_excel(request):
     tab = request.GET.get('tab', 'students')
     date_from = request.GET.get('date_from', '').strip()
     date_to = request.GET.get('date_to', '').strip()
+    selected_dates = _parse_selected_dates(request)
     teacher_id = request.GET.get('teacher', '').strip()
     student_q = request.GET.get('student', '').strip()
     grade = request.GET.get('grade', '').strip()
@@ -2096,30 +2158,39 @@ def export_attendance_excel(request):
             qs = qs.filter(date__gte=d_from)
         if d_to:
             qs = qs.filter(date__lte=d_to)
+        if selected_dates:
+            qs = qs.filter(date__in=selected_dates)
         if record_type:
             qs = qs.filter(record_type=record_type)
         if gender:
             teachers_qs = teachers_qs.filter(gender=gender)
             qs = qs.filter(teacher__gender=gender)
 
-        # If dates not provided, find min/max in qs
-        if not d_from and qs.exists():
-            d_from = qs.aggregate(models.Min('date'))['date__min']
-        if not d_to and qs.exists():
-            d_to = qs.aggregate(models.Max('date'))['date__max']
+        if selected_dates:
+            # Only the explicitly chosen dates (within the range, if one is set)
+            date_list = [
+                d for d in selected_dates
+                if (not d_from or d >= d_from) and (not d_to or d <= d_to)
+            ]
+        else:
+            # If dates not provided, find min/max in qs
+            if not d_from and qs.exists():
+                d_from = qs.aggregate(models.Min('date'))['date__min']
+            if not d_to and qs.exists():
+                d_to = qs.aggregate(models.Max('date'))['date__max']
 
-        # Fallback to today
-        if not d_from:
-            d_from = localdate()
-        if not d_to:
-            d_to = localdate()
+            # Fallback to today
+            if not d_from:
+                d_from = localdate()
+            if not d_to:
+                d_to = localdate()
 
-        # Build date list
-        date_list = []
-        curr = d_from
-        while curr <= d_to and (curr - d_from).days < 366:
-            date_list.append(curr)
-            curr += datetime.timedelta(days=1)
+            # Build date list
+            date_list = []
+            curr = d_from
+            while curr <= d_to and (curr - d_from).days < 366:
+                date_list.append(curr)
+                curr += datetime.timedelta(days=1)
 
         # Build attendance map
         attendance_map = {}
@@ -2187,6 +2258,8 @@ def export_attendance_excel(request):
             qs = qs.filter(date__gte=date_from)
         if date_to:
             qs = qs.filter(date__lte=date_to)
+        if selected_dates:
+            qs = qs.filter(date__in=selected_dates)
         if teacher_q:
             qs = qs.filter(
                 Q(teacher__full_name__icontains=teacher_q)
@@ -2225,6 +2298,8 @@ def export_attendance_excel(request):
             qs = qs.filter(date__gte=date_from)
         if date_to:
             qs = qs.filter(date__lte=date_to)
+        if selected_dates:
+            qs = qs.filter(date__in=selected_dates)
         if teacher_id:
             qs = qs.filter(
                 Q(assigned_teacher_id=teacher_id) | Q(
@@ -2238,7 +2313,7 @@ def export_attendance_excel(request):
             )
         if grade:
             qs = qs.filter(student__grade=grade)
-        
+
         if image_filter == 'missing':
             qs = qs.filter(
                 Q(homework_photo__exact='') | Q(homework_photo__isnull=True),
@@ -2249,6 +2324,7 @@ def export_attendance_excel(request):
         ws.append([
             'التاريخ', 'اسم الطالب', 'الرقم القومي', 'الكود', 'الصف',
             'وقت الحضور', 'وقت المغادرة', 'مدة الحضور', 'المعلم المكلف', 'التقييم', 'نيابة', 'ملاحظات', 'ملاحظة المعلم',
+            'المعلم الأصلي (الغائب)', 'صورة الواجب', 'صورة الاختبار',
         ])
         for rec in qs:
             ws.append([
@@ -2266,6 +2342,10 @@ def export_attendance_excel(request):
                 'نعم' if rec.is_substitute_assignment else 'لا',
                 rec.substitute_note,
                 rec.teacher_note,
+                rec.original_teacher.full_name
+                if rec.is_substitute_assignment and rec.original_teacher else '',
+                'نعم' if rec.homework_photo else 'لا',
+                'نعم' if rec.test_photo else 'لا',
             ])
         filename = 'student_attendance'
 

@@ -11,7 +11,15 @@
         <h1 class="h3 mb-0">
             <i class="bi bi-calendar-check me-2"></i>
             سجلات الحضور
+            {% if read_only %}
+            <span class="badge bg-secondary fs-6 align-middle ms-2"><i class="bi bi-eye me-1"></i>عرض فقط</span>
+            {% endif %}
         </h1>
+        {% if read_only %}
+        <a href="{% url 'supervisor_portal:dashboard' %}" class="btn btn-outline-secondary btn-sm">
+            <i class="bi bi-arrow-right me-1"></i>العودة للوحة المشرف
+        </a>
+        {% endif %}
     </div>
 
     <!-- Tabs -->
@@ -50,6 +58,7 @@
                     <label class="form-label mb-1 small fw-semibold">إلى تاريخ</label>
                     <input type="date" name="date_to" value="{{ date_to }}" class="form-control form-control-sm">
                 </div>
+                {% include 'admin_portal/_date_multi_picker.html' %}
                 <div class="col-md-2">
                     <label class="form-label mb-1 small fw-semibold">الطالب</label>
                     <input type="text" name="student" value="{{ student_q }}" class="form-control form-control-sm"
@@ -124,7 +133,7 @@
                         <th>نيابة</th>
                         <th>ملاحظات</th>
                         <th>الصور</th>
-                        <th></th>
+                        {% if not read_only %}<th></th>{% endif %}
                     </tr>
                 </thead>
                 <tbody>
@@ -133,10 +142,14 @@
                         <td class="text-muted small">{{ student_page.start_index|add:forloop.counter0 }}</td>
                         <td class="fw-semibold">{{ rec.date|date:"Y/m/d" }}</td>
                         <td>
+                            {% if read_only %}
+                            <span class="fw-semibold">{{ rec.student.full_name }}</span>
+                            {% else %}
                             <a href="{% url 'admin_portal:student_history' rec.student.id %}"
                                 class="text-decoration-none fw-semibold">
                                 {{ rec.student.full_name }}
                             </a>
+                            {% endif %}
                             <div class="font-monospace text-muted" style="font-size:.7rem;">
                                 {{ rec.student.student_code|default:"" }}
                             </div>
@@ -185,6 +198,18 @@
                             <!-- Modal -->
                             <div class="modal fade" id="noteModal{{ rec.pk }}" tabindex="-1" aria-hidden="true">
                                 <div class="modal-dialog modal-dialog-centered">
+                                    {% if read_only %}
+                                    <div class="modal-content">
+                                        <div class="modal-header">
+                                            <h5 class="modal-title fs-6">ملاحظات: {{ rec.student.full_name }}</h5>
+                                            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="إغلاق"></button>
+                                        </div>
+                                        <div class="modal-body text-start" dir="rtl" style="white-space:pre-wrap;">{{ rec.teacher_note|default:"لا توجد ملاحظات" }}</div>
+                                        <div class="modal-footer p-2 border-0">
+                                            <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">إغلاق</button>
+                                        </div>
+                                    </div>
+                                    {% else %}
                                     <form method="post" action="{% url 'admin_portal:attendance_record_edit_note' rec.pk %}" class="modal-content">
                                         {% csrf_token %}
                                         <input type="hidden" name="next" value="{{ request.get_full_path }}">
@@ -200,6 +225,7 @@
                                             <button type="submit" class="btn btn-primary btn-sm">حفظ التغييرات</button>
                                         </div>
                                     </form>
+                                    {% endif %}
                                 </div>
                             </div>
                         </td>
@@ -220,6 +246,7 @@
                                 {% else %}<span class="text-muted small" title="لا يوجد اختبار">—</span>{% endif %}
                             </div>
                         </td>
+                        {% if not read_only %}
                         <td>
                             <form method="post" action="{% url 'admin_portal:student_attendance_record_delete' rec.pk %}"
                                   onsubmit="return confirm('هل أنت متأكد من حذف سجل حضور {{ rec.student.full_name }} بتاريخ {{ rec.date }}؟')">
@@ -230,6 +257,7 @@
                                 </button>
                             </form>
                         </td>
+                        {% endif %}
                     </tr>
                     {% endfor %}
                 </tbody>
@@ -306,6 +334,7 @@
                     <label class="form-label mb-1 small fw-semibold">إلى تاريخ</label>
                     <input type="date" name="date_to" value="{{ date_to }}" class="form-control form-control-sm">
                 </div>
+                {% include 'admin_portal/_date_multi_picker.html' %}
                 <div class="col-md-2">
                     <label class="form-label mb-1 small fw-semibold">المعلم</label>
                     <input type="text" name="teacher_q" value="{{ teacher_q }}" class="form-control form-control-sm"
@@ -342,9 +371,11 @@
                         class="btn btn-success btn-sm" title="تصدير مجمع (جديد)">
                         <i class="bi bi-file-earmark-excel"></i> مجمع (جديد)
                     </a>
+                    {% if not read_only %}
                     <button type="button" class="btn btn-warning btn-sm" data-bs-toggle="modal" data-bs-target="#addExcusedAbsenceModal">
                         <i class="bi bi-person-dash"></i> إضافة غياب بإذن
                     </button>
+                    {% endif %}
                 </div>
             </form>
         </div>
@@ -365,7 +396,7 @@
                         <th>مدة الحضور</th>
                         <th>التقييم</th>
                         <th>ملاحظات</th>
-                        <th></th>
+                        {% if not read_only %}<th></th>{% endif %}
                     </tr>
                 </thead>
                 <tbody>
@@ -411,6 +442,7 @@
                             </span>
                         </td>
                         <td class="small text-muted" style="max-width:200px;white-space:pre-wrap;">{{ rec.notes|default:"—" }}</td>
+                        {% if not read_only %}
                         <td>
                             <div class="d-flex gap-1">
                                 <a href="{% url 'admin_portal:teacher_attendance_record_edit' rec.pk %}"
@@ -426,6 +458,7 @@
                                 </form>
                             </div>
                         </td>
+                        {% endif %}
                     </tr>
                     {% endfor %}
                 </tbody>
@@ -491,6 +524,7 @@
 
 </div>
 
+{% if not read_only %}
 <!-- Add Excused Absence Modal -->
 <div class="modal fade" id="addExcusedAbsenceModal" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered">
@@ -526,4 +560,56 @@
         </form>
     </div>
 </div>
+{% endif %}
+
+<script{% if csp_nonce %} nonce="{{ csp_nonce }}"{% endif %}>
+(function () {
+    // Multi-date picker: pick dates one at a time from the calendar; each becomes
+    // a removable chip. Stored as comma-separated YYYY-MM-DD in the hidden `dates` input.
+    var ISO = /^\d{4}-\d{2}-\d{2}$/;
+    document.querySelectorAll('.date-multi-picker').forEach(function (root) {
+        var input = root.querySelector('.dmp-input');
+        var hidden = root.querySelector('.dmp-hidden');
+        var chips = root.querySelector('.dmp-chips');
+        var clearBtn = root.querySelector('.dmp-clear');
+        var dates = (hidden.value || '').split(',').filter(function (d) { return ISO.test(d); });
+
+        function render() {
+            dates = Array.from(new Set(dates)).sort();
+            hidden.value = dates.join(',');
+            hidden.disabled = dates.length === 0; // keep URL clean when empty
+            chips.innerHTML = '';
+            dates.forEach(function (d) {
+                var chip = document.createElement('span');
+                chip.className = 'badge bg-primary-subtle text-primary-emphasis border d-inline-flex align-items-center gap-1';
+                chip.textContent = d.replace(/-/g, '/');
+                var x = document.createElement('button');
+                x.type = 'button';
+                x.className = 'btn-close';
+                x.style.fontSize = '.55rem';
+                x.setAttribute('aria-label', 'إزالة');
+                x.addEventListener('click', function () {
+                    dates = dates.filter(function (v) { return v !== d; });
+                    render();
+                });
+                chip.appendChild(x);
+                chips.appendChild(chip);
+            });
+        }
+
+        input.addEventListener('change', function () {
+            if (ISO.test(this.value)) {
+                dates.push(this.value);
+                render();
+            }
+            this.value = '';
+        });
+        clearBtn.addEventListener('click', function () {
+            dates = [];
+            render();
+        });
+        render();
+    });
+})();
+</script>
 {% endblock %}

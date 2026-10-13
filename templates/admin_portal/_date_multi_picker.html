@@ -1,0 +1,11 @@
+<div class="col-md-3 date-multi-picker">
+    <label class="form-label mb-1 small fw-semibold">تواريخ محددة</label>
+    <div class="input-group input-group-sm">
+        <input type="date" class="form-control form-control-sm dmp-input" aria-label="اختر تاريخاً لإضافته">
+        <button type="button" class="btn btn-outline-secondary dmp-clear" title="مسح التواريخ المحددة">
+            <i class="bi bi-calendar-x"></i>
+        </button>
+    </div>
+    <input type="hidden" name="dates" value="{{ dates_param }}" class="dmp-hidden">
+    <div class="d-flex flex-wrap gap-1 mt-1 dmp-chips"></div>
+</div>
