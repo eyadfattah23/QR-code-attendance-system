@@ -48,6 +48,15 @@
                                 </select>
                             </div>
                             <div class="col-md-2">
+                                <label class="form-label mb-1 small fw-semibold">طالب معلم</label>
+                                <select id="is-teacher-filter" class="form-select"
+                                    onchange="filterRows(document.getElementById('search-input').value)">
+                                    <option value="">— الكل —</option>
+                                    <option value="1">المعلمون فقط</option>
+                                    <option value="0">غير المعلمين</option>
+                                </select>
+                            </div>
+                            <div class="col-md-2">
                                 <button type="button" class="btn btn-outline-secondary w-100" onclick="clearFilters()">
                                     <i class="bi bi-x-lg me-1"></i>مسح
                                 </button>
@@ -94,7 +103,9 @@
                                     <tr data-name="{{ student.full_name|lower }}"
                                         data-code="{{ student.student_code|lower|default:'' }}"
                                         data-national="{{ student.national_id|lower }}"
-                                        data-grade="{{ student.grade|default:'' }}">
+                                        data-grade="{{ student.grade|default:'' }}"
+                                        data-is-teacher="{% if student.is_teacher %}1{% else %}0{% endif %}"
+                                        {% if student.is_teacher %}class="row-is-teacher"{% endif %}>
                                         <td>
                                             <input type="checkbox" class="form-check-input student-cb" name="students"
                                                 value="{{ student.id }}" id="cb-{{ student.id }}" {% if sid in linked_ids %}checked{% endif %} onchange="onStudentToggle(this)">
@@ -104,6 +115,7 @@
                                                 style="cursor:pointer">
                                                 {{ student.full_name }}
                                             </label>
+                                            {% include 'partials/is_teacher_badge.html' %}
                                             {% if student.other_primary_teacher %}
                                             <br>
                                             <span class="badge bg-warning text-dark mt-1"
@@ -279,6 +291,7 @@
     function filterRows(term) {
         const t = term.toLowerCase().trim();
         const grade = document.getElementById('grade-filter').value.toLowerCase();
+        const isTeacher = document.getElementById('is-teacher-filter').value;
         let visible = 0;
         document.querySelectorAll('#students-table tbody tr[data-name]').forEach(row => {
             const matchesSearch = !t ||
@@ -286,7 +299,8 @@
                 row.dataset.code.includes(t) ||
                 row.dataset.national.includes(t);
             const matchesGrade = !grade || row.dataset.grade === grade;
-            const show = matchesSearch && matchesGrade;
+            const matchesTeacher = !isTeacher || row.dataset.isTeacher === isTeacher;
+            const show = matchesSearch && matchesGrade && matchesTeacher;
             row.style.display = show ? '' : 'none';
             if (show) visible++;
         });
@@ -306,6 +320,7 @@
     function clearFilters() {
         document.getElementById('search-input').value = '';
         document.getElementById('grade-filter').value = '';
+        document.getElementById('is-teacher-filter').value = '';
         filterRows('');
     }
 

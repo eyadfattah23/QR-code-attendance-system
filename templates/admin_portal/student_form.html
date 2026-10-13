@@ -42,6 +42,15 @@
                             {% include "admin_portal/_form_field.html" with field=fc.grade col="col-md-4" %}
                             {% include "admin_portal/_form_field.html" with field=fc.education_type col="col-md-4" %}
                             {% include "admin_portal/_form_field.html" with field=fc.gender col="col-md-4" %}
+                            <div class="col-12">
+                                <div class="form-check form-switch p-2 ps-5 rounded border" style="border-color:#6f42c1 !important;">
+                                    {{ fc.is_teacher }}
+                                    <label class="form-check-label fw-semibold" for="{{ fc.is_teacher.id_for_label }}">
+                                        <i class="bi bi-mortarboard-fill me-1" style="color:#6f42c1;"></i>{{ fc.is_teacher.label }}
+                                    </label>
+                                    <div class="form-text text-muted">{{ fc.is_teacher.help_text }}</div>
+                                </div>
+                            </div>
                             {% include "admin_portal/_form_field.html" with field=fc.phone col="col-md-6" %}
                             {% include "admin_portal/_form_field.html" with field=fc.date_of_birth col="col-md-6" %}
                             {% include "admin_portal/_form_field.html" with field=fc.joining_date col="col-md-6" %}

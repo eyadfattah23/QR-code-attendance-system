@@ -13,6 +13,7 @@ from django.db import IntegrityError
 from django.db.models import Avg, Q
 
 from core.models import Student, Teacher, StudentTeacherLink
+from core.filters import get_is_teacher_filter
 from attendance.models import StudentAttendanceRecord
 from admin_portal.models import AuditLog
 
@@ -93,6 +94,7 @@ def dashboard(request):
     """Teacher dashboard showing their students."""
     today = localdate()
     sort = request.GET.get('sort', '')
+    is_teacher_filter = get_is_teacher_filter(request)
 
     teacher = get_acting_teacher(request)
     try:
@@ -157,6 +159,15 @@ def dashboard(request):
             student_rows.sort(key=lambda r: not r['is_attended'])
         elif sort == 'absent_first':
             student_rows.sort(key=lambda r: r['is_attended'])
+
+        # Students who are also teachers always come first (stable sort keeps
+        # the chosen ordering within each group).
+        student_rows.sort(key=lambda r: not r['student'].is_teacher)
+
+        if is_teacher_filter:
+            want = is_teacher_filter == '1'
+            student_rows = [
+                r for r in student_rows if r['student'].is_teacher == want]
     except Teacher.DoesNotExist:
         students = []
         student_rows = []
@@ -171,6 +182,7 @@ def dashboard(request):
         'attended_count': attended_count,
         'today': today,
         'sort': sort,
+        'is_teacher_filter': is_teacher_filter,
         'acting_teacher': teacher,
         'scan_results': request.session.pop('teacher_scan_results', []),
     }
@@ -455,7 +467,12 @@ def export_attendance(request):
     )
     all_student_ids = set(linked_student_ids + assigned_student_ids)
 
-    students = list(Student.objects.filter(id__in=all_student_ids))
+    students = Student.objects.filter(id__in=all_student_ids).order_by(
+        '-is_teacher', 'full_name')
+    is_teacher_filter = get_is_teacher_filter(request)
+    if is_teacher_filter:
+        students = students.filter(is_teacher=is_teacher_filter == '1')
+    students = list(students)
 
     today_attendance = StudentAttendanceRecord.objects.filter(
         Q(original_teacher=teacher) | Q(assigned_teacher=teacher),
@@ -481,7 +498,7 @@ def export_attendance(request):
     ws = wb.active
     ws.title = str(today)
     ws.append(['اسم الطالب', 'الصف', 'حالة الحضور', 'وقت الحضور',
-              'التقييم', 'متوسط التقييم', 'الملاحظة'])
+              'التقييم', 'متوسط التقييم', 'الملاحظة', 'طالب معلم'])
 
     for student in students:
         att = attendance_by_id.get(student.id)
@@ -495,6 +512,7 @@ def export_attendance(request):
             att.rating if att else '',
             round(avg, 1) if avg is not None else '',
             att.teacher_note if att else '',
+            'نعم' if student.is_teacher else 'لا',
         ])
 
     response = HttpResponse(

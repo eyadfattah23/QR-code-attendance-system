@@ -304,6 +304,11 @@ class Student(models.Model):
         default='',
         help_text="اسم القاعة / المجموعة",
     )
+    is_teacher = models.BooleanField(
+        default=False,
+        db_index=True,
+        help_text="الطالب معلم أيضاً (يُميَّز بلون مختلف في القوائم والسجلات)",
+    )
     notes = models.TextField(
         blank=True,
         default='',

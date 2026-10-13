@@ -18,7 +18,7 @@
                 <i class="bi bi-file-earmark-excel me-1"></i>
                 استيراد Excel
             </button>
-            <a href="{% url 'admin_portal:student_export' %}{% if q or grade_filter or gender_filter or education_types_filter %}?{% if q %}q={{ q }}{% endif %}{% if grade_filter %}&grade={{ grade_filter }}{% endif %}{% if gender_filter %}&gender={{ gender_filter }}{% endif %}{% for et in education_types_filter %}&education_type={{ et }}{% endfor %}{% endif %}"
+            <a href="{% url 'admin_portal:student_export' %}{% if q or grade_filter or gender_filter or education_types_filter or is_teacher_filter %}?{% if q %}q={{ q }}{% endif %}{% if grade_filter %}&grade={{ grade_filter }}{% endif %}{% if gender_filter %}&gender={{ gender_filter }}{% endif %}{% for et in education_types_filter %}&education_type={{ et }}{% endfor %}{% if is_teacher_filter %}&is_teacher={{ is_teacher_filter }}{% endif %}{% endif %}"
                 class="btn btn-outline-secondary">
                 <i class="bi bi-download me-1"></i>
                 تصدير Excel
@@ -94,6 +94,7 @@
                         {% endfor %}
                     </select>
                 </div>
+                {% include 'partials/is_teacher_filter.html' with value=is_teacher_filter %}
                 <div class="col-md-2">
                     <label class="form-label mb-1 small fw-semibold">ترتيب</label>
                     <select name="sort" class="form-select">
@@ -111,7 +112,7 @@
                         <i class="bi bi-search"></i>
                     </button>
                 </div>
-                {% if q or grade_filter or gender_filter or birth_year_filter or hall_filter or sort %}
+                {% if q or grade_filter or gender_filter or birth_year_filter or hall_filter or sort or is_teacher_filter %}
                 <div class="col-md-auto">
                     <a href="{% url 'admin_portal:student_list' %}" class="btn btn-outline-secondary">
                         <i class="bi bi-x-lg me-1"></i>مسح
@@ -174,14 +175,14 @@
                         </thead>
                         <tbody>
                             {% for student in page_obj %}
-                            <tr>
+                            <tr{% if student.is_teacher %} class="row-is-teacher"{% endif %}>
                                 <td>
                                     <input type="checkbox" class="form-check-input row-cb"
                                         data-id="{{ student.id }}">
                                 </td>
                                 <td class="text-muted small">{{ forloop.counter|add:page_obj.start_index|add:"-1" }}
                                 </td>
-                                <td class="fw-semibold">{{ student.full_name }}</td>
+                                <td class="fw-semibold">{{ student.full_name }}{% include 'partials/is_teacher_badge.html' %}</td>
                                 <td class="text-muted small">{{ student.nickname|default:"—" }}</td>
                                 <td class="font-monospace small text-muted">{{ student.national_id }}</td>
                                 <td>

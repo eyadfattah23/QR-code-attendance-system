@@ -1,0 +1,8 @@
+<div class="{{ col|default:'col-md-2' }}">
+    <label class="form-label mb-1 small fw-semibold">طالب معلم</label>
+    <select name="is_teacher" class="form-select{% if sm %} form-select-sm{% endif %}"{% if select_id %} id="{{ select_id }}"{% endif %}>
+        <option value="">— الكل —</option>
+        <option value="1" {% if value == '1' %}selected{% endif %}>المعلمون فقط</option>
+        <option value="0" {% if value == '0' %}selected{% endif %}>غير المعلمين</option>
+    </select>
+</div>

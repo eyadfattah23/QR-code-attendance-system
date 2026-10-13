@@ -32,6 +32,7 @@
                 {% if student.grade %}<span class="badge bg-light text-dark border me-1">{{ student.grade }}</span>{% endif %}
                 {% if student.gender == 'M' %}<span class="badge bg-info bg-opacity-25 text-info-emphasis border">ذكر</span>
                 {% elif student.gender == 'F' %}<span class="badge bg-warning bg-opacity-25 text-warning-emphasis border">أنثى</span>{% endif %}
+                {% include 'partials/is_teacher_badge.html' %}
             </div>
         </div>
         <div class="d-flex gap-2">
@@ -82,6 +83,9 @@
 
                         <dt class="col-sm-5 text-muted fw-normal">اسم القاعة</dt>
                         <dd class="col-sm-7">{{ student.hall_name|default:"—" }}</dd>
+
+                        <dt class="col-sm-5 text-muted fw-normal">طالب معلم</dt>
+                        <dd class="col-sm-7">{% if student.is_teacher %}{% include 'partials/is_teacher_badge.html' %}{% else %}لا{% endif %}</dd>
                     </dl>
                 </div>
             </div>

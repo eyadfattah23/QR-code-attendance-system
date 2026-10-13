@@ -8,7 +8,7 @@
 
     <div class="d-flex justify-content-between align-items-center mb-3 mt-2 flex-wrap gap-2">
         <h1 class="h4 mb-0"><i class="bi bi-cash-stack me-2 text-success"></i>سجلات الدفع (تقرير عام)</h1>
-        <a href="{% url 'admin_portal:payments_export' %}?course={{ course_id }}&q={{ q }}&status={{ status_filter }}&year={{ year_filter }}&month={{ month_filter }}"
+        <a href="{% url 'admin_portal:payments_export' %}?course={{ course_id }}&q={{ q|urlencode }}&status={{ status_filter }}&year={{ year_filter }}&month={{ month_filter }}&is_teacher={{ is_teacher_filter }}"
            class="btn btn-outline-success btn-sm">
             <i class="bi bi-file-earmark-excel me-1"></i>تصدير Excel
         </a>
@@ -96,6 +96,7 @@
                         {% endfor %}
                     </select>
                 </div>
+                {% include 'partials/is_teacher_filter.html' with value=is_teacher_filter sm=True col='col-lg-2 col-md-4 col-6' %}
                 <div class="col-12">
                     <button type="submit" class="btn btn-primary btn-sm"><i class="bi bi-search me-1"></i>تصفية</button>
                     <a href="{% url 'admin_portal:payments_list' %}" class="btn btn-outline-secondary btn-sm">إعادة تعيين</a>
@@ -118,11 +119,12 @@
                     </thead>
                     <tbody>
                         {% for payment in page_obj %}
-                        <tr>
+                        <tr{% if payment.student.is_teacher %} class="row-is-teacher"{% endif %}>
                             <td>
                                 <a href="{% url 'admin_portal:student_detail' payment.student.id %}" class="text-decoration-none">
                                     {{ payment.student.full_name }}
                                 </a>
+                                {% include 'partials/is_teacher_badge.html' with student=payment.student %}
                             </td>
                             <td>
                                 <a href="{% url 'admin_portal:course_roster' payment.course.id %}" class="text-decoration-none">

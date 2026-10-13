@@ -27,12 +27,18 @@
 
     <div class="card border-0 shadow-sm">
         <div class="card-body">
-            <form method="get" class="mb-3">
+            <form method="get" class="mb-3 d-flex flex-wrap gap-2">
                 <div class="input-group input-group-sm" style="max-width: 320px;">
                     <span class="input-group-text"><i class="bi bi-search"></i></span>
                     <input type="text" name="q" value="{{ q }}" class="form-control" placeholder="ابحث عن طالب...">
                     <button class="btn btn-outline-secondary" type="submit">بحث</button>
                 </div>
+                <select name="is_teacher" class="form-select form-select-sm" style="width:auto;"
+                    onchange="this.form.submit()" title="طالب معلم">
+                    <option value="">طالب معلم: الكل</option>
+                    <option value="1" {% if is_teacher_filter == '1' %}selected{% endif %}>المعلمون فقط</option>
+                    <option value="0" {% if is_teacher_filter == '0' %}selected{% endif %}>غير المعلمين</option>
+                </select>
             </form>
 
             {% if roster %}
@@ -48,12 +54,13 @@
                     </thead>
                     <tbody>
                         {% for row in roster %}
-                        <tr>
+                        <tr{% if row.student.is_teacher %} class="row-is-teacher"{% endif %}>
                             <td class="text-muted small">{{ forloop.counter }}</td>
                             <td class="fw-semibold">
                                 <a href="{% url 'admin_portal:student_detail' row.student.id %}" class="text-decoration-none">
                                     {{ row.student.full_name }}
                                 </a>
+                                {% include 'partials/is_teacher_badge.html' with student=row.student %}
                             </td>
                             <td>
                                 {% include 'admin_portal/partials/payment_status_button.html' with payment=row.payment student=row.student %}

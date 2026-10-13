@@ -99,6 +99,7 @@
                         <option value="F" {% if gender == 'F' %}selected{% endif %}>إناث</option>
                     </select>
                 </div>
+                {% include 'partials/is_teacher_filter.html' with value=is_teacher_filter sm=True %}
                 <div class="col-md-auto d-flex gap-1">
                     <button type="submit" class="btn btn-primary btn-sm" title="بحث">
                         <i class="bi bi-search"></i>
@@ -138,7 +139,7 @@
                 </thead>
                 <tbody>
                     {% for rec in student_page %}
-                    <tr>
+                    <tr{% if rec.student.is_teacher %} class="row-is-teacher"{% endif %}>
                         <td class="text-muted small">{{ student_page.start_index|add:forloop.counter0 }}</td>
                         <td class="fw-semibold">{{ rec.date|date:"Y/m/d" }}</td>
                         <td>
@@ -150,6 +151,7 @@
                                 {{ rec.student.full_name }}
                             </a>
                             {% endif %}
+                            {% include 'partials/is_teacher_badge.html' with student=rec.student %}
                             <div class="font-monospace text-muted" style="font-size:.7rem;">
                                 {{ rec.student.student_code|default:"" }}
                             </div>

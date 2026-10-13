@@ -15,6 +15,7 @@ from django.views.decorators.http import require_http_methods
 from functools import wraps
 
 from core.models import Student, Teacher, User, StudentTeacherLink, CoursePayment
+from core.filters import get_is_teacher_filter, apply_is_teacher_filter
 from attendance.models import StudentAttendanceRecord, TeacherAttendanceRecord
 from .forms import StudentForm, TeacherForm, SupervisorForm, AssistantForm, CoursePaymentForm
 from .models import AuditLog
@@ -170,6 +171,7 @@ def student_list(request):
     birth_year_filter = request.GET.get('birth_year', '').strip()
     hall_filter = request.GET.get('hall', '').strip()
     education_types_filter = request.GET.getlist('education_type')
+    is_teacher_filter = get_is_teacher_filter(request)
     sort = request.GET.get('sort', '').strip()
 
     qs = Student.objects.annotate(avg_rating=Avg('attendance_records__rating'))
@@ -192,6 +194,7 @@ def student_list(request):
         qs = qs.filter(hall_name=hall_filter)
     if education_types_filter:
         qs = qs.filter(education_type__in=education_types_filter)
+    qs = apply_is_teacher_filter(qs, is_teacher_filter)
 
     if sort == 'avg_rating_desc':
         qs = qs.order_by(models.F('avg_rating').desc(nulls_last=True))
@@ -240,6 +243,7 @@ def student_list(request):
         'hall_filter': hall_filter,
         'education_types_filter': education_types_filter,
         'education_types_choices': Student.EducationType.choices,
+        'is_teacher_filter': is_teacher_filter,
         'grades': grades,
         'birth_years': birth_years,
         'halls': halls,
@@ -518,6 +522,8 @@ def student_import(request):
         parent_spouse_job = _cell('parent_spouse_job') or ''
         parent_address = _cell('parent_address') or ''
         child_pickup_person = _cell('child_pickup_person') or ''
+        is_teacher = _cell('is_teacher').lower() in (
+            '1', 'true', 'yes', 'y', 'نعم', 'معلم')
 
         marital_raw = _cell('parent_marital_status').lower()
         valid_marital = {'married', 'divorced', 'widowed', 'separated'}
@@ -567,6 +573,7 @@ def student_import(request):
                 parent_spouse_job=parent_spouse_job,
                 parent_address=parent_address,
                 child_pickup_person=child_pickup_person,
+                is_teacher=is_teacher,
             )
             created += 1
         except Exception as exc:
@@ -817,18 +824,19 @@ def student_import_template(request):
         'nickname', 'date_of_birth', 'joining_date', 'hall_name', 'notes',
         'parent_phone', 'parent_full_name', 'parent_qualification', 'parent_job',
         'parent_calls_phone', 'parent_marital_status', 'parent_spouse_job',
-        'parent_address', 'child_pickup_person',
+        'parent_address', 'child_pickup_person', 'is_teacher',
     ])
     ws.append([
         'أحمد محمد علي', '12345678901234', 'STU001', 'السنة الأولى', 'عام', 'M', '',
         'أحمد', '2010-05-15', '2024-09-01', 'قاعة 1', '',
         '01012345678', 'محمد علي حسن سالم', 'بكالوريوس', 'مهندس',
-        '01098765432', 'married', '', 'القاهرة', '',
+        '01098765432', 'married', '', 'القاهرة', '', 'no',
     ])
     # Add a note row explaining parent_marital_status valid values
     ws.append([])
     ws.append(
-        ['# parent_marital_status القيم المقبولة: married / divorced / widowed / separated'])
+        ['# parent_marital_status القيم المقبولة: married / divorced / widowed / separated'
+         ' | is_teacher: yes / no'])
 
     buf = io.BytesIO()
     wb.save(buf)
@@ -876,6 +884,7 @@ def student_export(request):
             qs = qs.filter(gender=gender_filter)
         if education_types_filter:
             qs = qs.filter(education_type__in=education_types_filter)
+        qs = apply_is_teacher_filter(qs, get_is_teacher_filter(request))
 
     wb = openpyxl.Workbook()
     ws = wb.active
@@ -885,7 +894,7 @@ def student_export(request):
         'nickname', 'date_of_birth', 'joining_date', 'hall_name', 'notes',
         'parent_phone', 'parent_full_name', 'parent_qualification', 'parent_job',
         'parent_calls_phone', 'parent_marital_status', 'parent_spouse_job',
-        'parent_address', 'child_pickup_person',
+        'parent_address', 'child_pickup_person', 'is_teacher',
     ])
     for s in qs:
         ws.append([
@@ -910,6 +919,7 @@ def student_export(request):
             s.parent_spouse_job,
             s.parent_address,
             s.child_pickup_person,
+            'yes' if s.is_teacher else 'no',
         ])
 
     buf = io.BytesIO()
@@ -1312,7 +1322,7 @@ def teacher_students_export(request, pk):
         'nickname', 'date_of_birth', 'joining_date', 'hall_name', 'notes',
         'parent_phone', 'parent_full_name', 'parent_qualification', 'parent_job',
         'parent_calls_phone', 'parent_marital_status', 'parent_spouse_job',
-        'parent_address', 'child_pickup_person',
+        'parent_address', 'child_pickup_person', 'is_teacher',
     ])
     for s in linked_students:
         ws.append([
@@ -1336,6 +1346,7 @@ def teacher_students_export(request, pk):
             s.parent_spouse_job,
             s.parent_address,
             s.child_pickup_person,
+            'yes' if s.is_teacher else 'no',
         ])
 
     buf = io.BytesIO()
@@ -1372,6 +1383,7 @@ def course_roster(request, pk):
     year, month = today.year, today.month
 
     q = request.GET.get('q', '').strip()
+    is_teacher_filter = get_is_teacher_filter(request)
     links = (
         StudentTeacherLink.objects
         .filter(teacher=course)
@@ -1384,6 +1396,8 @@ def course_roster(request, pk):
             | Q(student__student_code__icontains=q)
             | Q(student__national_id__icontains=q)
         )
+    links = apply_is_teacher_filter(
+        links, is_teacher_filter, 'student__is_teacher')
 
     student_ids = [link.student_id for link in links]
     payments_by_student = {
@@ -1410,6 +1424,7 @@ def course_roster(request, pk):
         'year': year,
         'month': month,
         'q': q,
+        'is_teacher_filter': is_teacher_filter,
         'total_count': len(roster),
         'unpaid_count': unpaid_count,
     })
@@ -1573,8 +1588,10 @@ def _filtered_course_payments(request):
     status_filter = request.GET.get('status', '').strip()
     year_filter = request.GET.get('year', '').strip()
     month_filter = request.GET.get('month', '').strip()
+    is_teacher_filter = get_is_teacher_filter(request)
 
     qs = CoursePayment.objects.select_related('student', 'course')
+    qs = apply_is_teacher_filter(qs, is_teacher_filter, 'student__is_teacher')
     if course_id:
         qs = qs.filter(course_id=course_id)
     if q:
@@ -1598,6 +1615,7 @@ def _filtered_course_payments(request):
         'status_filter': status_filter,
         'year_filter': year_filter,
         'month_filter': month_filter,
+        'is_teacher_filter': is_teacher_filter,
     }
     return qs, filters
 
@@ -1650,7 +1668,7 @@ def payments_export(request):
     ws.title = 'سجلات الدفع'
     ws.append([
         'الطالب', 'الكورس', 'السنة', 'الشهر', 'الحالة', 'المبلغ المدفوع',
-        'ملاحظات', 'آخر تحديث',
+        'ملاحظات', 'آخر تحديث', 'طالب معلم',
     ])
     for p in qs:
         ws.append([
@@ -1663,6 +1681,7 @@ def payments_export(request):
             p.note,
             localtime(p.updated_at).strftime(
                 '%Y-%m-%d %H:%M') if p.updated_at else '',
+            'نعم' if p.student.is_teacher else 'لا',
         ])
 
     buf = io.BytesIO()
@@ -1995,6 +2014,7 @@ def attendance_records(request):
     record_type = request.GET.get('record_type', '').strip()
     image_filter = request.GET.get('image_filter', '').strip()
     gender = request.GET.get('gender', '').strip()
+    is_teacher_filter = get_is_teacher_filter(request)
 
     # --- student records ---
     student_qs = (
@@ -2023,6 +2043,8 @@ def attendance_records(request):
         student_qs = student_qs.filter(student__grade=grade)
     if gender:
         student_qs = student_qs.filter(student__gender=gender)
+    student_qs = apply_is_teacher_filter(
+        student_qs, is_teacher_filter, 'student__is_teacher')
 
     if image_filter == 'missing':
         student_qs = student_qs.filter(
@@ -2094,6 +2116,7 @@ def attendance_records(request):
         'gender': gender,
         'per_page': per_page,
         'read_only': read_only,
+        'is_teacher_filter': is_teacher_filter,
     })
 
 
@@ -2321,10 +2344,12 @@ def export_attendance_excel(request):
             )
         if gender:
             qs = qs.filter(student__gender=gender)
+        qs = apply_is_teacher_filter(
+            qs, get_is_teacher_filter(request), 'student__is_teacher')
         ws.append([
             'التاريخ', 'اسم الطالب', 'الرقم القومي', 'الكود', 'الصف',
             'وقت الحضور', 'وقت المغادرة', 'مدة الحضور', 'المعلم المكلف', 'التقييم', 'نيابة', 'ملاحظات', 'ملاحظة المعلم',
-            'المعلم الأصلي (الغائب)', 'صورة الواجب', 'صورة الاختبار',
+            'المعلم الأصلي (الغائب)', 'صورة الواجب', 'صورة الاختبار', 'طالب معلم',
         ])
         for rec in qs:
             ws.append([
@@ -2346,6 +2371,7 @@ def export_attendance_excel(request):
                 if rec.is_substitute_assignment and rec.original_teacher else '',
                 'نعم' if rec.homework_photo else 'لا',
                 'نعم' if rec.test_photo else 'لا',
+                'نعم' if rec.student.is_teacher else 'لا',
             ])
         filename = 'student_attendance'
 

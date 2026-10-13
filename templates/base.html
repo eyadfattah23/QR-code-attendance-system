@@ -73,6 +73,21 @@
             width: 100%;
             max-width: 400px;
         }
+
+        /* Students flagged as teachers (Student.is_teacher) */
+        tr.row-is-teacher > * {
+            --bs-table-bg: #f1e8ff;
+            --bs-table-accent-bg: #f1e8ff;
+        }
+
+        tr.row-is-teacher > :first-child {
+            border-inline-start: 4px solid #6f42c1;
+        }
+
+        .badge-is-teacher {
+            background-color: #6f42c1;
+            color: #fff;
+        }
     </style>
     {% block extra_css %}{% endblock %}
 </head>

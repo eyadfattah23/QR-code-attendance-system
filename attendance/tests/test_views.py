@@ -324,10 +324,10 @@ class TeacherScanTestCase(TestCase):
         response = self.client.post(
             self.scan_url, {'scanned_codes': 'NOEXIST999'})
         self.assertEqual(response.status_code, 302)
-        messages_list = list(get_messages(response.wsgi_request))
-        self.assertEqual(len(messages_list), 1)
-        self.assertEqual(messages_list[0].level_tag, 'error')
-        self.assertIn('لم يتم العثور', str(messages_list[0]))
+        results = self.client.session['teacher_scan_results']
+        self.assertEqual(len(results), 1)
+        self.assertEqual(results[0]['row_class'], 'danger')
+        self.assertIn('لم يتم العثور', results[0]['message'])
 
     def test_teacher_scan_unknown_uuid_not_in_db(self):
         """Test scanning a valid UUID matching no record shows an error message."""
@@ -335,9 +335,9 @@ class TeacherScanTestCase(TestCase):
         response = self.client.post(
             self.scan_url, {'scanned_codes': unknown_uuid})
         self.assertEqual(response.status_code, 302)
-        messages_list = list(get_messages(response.wsgi_request))
-        self.assertEqual(len(messages_list), 1)
-        self.assertEqual(messages_list[0].level_tag, 'error')
+        results = self.client.session['teacher_scan_results']
+        self.assertEqual(len(results), 1)
+        self.assertEqual(results[0]['row_class'], 'danger')
 
     def test_teacher_scan_teacher_uuid_shows_warning_not_record(self):
         """Test scanning another teacher's UUID produces a warning and no TeacherAttendanceRecord."""
@@ -345,9 +345,9 @@ class TeacherScanTestCase(TestCase):
             'scanned_codes': str(self.another_teacher.id)
         })
         self.assertEqual(response.status_code, 302)
-        messages_list = list(get_messages(response.wsgi_request))
-        self.assertEqual(len(messages_list), 1)
-        self.assertEqual(messages_list[0].level_tag, 'warning')
+        results = self.client.session['teacher_scan_results']
+        self.assertEqual(len(results), 1)
+        self.assertEqual(results[0]['row_class'], 'warning')
         # No teacher record should have been created
         self.assertFalse(
             TeacherAttendanceRecord.objects.filter(
@@ -361,18 +361,17 @@ class TeacherScanTestCase(TestCase):
         # Use separate clients so session messages don't bleed across requests
         client_a = Client()
         client_a.login(phone='01234567891', password='teacherpass123')
-        response_unlinked = client_a.post(self.scan_url, {
+        client_a.post(self.scan_url, {
             'scanned_codes': str(self.unlinked_student.id)
         })
-        msgs_unlinked = list(get_messages(response_unlinked.wsgi_request))
-        unlinked_text = str(msgs_unlinked[0])
+        unlinked = client_a.session['teacher_scan_results'][0]
+        unlinked_text = f"{unlinked['label']} - {unlinked['message']}"
 
         client_b = Client()
         client_b.login(phone='01234567891', password='teacherpass123')
-        response_unknown = client_b.post(
+        client_b.post(
             self.scan_url, {'scanned_codes': 'NO-SUCH-CODE'})
-        msgs_unknown = list(get_messages(response_unknown.wsgi_request))
-        unknown_text = str(msgs_unknown[0])
+        unknown_text = client_b.session['teacher_scan_results'][0]['message']
 
         # Unlinked message contains the student's name
         self.assertIn(self.unlinked_student.full_name, unlinked_text)

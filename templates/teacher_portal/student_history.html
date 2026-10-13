@@ -14,6 +14,7 @@
             <h1 class="h3 mb-0">
                 <i class="bi bi-clock-history me-2 text-info"></i>
                 سجل حضور: <strong>{{ student.full_name }}</strong>
+                {% include 'partials/is_teacher_badge.html' %}
             </h1>
             <small class="text-muted">
                 {% if student.grade %}{{ student.grade }} — {% endif %}
@@ -53,7 +54,7 @@
                         </thead>
                         <tbody>
                             {% for record in records %}
-                            <tr{% if record.is_substitute_assignment %} class="table-warning" {% endif %}>
+                            <tr class="{% if record.is_substitute_assignment %}table-warning{% endif %}{% if student.is_teacher %} row-is-teacher{% endif %}">
                                 <td class="text-muted small">{{ forloop.counter }}</td>
                                 <td class="fw-semibold">{{ record.date|date:"Y/m/d" }}</td>
                                 <td class="font-monospace small text-muted">

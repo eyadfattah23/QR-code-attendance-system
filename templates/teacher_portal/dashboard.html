@@ -127,13 +127,19 @@
                         <option value="avg_rating_asc" {% if sort == 'avg_rating_asc' %}selected{% endif %}>متوسط تقييم
                             (أدنى)</option>
                     </select>
+                    <select name="is_teacher" class="form-select form-select-sm" style="width:auto;"
+                        onchange="this.form.submit()" title="طالب معلم">
+                        <option value="" {% if not is_teacher_filter %}selected{% endif %}>طالب معلم: الكل</option>
+                        <option value="1" {% if is_teacher_filter == '1' %}selected{% endif %}>المعلمون فقط</option>
+                        <option value="0" {% if is_teacher_filter == '0' %}selected{% endif %}>غير المعلمين</option>
+                    </select>
                 </form>
                 <div class="btn-group">
                     <button class="btn btn-outline-secondary btn-sm">
                         <i class="bi bi-funnel me-1"></i>
                         تصفية
                     </button>
-                    <a href="{% url 'teacher_portal:export_attendance' %}" class="btn btn-outline-success btn-sm">
+                    <a href="{% url 'teacher_portal:export_attendance' %}{% if is_teacher_filter %}?is_teacher={{ is_teacher_filter }}{% endif %}" class="btn btn-outline-success btn-sm">
                         <i class="bi bi-download me-1"></i>
                         تصدير
                     </a>
@@ -163,7 +169,7 @@
                     </thead>
                     <tbody>
                         {% for row in student_rows %}
-                        <tr>
+                        <tr{% if row.student.is_teacher %} class="row-is-teacher"{% endif %}>
                             <td class="d-none d-md-table-cell">{{ forloop.counter }}</td>
                             <td>
                                 <div class="d-flex align-items-center">
@@ -173,6 +179,7 @@
                                     </div>
                                     <a href="{% url 'teacher_portal:student_history' row.student.id %}"
                                         class="text-decoration-none fw-semibold">{{ row.student.full_name }}</a>
+                                    {% include 'partials/is_teacher_badge.html' with student=row.student %}
                                 </div>
                             </td>
                             <td class="d-none d-md-table-cell">{{ row.student.grade|default:"-" }}</td>
@@ -339,6 +346,10 @@
                                     </div>
                                 </div>
                             </td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="13" class="text-center text-muted py-4">لا يوجد طلاب مطابقون لهذا الفلتر</td>
                         </tr>
                         {% endfor %}
                     </tbody>

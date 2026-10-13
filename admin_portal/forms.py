@@ -17,7 +17,7 @@ class StudentForm(forms.ModelForm):
         model = Student
         fields = [
             'full_name', 'nickname', 'national_id', 'student_code',
-            'image', 'grade', 'education_type', 'gender', 'phone', 'parent_phone',
+            'image', 'grade', 'education_type', 'gender', 'is_teacher', 'phone', 'parent_phone',
             'date_of_birth', 'joining_date', 'hall_name', 'notes',
             # Parent / Guardian
             'parent_full_name', 'parent_qualification', 'parent_job',
@@ -33,6 +33,7 @@ class StudentForm(forms.ModelForm):
             'grade': 'الصف / المستوى',
             'education_type': 'نوع التعليم',
             'gender': 'الجنس',
+            'is_teacher': 'الطالب معلم أيضاً',
             'phone': 'هاتف الطالب',
             'parent_phone': 'واتساب ولي الأمر',
             'date_of_birth': 'تاريخ الميلاد',
@@ -55,6 +56,7 @@ class StudentForm(forms.ModelForm):
             'parent_phone': 'اختياري — 11 رقماً يبدأ بـ 01',
             'parent_calls_phone': 'اختياري — 11 رقماً يبدأ بـ 01 (يمكن أن يكون نفس الواتساب)',
             'nickname': 'اختياري',
+            'is_teacher': 'يُميَّز هذا الطالب وسجلات حضوره بلون مختلف ويظهر أولاً في قائمة المعلم',
             'hall_name': 'اختياري',
             'notes': 'اختياري',
             'parent_spouse_job': 'اختياري',
@@ -69,6 +71,7 @@ class StudentForm(forms.ModelForm):
             'grade': forms.TextInput(attrs={'class': 'form-control'}),
             'education_type': forms.Select(attrs={'class': 'form-select'}),
             'gender': forms.Select(attrs={'class': 'form-select'}),
+            'is_teacher': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
             'phone': forms.TextInput(attrs={'class': 'form-control', 'dir': 'ltr', 'placeholder': '01XXXXXXXXX'}),
             'parent_phone': forms.TextInput(attrs={'class': 'form-control', 'dir': 'ltr', 'placeholder': '01XXXXXXXXX'}),
             'date_of_birth': forms.DateInput(attrs={'class': 'form-control', 'type': 'date'}),
