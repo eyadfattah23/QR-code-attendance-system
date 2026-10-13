@@ -172,6 +172,7 @@ def dashboard(request):
         'today': today,
         'sort': sort,
         'acting_teacher': teacher,
+        'scan_results': request.session.pop('teacher_scan_results', []),
     }
     return render(request, 'teacher_portal/dashboard.html', context)
 
@@ -179,8 +180,29 @@ def dashboard(request):
 @teacher_required
 @require_http_methods(["POST"])
 def teacher_scan(request):
-    """Process attendance scans for teacher's linked students only."""
+    """Process attendance scans for teacher's linked students only.
+
+    Results (with student image, like the admin scan station) are stored in the
+    session and rendered on the dashboard after the redirect.
+    """
     teacher = get_acting_teacher(request)
+    results = []
+    icons = {
+        'success': 'bi-check-circle-fill',
+        'warning': 'bi-exclamation-triangle-fill',
+        'danger': 'bi-x-circle-fill',
+    }
+
+    def add_result(row_class, message, student=None, label=None):
+        results.append({
+            'row_class': row_class,
+            'icon': icons[row_class],
+            'label': student.full_name if student else (label or 'خطأ'),
+            'message': message,
+            'has_image': student is not None,
+            'image_url': student.image.url if student and student.image else None,
+        })
+
     try:
         if teacher is None:
             raise Teacher.DoesNotExist
@@ -214,21 +236,20 @@ def teacher_scan(request):
 
                 # Teacher QR card → teacher attendance is recorded by admin only
                 if Teacher.objects.filter(id=code_uuid).exists():
-                    messages.warning(
-                        request,
+                    add_result(
+                        'warning',
                         f"تسجيل حضور المعلمين يتم من قِبَل المسؤول فقط - الرمز: {raw_code}",
+                        label='بطاقة معلم',
                     )
                     continue
 
                 any_student = Student.objects.filter(id=code_uuid).first()
                 if any_student is None:
-                    messages.error(
-                        request, f"لم يتم العثور على هذا الرمز: {raw_code}")
+                    add_result('danger', f"لم يتم العثور على هذا الرمز: {raw_code}")
                     continue
 
                 if any_student.id not in allowed_student_ids:
-                    messages.error(
-                        request, f"{any_student.full_name} - ليس ضمن قائمة طلابك")
+                    add_result('danger', 'ليس ضمن قائمة طلابك', any_student)
                     continue
 
                 student = any_student
@@ -240,13 +261,11 @@ def teacher_scan(request):
                     or Student.objects.filter(national_id__iexact=lookup).first()
                 )
                 if any_student is None:
-                    messages.error(
-                        request, f"لم يتم العثور على هذا الرمز: {raw_code}")
+                    add_result('danger', f"لم يتم العثور على هذا الرمز: {raw_code}")
                     continue
 
                 if any_student.id not in allowed_student_ids:
-                    messages.error(
-                        request, f"{any_student.full_name} - ليس ضمن قائمة طلابك")
+                    add_result('danger', 'ليس ضمن قائمة طلابك', any_student)
                     continue
 
                 student = any_student
@@ -260,15 +279,17 @@ def teacher_scan(request):
                 if student_record.check_out_time is None:
                     student_record.check_out_time = localtime()
                     student_record.save(update_fields=['check_out_time'])
-                    messages.success(
-                        request,
-                        f"{student.full_name} - تم تسجيل الانصراف بنجاح (حصة: {teacher.full_name})",
+                    add_result(
+                        'success',
+                        f"تم تسجيل الانصراف بنجاح (حصة: {teacher.full_name})",
+                        student,
                     )
                 else:
-                    messages.warning(
-                        request,
-                        f"{student.full_name} - غادر مسبقاً الساعة "
-                        f"{student_record.check_out_time.strftime('%H:%M')} (حصة: {teacher.full_name})",
+                    add_result(
+                        'warning',
+                        f"غادر مسبقاً الساعة "
+                        f"{localtime(student_record.check_out_time).strftime('%H:%M')} (حصة: {teacher.full_name})",
+                        student,
                     )
             except StudentAttendanceRecord.DoesNotExist:
                 try:
@@ -282,19 +303,19 @@ def teacher_scan(request):
                         substitute_note="",
                         rating=6,
                     )
-                    messages.success(
-                        request,
-                        f"{student.full_name} - تم تسجيل الحضور بنجاح (حصة: {teacher.full_name})",
+                    add_result(
+                        'success',
+                        f"تم تسجيل الحضور بنجاح (حصة: {teacher.full_name})",
+                        student,
                     )
                 except IntegrityError:
-                    messages.warning(
-                        request,
-                        f"{student.full_name} - تم تسجيل حضوره للتو من محطة أخرى",
-                    )
+                    add_result('warning', 'تم تسجيل حضوره للتو من محطة أخرى', student)
 
     except Teacher.DoesNotExist:
         messages.error(request, 'لم يتم ربط حسابك بملف معلم')
 
+    if results:
+        request.session['teacher_scan_results'] = results
     return redirect('teacher_portal:dashboard')
 
 
