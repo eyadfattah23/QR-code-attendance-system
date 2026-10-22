@@ -97,7 +97,7 @@
                                         {% else %}
                                         <span class="text-muted">—</span>
                                         {% endif %}
-                                        <a href="{% url 'admin_portal:attendance_record_edit_rating' record.id %}"
+                                        <a href="{% url 'admin_portal:attendance_record_edit_rating' record.id %}?next={{ request.get_full_path|urlencode }}"
                                            class="btn btn-outline-secondary btn-sm p-1" title="تعديل التقييم">
                                             <i class="bi bi-pencil" style="font-size:.75rem;"></i>
                                         </a>

@@ -2423,6 +2423,26 @@ def attendance_record_edit_rating(request, pk):
         messages.error(request, 'ليس لديك صلاحية تعديل هذا السجل')
         return redirect('dashboard')
 
+    # Where to go back to: the page the user came from (validated to be a
+    # same-site URL to avoid open redirects), else the role-based default.
+    from django.utils.http import url_has_allowed_host_and_scheme
+    default_back = (
+        reverse('admin_portal:student_history', args=[record.student_id])
+        if user.is_admin else
+        reverse('teacher_portal:dashboard')
+    )
+    back_url = default_back
+    candidates = [request.POST.get('next'), request.GET.get('next')]
+    if request.method == 'GET':
+        candidates.append(request.META.get('HTTP_REFERER'))
+    for candidate in candidates:
+        if candidate and url_has_allowed_host_and_scheme(
+                candidate, allowed_hosts={request.get_host()},
+                require_https=request.is_secure()) \
+                and request.path not in candidate:
+            back_url = candidate
+            break
+
     if request.method == 'POST':
         try:
             rating = int(request.POST.get('rating', ''))
@@ -2436,19 +2456,13 @@ def attendance_record_edit_rating(request, pk):
             _log_audit(request, AuditLog.Action.EDIT, 'سجل حضور طالب',
                        f'{record.student.full_name} — {record.date}')
             messages.success(request, f'تم تحديث التقييم إلى {rating}/10')
-            if user.is_admin:
-                return redirect('admin_portal:student_history', pk=record.student_id)
-            return redirect('teacher_portal:dashboard')
+            return redirect(back_url)
 
     return render(request, 'admin_portal/attendance_record_edit_rating.html', {
         'record': record,
         'student': record.student,
         'rating_choices': range(1, 11),
-        'back_url': (
-            reverse('admin_portal:student_history', args=[record.student_id])
-            if user.is_admin else
-            reverse('teacher_portal:dashboard')
-        ),
+        'back_url': back_url,
     })
 
 

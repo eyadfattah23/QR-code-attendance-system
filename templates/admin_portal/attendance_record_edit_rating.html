@@ -36,6 +36,7 @@
 
             <form method="post">
                 {% csrf_token %}
+                <input type="hidden" name="next" value="{{ back_url }}">
                 <div class="mb-4">
                     <label class="form-label fw-semibold">التقييم الجديد (1 – 10)</label>
                     <!-- Rating buttons grid -->

@@ -365,6 +365,7 @@ class StudentCreateTestCase(_StudentManagementBase):
             'national_id': '99999999999999',
             'student_code': 'NEW001',
             'grade': 'الصف الثاني',
+            'education_type': Student.EducationType.UNSPECIFIED,
         })
         self.assertEqual(response.status_code, 302)
         self.assertTrue(Student.objects.filter(
@@ -376,6 +377,7 @@ class StudentCreateTestCase(_StudentManagementBase):
             'national_id': '88888888888888',
             'student_code': '',
             'grade': '',
+            'education_type': Student.EducationType.UNSPECIFIED,
         })
         self.assertRedirects(response, reverse('admin_portal:student_list'))
 
@@ -397,6 +399,7 @@ class StudentCreateTestCase(_StudentManagementBase):
             'national_id': '77777777777777',
             'student_code': '',
             'grade': '',
+            'education_type': Student.EducationType.UNSPECIFIED,
         })
         student = Student.objects.get(national_id='77777777777777')
         self.assertEqual(student.student_code, '77777777777777')
@@ -414,6 +417,7 @@ class StudentCreateTestCase(_StudentManagementBase):
             'student_code': '',
             'grade': '',
             'gender': 'F',
+            'education_type': Student.EducationType.UNSPECIFIED,
         })
         student = Student.objects.get(national_id='91111111111111')
         self.assertEqual(student.gender, 'F')
@@ -437,6 +441,7 @@ class StudentEditTestCase(_StudentManagementBase):
             'national_id': '12345678901234',
             'student_code': 'STU001',
             'grade': 'الصف الثاني',
+            'education_type': Student.EducationType.UNSPECIFIED,
         })
         self.student.refresh_from_db()
         self.assertEqual(self.student.full_name, 'Updated Name')
@@ -448,6 +453,7 @@ class StudentEditTestCase(_StudentManagementBase):
             'national_id': '12345678901234',
             'student_code': 'STU001',
             'grade': '',
+            'education_type': Student.EducationType.UNSPECIFIED,
         })
         self.assertRedirects(response, reverse('admin_portal:student_list'))
 

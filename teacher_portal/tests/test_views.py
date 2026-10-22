@@ -412,10 +412,11 @@ class UploadPhotoTestCase(TestCase):
         self.record.refresh_from_db()
         self.assertTrue(bool(self.record.homework_photo))
 
-    def test_post_redirects_to_dashboard(self):
+    def test_post_redirects_back_to_upload_page(self):
+        # Stays on the upload page so the second photo (homework/test) can be added.
         photo = self._make_jpeg()
         response = self.client.post(self.url, {'photo_field': 'homework_photo', 'homework_photo': photo})
-        self.assertRedirects(response, reverse('teacher_portal:dashboard'))
+        self.assertRedirects(response, self.url)
 
     def test_post_unlinked_teacher_cannot_upload(self):
         self.client.logout()

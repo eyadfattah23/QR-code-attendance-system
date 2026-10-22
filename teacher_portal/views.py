@@ -40,7 +40,13 @@ def teacher_required(view_func):
         if request.user.is_teacher:
             return view_func(request, *args, **kwargs)
         if request.user.is_supervisor or request.user.is_admin:
-            if not request.session.get('supervisor_teacher_id'):
+            teacher_pk = request.session.get('supervisor_teacher_id')
+            if not teacher_pk:
+                return redirect('supervisor_portal:dashboard')
+            if not Teacher.objects.filter(pk=teacher_pk, is_active=True).exists():
+                # Selected teacher was deleted/deactivated since it was chosen.
+                request.session.pop('supervisor_teacher_id', None)
+                messages.warning(request, 'هذا المعلم لم يعد نشطاً')
                 return redirect('supervisor_portal:dashboard')
             return view_func(request, *args, **kwargs)
         if request.user.is_assistant:
@@ -65,7 +71,7 @@ def get_acting_teacher(request):
         if not pk:
             return None
         try:
-            return Teacher.objects.get(pk=pk)
+            return Teacher.objects.get(pk=pk, is_active=True)
         except Teacher.DoesNotExist:
             return None
             

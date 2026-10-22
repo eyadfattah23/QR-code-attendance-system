@@ -40,6 +40,7 @@ def dashboard(request):
 
     teachers = (
         Teacher.objects
+        .filter(is_active=True)
         .select_related('user')
         .annotate(
             student_count=Count('student_links', distinct=True),
@@ -93,7 +94,7 @@ def dashboard(request):
             'actual_days': actual_days,
         })
         
-    subjects = Teacher.objects.exclude(subject__isnull=True).exclude(subject='').values_list('subject', flat=True).distinct().order_by('subject')
+    subjects = Teacher.objects.filter(is_active=True).exclude(subject__isnull=True).exclude(subject='').values_list('subject', flat=True).distinct().order_by('subject')
 
     return render(request, 'supervisor_portal/dashboard.html', {
         'teacher_cards': teacher_cards,
@@ -110,7 +111,7 @@ def dashboard(request):
 @require_http_methods(['POST'])
 def select_teacher(request, pk):
     """Store the chosen teacher in session and redirect to teacher portal."""
-    teacher = get_object_or_404(Teacher, pk=pk)
+    teacher = get_object_or_404(Teacher, pk=pk, is_active=True)
     request.session['supervisor_teacher_id'] = str(teacher.pk)
     messages.success(
         request, f'أنت الآن تعمل بصلاحيات المعلم: {teacher.full_name}')
