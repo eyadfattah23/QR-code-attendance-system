@@ -11,11 +11,15 @@ linked to its teacher.
 """
 
 import datetime
+import io
 import math
+import re
+import zipfile
 from collections import defaultdict
 from pathlib import Path
 from urllib.parse import unquote, urlsplit
 
+from django.conf import settings
 from django.contrib.staticfiles import finders
 from django.core.files.storage import default_storage
 from django.db.models import Avg, Min
@@ -428,11 +432,61 @@ def _local_asset_fetcher():
     return LocalAssetFetcher(allowed_protocols={'file', 'data'})
 
 
-def render_parent_report_pdf(context):
-    """Render the report to PDF bytes."""
+_PDF_OPTIONS = {'optimize_images': True, 'jpeg_quality': 72, 'dpi': 160}
+
+
+def bulk_report_limit():
+    """Max students per bulk request (settings.PARENT_REPORT_BULK_MAX)."""
+    return getattr(settings, 'PARENT_REPORT_BULK_MAX', 20)
+
+_FILENAME_UNSAFE = re.compile(r'[\\/:*?"<>|]+')
+
+
+def report_filename(student, date_from, date_to):
+    name = _FILENAME_UNSAFE.sub(' ', student.full_name).strip()
+    return f'تقرير {name} {date_from:%Y-%m-%d} إلى {date_to:%Y-%m-%d}.pdf'
+
+
+def _render_document(context, font_config, cache):
     from weasyprint import HTML
 
     html = render_to_string('admin_portal/parent_report/pdf.html', context)
     return HTML(
         string=html, base_url=_PDF_BASE_URL, url_fetcher=_local_asset_fetcher(),
-    ).write_pdf(optimize_images=True, jpeg_quality=72, dpi=160)
+    ).render(font_config=font_config, cache=cache, **_PDF_OPTIONS)
+
+
+def render_parent_report_pdf(context):
+    """Render the report to PDF bytes."""
+    from weasyprint.text.fonts import FontConfiguration
+
+    return _render_document(context, FontConfiguration(), {}).write_pdf(**_PDF_OPTIONS)
+
+
+def render_bulk_reports(students, date_from, date_to, merged=False):
+    """Render reports for several students.
+
+    Returns (filename, bytes, content_type): a ZIP with one PDF per student
+    (for sending each parent their own file), or one merged PDF for
+    printing in which every report keeps its own page numbering.
+    """
+    from weasyprint.text.fonts import FontConfiguration
+
+    font_config, cache = FontConfiguration(), {}
+    period = f'{date_from:%Y-%m-%d} إلى {date_to:%Y-%m-%d}'
+    documents = [
+        (student, _render_document(
+            build_parent_report(student, date_from, date_to), font_config, cache))
+        for student in students
+    ]
+    if merged:
+        pages = [page for _, doc in documents for page in doc.pages]
+        pdf = documents[0][1].copy(pages).write_pdf(**_PDF_OPTIONS)
+        return f'تقارير أولياء الأمور {period}.pdf', pdf, 'application/pdf'
+
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, 'w', zipfile.ZIP_DEFLATED) as archive:
+        for student, doc in documents:
+            archive.writestr(report_filename(student, date_from, date_to),
+                             doc.write_pdf(**_PDF_OPTIONS))
+    return f'تقارير أولياء الأمور {period}.zip', buf.getvalue(), 'application/zip'

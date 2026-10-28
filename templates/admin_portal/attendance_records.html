@@ -115,6 +115,12 @@
                         data-bs-target="#parentReportModal" title="تقرير ولي الأمر">
                         <i class="bi bi-file-earmark-person me-1"></i>تقرير ولي الأمر
                     </button>
+                    <button type="button" class="btn btn-outline-success btn-sm" data-bs-toggle="modal"
+                        data-bs-target="#bulkReportModal"
+                        title="تقارير لكل طلاب النتائج الحالية (الحد الأقصى {{ bulk_max }})">
+                        <i class="bi bi-files me-1"></i>تقارير جماعية
+                        <span class="badge {% if bulk_count > bulk_max %}bg-warning text-dark{% else %}bg-success{% endif %} ms-1">{{ bulk_count }}</span>
+                    </button>
                 </div>
             </form>
         </div>
@@ -333,6 +339,7 @@
     </div>
 
     {% include 'admin_portal/parent_report/_dialog.html' with report_student=None %}
+    {% include 'admin_portal/parent_report/_bulk_dialog.html' %}
 
     <!-- ===== TEACHERS TAB ===== -->
     {% else %}

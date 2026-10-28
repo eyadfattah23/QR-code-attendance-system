@@ -3,6 +3,8 @@ import datetime
 import io
 import shutil
 import tempfile
+import zipfile
+from unittest import mock
 
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import TestCase, Client, override_settings
@@ -280,3 +282,79 @@ class AttendanceRecordsReportEntryTests(ParentReportTestBase):
         self.client.login(phone='02722222222', password='tpass')
         url = reverse('admin_portal:parent_report_student_options')
         self.assertEqual(self.client.get(url).status_code, 302)
+
+
+class BulkParentReportTests(ParentReportTestBase):
+    def setUp(self):
+        self.client = Client()
+        self.client.login(phone='02700000000', password='adminpass')
+        self.url = reverse('admin_portal:parent_reports_bulk')
+        self.data = {
+            'student_ids': [str(self.student.pk), str(self.other.pk)],
+            'date_from': '2026-05-04', 'date_to': '2026-05-12',
+        }
+
+    def test_zip_has_one_pdf_per_student(self):
+        response = self.client.post(self.url, self.data)
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response['Content-Type'], 'application/zip')
+        self.assertIn('attachment', response['Content-Disposition'])
+        with zipfile.ZipFile(io.BytesIO(response.content)) as archive:
+            names = sorted(archive.namelist())
+            self.assertEqual(len(names), 2)
+            self.assertTrue(all(n.endswith('2026-05-04 إلى 2026-05-12.pdf') for n in names))
+            self.assertTrue(any('طالب التقرير' in n for n in names))
+            for name in names:
+                self.assertTrue(archive.read(name).startswith(b'%PDF'))
+
+    def test_merged_pdf_keeps_every_report(self):
+        from weasyprint.document import Document
+        with mock.patch.object(Document, 'copy', autospec=True,
+                               side_effect=Document.copy) as copy:
+            response = self.client.post(self.url, {**self.data, 'output': 'pdf'})
+        self.assertEqual(response['Content-Type'], 'application/pdf')
+        self.assertTrue(response.content.startswith(b'%PDF'))
+        # Pages of both reports (each at least one page) go into one file.
+        self.assertGreaterEqual(len(copy.call_args.args[1]), 2)
+
+    def test_supervisor_allowed_teacher_refused(self):
+        self.client.login(phone='02711111111', password='suppass')
+        self.assertEqual(self.client.post(self.url, self.data).status_code, 200)
+        self.client.login(phone='02722222222', password='tpass')
+        self.assertEqual(self.client.post(self.url, self.data).status_code, 302)
+
+    def test_get_not_allowed(self):
+        self.assertEqual(self.client.get(self.url).status_code, 405)
+
+    @override_settings(PARENT_REPORT_BULK_MAX=1)
+    def test_limit_is_enforced(self):
+        response = self.client.post(self.url, self.data, HTTP_X_REQUESTED_WITH='fetch')
+        self.assertEqual(response.status_code, 400)
+        self.assertIn('الحد الأقصى 1', response.content.decode())
+        response = self.client.post(self.url, {**self.data, 'next': '/portal/admin/students/'})
+        self.assertRedirects(response, '/portal/admin/students/', fetch_redirect_response=False)
+
+    def test_no_valid_students(self):
+        response = self.client.post(self.url, {**self.data, 'student_ids': ['nope']},
+                                    HTTP_X_REQUESTED_WITH='fetch')
+        self.assertEqual(response.status_code, 400)
+
+    def test_students_list_offers_bulk_dialog(self):
+        response = self.client.get(reverse('admin_portal:student_list'))
+        self.assertContains(response, 'id="bulkReportModal"')
+        self.assertContains(response, 'window.parentReportSelectedIds')
+
+    def test_records_page_bulk_uses_current_results(self):
+        records_url = reverse('admin_portal:attendance_records')
+        response = self.client.get(records_url, {'tab': 'students', 'student': 'REP001'})
+        self.assertEqual(response.context['bulk_count'], 1)
+        self.assertEqual(response.context['bulk_student_ids'], [self.student.pk])
+        response = self.client.get(records_url, {'tab': 'students'})
+        self.assertEqual(response.context['bulk_count'], 2)
+
+    @override_settings(PARENT_REPORT_BULK_MAX=1)
+    def test_records_page_bulk_over_limit_sends_no_ids(self):
+        response = self.client.get(reverse('admin_portal:attendance_records'), {'tab': 'students'})
+        self.assertEqual(response.context['bulk_count'], 2)
+        self.assertEqual(response.context['bulk_student_ids'], [])
+

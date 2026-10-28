@@ -25,6 +25,8 @@ urlpatterns = [
          views.student_payments, name='student_payments'),
     path('students/parent-report/options/',
          views.parent_report_student_options, name='parent_report_student_options'),
+    path('students/parent-report/bulk/',
+         views.parent_reports_bulk, name='parent_reports_bulk'),
     path('students/<uuid:pk>/parent-report/',
          views.student_parent_report, name='student_parent_report'),
     path('students/<uuid:pk>/parent-report/pdf/',

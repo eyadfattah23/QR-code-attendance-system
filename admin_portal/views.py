@@ -23,8 +23,8 @@ from attendance.models import StudentAttendanceRecord, TeacherAttendanceRecord
 from .forms import StudentForm, TeacherForm, SupervisorForm, AssistantForm, CoursePaymentForm
 from .models import AuditLog
 from .parent_report import (
-    build_parent_report, month_period, parse_period, render_parent_report_pdf,
-    report_presets,
+    build_parent_report, bulk_report_limit, month_period, parse_period,
+    render_bulk_reports, render_parent_report_pdf, report_filename, report_presets,
 )
 
 
@@ -257,6 +257,8 @@ def student_list(request):
         'total_count': qs.count(),
         'sort': sort,
         'per_page': per_page,
+        'bulk_max': bulk_report_limit(),
+        **_parent_report_dialog_context(),
     })
 
 
@@ -1978,11 +1980,19 @@ def _parent_report_dialog_context(date_from=None, date_to=None):
     }
 
 
+def _internal_next(request, value):
+    """`value` if it is a path on this site, else ''."""
+    value = value or ''
+    if value.startswith('/') and url_has_allowed_host_and_scheme(
+            value, allowed_hosts={request.get_host()}):
+        return value
+    return ''
+
+
 def _parent_report_back_url(request, student):
     """Internal `next` path if given, else the natural page for the role."""
-    nxt = request.GET.get('next', '')
-    if nxt.startswith('/') and url_has_allowed_host_and_scheme(
-            nxt, allowed_hosts={request.get_host()}):
+    nxt = _internal_next(request, request.GET.get('next'))
+    if nxt:
         return nxt
     if request.user.is_admin:
         return reverse('admin_portal:student_detail', args=[student.pk])
@@ -2048,8 +2058,52 @@ def student_parent_report_pdf(request, pk):
     student = get_object_or_404(Student, pk=pk)
     date_from, date_to = parse_period(request.GET)
     pdf = render_parent_report_pdf(build_parent_report(student, date_from, date_to))
-    filename = f'تقرير {student.full_name} {date_from:%Y-%m-%d} إلى {date_to:%Y-%m-%d}.pdf'
     response = HttpResponse(pdf, content_type='application/pdf')
+    response['Content-Disposition'] = content_disposition_header(
+        as_attachment=True, filename=report_filename(student, date_from, date_to))
+    return response
+
+
+@admin_or_supervisor_required
+@require_http_methods(['POST'])
+def parent_reports_bulk(request):
+    """Download parent reports for several students at once.
+
+    `output=zip` (default) gives one PDF per student for sending to each
+    parent; `output=pdf` merges them into one file for printing. The dialog
+    posts with fetch (X-Requested-With: fetch) and shows errors inline; a
+    plain form post gets a flash message and a redirect instead.
+    """
+    import uuid
+
+    def fail(message):
+        if request.headers.get('X-Requested-With') == 'fetch':
+            return HttpResponse(message, status=400, content_type='text/plain; charset=utf-8')
+        messages.error(request, message)
+        fallback = ('admin_portal:student_list' if request.user.is_admin
+                    else 'admin_portal:attendance_records')
+        return redirect(_internal_next(request, request.POST.get('next')) or reverse(fallback))
+
+    ids = set()
+    for value in request.POST.getlist('student_ids'):
+        try:
+            ids.add(uuid.UUID(value))
+        except ValueError:
+            continue
+    limit = bulk_report_limit()
+    if not ids:
+        return fail('لم يتم اختيار أي طالب.')
+    if len(ids) > limit:
+        return fail(f'الحد الأقصى {limit} طالباً في المرة الواحدة (تم اختيار {len(ids)}). '
+                    'ضيّق الاختيار أو قسّمه على أكثر من دفعة.')
+    students = list(Student.objects.filter(pk__in=ids).order_by('full_name'))
+    if not students:
+        return fail('لم يتم العثور على الطلاب المحددين.')
+
+    date_from, date_to = parse_period(request.POST)
+    filename, data, content_type = render_bulk_reports(
+        students, date_from, date_to, merged=request.POST.get('output') == 'pdf')
+    response = HttpResponse(data, content_type=content_type)
     response['Content-Disposition'] = content_disposition_header(
         as_attachment=True, filename=filename)
     return response
@@ -2216,10 +2270,17 @@ def attendance_records(request):
                 'next': here,
             })
         matching = list(_search_students(student_q)[:2]) if student_q else []
+        # Bulk reports cover every student in the current results.
+        bulk_students = student_qs.order_by().values_list('student_id', flat=True).distinct()
+        bulk_count = bulk_students.count()
+        bulk_max = bulk_report_limit()
         report_context = {
             **_parent_report_dialog_context(*(report_range or (None, None))),
             'report_preselected': matching[0] if len(matching) == 1 else None,
             'report_student_id': str(matching[0].pk) if len(matching) == 1 else '',
+            'bulk_count': bulk_count,
+            'bulk_max': bulk_max,
+            'bulk_student_ids': list(bulk_students) if bulk_count <= bulk_max else [],
         }
 
     return render(request, 'admin_portal/attendance_records.html', {
