@@ -18,6 +18,7 @@ A robust, localized (Arabic RTL), Django-based attendance system utilizing QR co
 - **Daily Student Evaluation**: Teachers can attach a daily photo, assign a performance rating (1-10), and leave daily behavioral notes for each student.
 - **QR Card Generator**: Programmatically generate printable PDF ID cards with customizable grid layouts.
 - **Rich Reporting & Exporting**: Export attendance data, substitute notes, and student histories to Excel (`.xlsx`).
+- **Parent Progress Report (PDF)**: Admins and supervisors pick a student and any date range to preview and download an A4 Arabic report for parents — attendance per subject (with inferred absences), rating trend vs. the previous period, teacher notes ranked so low-rating days stand out, exam photos, and signature boxes.
 - **Fully Localized**: Complete Arabic Language support with right-to-left (RTL) interface design.
 
 ---
@@ -27,7 +28,7 @@ A robust, localized (Arabic RTL), Django-based attendance system utilizing QR co
 - **Backend Architecture**: Django 6.0+ & Django REST Framework
 - **Frontend Interactivity**: Django Templates, Vanilla JavaScript, & HTMX
 - **Database Engine**: SQLite (Development) / PostgreSQL (Production)
-- **PDF Engine**: ReportLab
+- **PDF Engine**: ReportLab (QR cards), WeasyPrint (parent reports; needs Pango on the server — see `docs/deployment.md`)
 - **Data Export**: OpenPyXL
 
 ---

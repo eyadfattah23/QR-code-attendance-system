@@ -21,6 +21,9 @@
                 {{ total_records }} يوم حضور مسجّل
             </small>
         </div>
+        <button type="button" class="btn btn-success btn-sm ms-auto" data-bs-toggle="modal" data-bs-target="#parentReportModal">
+            <i class="bi bi-file-earmark-person me-1"></i>تقرير ولي الأمر
+        </button>
     </div>
 
     <div class="row g-3">
@@ -282,6 +285,8 @@
         </div>
     </div>
 </div>
+
+{% include 'admin_portal/parent_report/_dialog.html' with report_student=student %}
 
 <!-- Photo lightbox modal -->
 <div class="modal fade" id="photoModal" tabindex="-1" aria-hidden="true">

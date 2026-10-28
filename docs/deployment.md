@@ -21,7 +21,13 @@
 ```bash
 sudo apt update && sudo apt upgrade -y
 sudo apt install -y python3 python3-pip python3-venv git postgresql postgresql-contrib
+# مكتبات توليد ملفات PDF لتقرير ولي الأمر (WeasyPrint) | PDF engine libraries
+sudo apt install -y libpango-1.0-0 libpangoft2-1.0-0 libharfbuzz-subset0
 ```
+
+> **تقرير ولي الأمر (PDF)**: يعتمد على WeasyPrint الذي يحتاج مكتبات Pango أعلاه.
+> الخط العربي (IBM Plex Sans Arabic) مضمّن في `static/fonts/` فلا حاجة لتثبيت خطوط على الخادم.
+> على خادم قائم يكفي تشغيل أمر `apt install` الثاني ثم `pip install -r requirements.txt` وإعادة تشغيل الخدمة.
 
 ---
 

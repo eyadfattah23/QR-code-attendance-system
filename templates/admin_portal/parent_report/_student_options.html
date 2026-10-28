@@ -1,0 +1,5 @@
+{% for s in students %}
+<option value="{{ s.id }}"{% if s.id|stringformat:"s" == selected %} selected{% endif %}>{{ s.full_name }}{% if s.student_code %} — {{ s.student_code }}{% endif %}</option>
+{% empty %}
+<option value="" disabled>لا يوجد طالب مطابق</option>
+{% endfor %}
