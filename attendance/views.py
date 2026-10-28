@@ -11,7 +11,8 @@ from django.shortcuts import render, redirect
 
 from core.models import Student, StudentTeacherLink, Teacher
 
-from .models import StudentAttendanceRecord, TeacherAttendanceRecord
+from .models import StudentAttendanceRecord, TeacherAttendanceRecord, TeacherScanOutcome
+from .services import record_teacher_scan
 
 
 def _checkout_student_record(results, student, record):
@@ -311,98 +312,78 @@ def station_view(request):
                     continue
 
                 if teacher is not None:
-                    with _tx.atomic():
-                        try:
-                            teacher_record = TeacherAttendanceRecord.objects.select_for_update().get(
-                                teacher=teacher,
-                                date=today,
-                            )
-
-                            if teacher_record.record_type == TeacherAttendanceRecord.RecordType.EXCUSED_ABSENCE:
-                                results.append({
-                                    "status": "warning",
-                                    "icon": "bi-exclamation-circle-fill",
-                                    "label": "غياب مسجل مسبقاً",
-                                    "message": f"{teacher.full_name} (معلم) - مسجل غياب بإذن لهذا اليوم.",
-                                    "row_class": "warning",
-                                })
-                                continue
-
-                            # Record exists — second scan = check-out
-                            if teacher_record.check_out_time is not None:
-                                # Already checked out
-                                results.append({
-                                    "status": "warning",
-                                    "icon": "bi-exclamation-circle-fill",
-                                    "label": "مغادرة مسجلة مسبقاً",
-                                    "message": (
-                                        f"{teacher.full_name} (معلم) - غادر مسبقاً الساعة "
-                                        f"{teacher_record.check_out_time.strftime('%H:%M')}"
-                                    ),
-                                    "row_class": "warning",
-                                })
-                            else:
-                                # First checkout scan
-                                now = localtime()
-                                if now < teacher_record.check_in_time:
-                                    # Clock skew — reject
-                                    results.append({
-                                        "status": "warning",
-                                        "icon": "bi-exclamation-circle-fill",
-                                        "label": "خطأ في التوقيت",
-                                        "message": (
-                                            f"{teacher.full_name} (معلم) - وقت المغادرة "
-                                            f"({now.strftime('%H:%M')}) قبل وقت الحضور "
-                                            f"({teacher_record.check_in_time.strftime('%H:%M')})"
-                                        ),
-                                        "row_class": "warning",
-                                    })
-                                elif (now - teacher_record.check_in_time).total_seconds() < 300:
-                                    # Less than 5 minutes since check-in — reject
-                                    elapsed = int(
-                                        (now - teacher_record.check_in_time).total_seconds() // 60)
-                                    remaining = 5 - elapsed
-                                    results.append({
-                                        "status": "warning",
-                                        "icon": "bi-clock-fill",
-                                        "label": "مبكر جداً",
-                                        "message": (
-                                            f"{teacher.full_name} (معلم) - لا يمكن تسجيل المغادرة "
-                                            f"قبل مرور 5 دقائق من الحضور "
-                                            f"(باقي {remaining} دقيقة)"
-                                        ),
-                                        "row_class": "warning",
-                                    })
-                                else:
-                                    teacher_record.check_out_time = now
-                                    teacher_record.save(
-                                        update_fields=['check_out_time'])
-                                    results.append({
-                                        "status": "checkout",
-                                        "icon": "bi-door-open-fill",
-                                        "label": "تم تسجيل المغادرة",
-                                        "message": (
-                                            f"{teacher.full_name} (معلم) - غادر الساعة "
-                                            f"{now.strftime('%H:%M')} | "
-                                            f"مدة الحضور: {teacher_record.duration_display}"
-                                        ),
-                                        "row_class": "info",
-                                    })
-                        except TeacherAttendanceRecord.DoesNotExist:
-                            # No record today — first scan = check-in
-                            TeacherAttendanceRecord.objects.create(
-                                teacher=teacher,
-                                date=today,
-                                check_in_time=localtime(),
-                                recorded_by=request.user,
-                            )
-                            results.append({
-                                "status": "success",
-                                "icon": "bi-check-circle-fill",
-                                "label": "تم التسجيل",
-                                "message": f"{teacher.full_name} (معلم) - تم تسجيل الحضور بنجاح",
-                                "row_class": "success",
-                            })
+                    # Check-in/out rules live in services so the fingerprint device shares them.
+                    scan = record_teacher_scan(teacher, recorded_by=request.user)
+                    teacher_record = scan.record
+                    now = scan.at
+                    if scan.outcome == TeacherScanOutcome.CHECKED_IN:
+                        results.append({
+                            "status": "success",
+                            "icon": "bi-check-circle-fill",
+                            "label": "تم التسجيل",
+                            "message": f"{teacher.full_name} (معلم) - تم تسجيل الحضور بنجاح",
+                            "row_class": "success",
+                        })
+                    elif scan.outcome == TeacherScanOutcome.EXCUSED_ABSENCE:
+                        results.append({
+                            "status": "warning",
+                            "icon": "bi-exclamation-circle-fill",
+                            "label": "غياب مسجل مسبقاً",
+                            "message": f"{teacher.full_name} (معلم) - مسجل غياب بإذن لهذا اليوم.",
+                            "row_class": "warning",
+                        })
+                    elif scan.outcome == TeacherScanOutcome.ALREADY_CHECKED_OUT:
+                        results.append({
+                            "status": "warning",
+                            "icon": "bi-exclamation-circle-fill",
+                            "label": "مغادرة مسجلة مسبقاً",
+                            "message": (
+                                f"{teacher.full_name} (معلم) - غادر مسبقاً الساعة "
+                                f"{teacher_record.check_out_time.strftime('%H:%M')}"
+                            ),
+                            "row_class": "warning",
+                        })
+                    elif scan.outcome == TeacherScanOutcome.BEFORE_CHECK_IN:
+                        # Clock skew — reject
+                        results.append({
+                            "status": "warning",
+                            "icon": "bi-exclamation-circle-fill",
+                            "label": "خطأ في التوقيت",
+                            "message": (
+                                f"{teacher.full_name} (معلم) - وقت المغادرة "
+                                f"({now.strftime('%H:%M')}) قبل وقت الحضور "
+                                f"({teacher_record.check_in_time.strftime('%H:%M')})"
+                            ),
+                            "row_class": "warning",
+                        })
+                    elif scan.outcome == TeacherScanOutcome.TOO_EARLY:
+                        # Less than 5 minutes since check-in — reject
+                        elapsed = int(
+                            (now - teacher_record.check_in_time).total_seconds() // 60)
+                        remaining = 5 - elapsed
+                        results.append({
+                            "status": "warning",
+                            "icon": "bi-clock-fill",
+                            "label": "مبكر جداً",
+                            "message": (
+                                f"{teacher.full_name} (معلم) - لا يمكن تسجيل المغادرة "
+                                f"قبل مرور 5 دقائق من الحضور "
+                                f"(باقي {remaining} دقيقة)"
+                            ),
+                            "row_class": "warning",
+                        })
+                    else:
+                        results.append({
+                            "status": "checkout",
+                            "icon": "bi-door-open-fill",
+                            "label": "تم تسجيل المغادرة",
+                            "message": (
+                                f"{teacher.full_name} (معلم) - غادر الساعة "
+                                f"{now.strftime('%H:%M')} | "
+                                f"مدة الحضور: {teacher_record.duration_display}"
+                            ),
+                            "row_class": "info",
+                        })
                     continue
 
                 results.append(

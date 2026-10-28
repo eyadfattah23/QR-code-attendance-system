@@ -12,7 +12,7 @@ import re
 import uuid
 from django.contrib.auth.models import AbstractUser, BaseUserManager
 from django.core.exceptions import ValidationError
-from django.core.validators import RegexValidator
+from django.core.validators import MaxValueValidator, MinValueValidator, RegexValidator
 from django.db import models
 
 
@@ -405,6 +405,13 @@ class Teacher(models.Model):
         blank=True,
         db_index=True,
         help_text="كود المعلم"
+    )
+    device_user_id = models.PositiveIntegerField(
+        unique=True,
+        null=True,
+        blank=True,
+        validators=[MinValueValidator(1), MaxValueValidator(999999999)],
+        help_text="رقم المستخدم (User ID) المسجل لهذا المعلم على جهاز البصمة"
     )
     subject = models.CharField(
         max_length=100,

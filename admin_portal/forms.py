@@ -118,6 +118,14 @@ class TeacherForm(forms.Form):
         widget=forms.TextInput(attrs={'class': 'form-control'}),
         help_text='كود تعريفي للمعلم',
     )
+    device_user_id = forms.IntegerField(
+        required=False,
+        min_value=1,
+        max_value=999999999,
+        label='رقم جهاز البصمة',
+        widget=forms.NumberInput(attrs={'class': 'form-control', 'dir': 'ltr'}),
+        help_text='رقم المستخدم (User ID) الذي سُجّلت به بصمة المعلم على الجهاز — اختياري',
+    )
     hall_name = forms.CharField(
         max_length=100,
         required=False,
@@ -186,6 +194,7 @@ class TeacherForm(forms.Form):
         else:
             self.fields['gender'].initial = instance.gender or ''
             self.fields['teacher_code'].initial = instance.teacher_code or ''
+            self.fields['device_user_id'].initial = instance.device_user_id
             self.fields['is_course'].initial = instance.is_course
             self.fields['is_active'].initial = instance.is_active
             self.fields['hall_name'].initial = instance.hall_name or ''
@@ -214,6 +223,18 @@ class TeacherForm(forms.Form):
             raise forms.ValidationError('كود المعلم مستخدم بالفعل')
         return teacher_code
 
+    def clean_device_user_id(self):
+        device_user_id = self.cleaned_data.get('device_user_id')
+        if device_user_id is None:
+            return None
+        qs = Teacher.objects.filter(device_user_id=device_user_id)
+        if self.instance:
+            qs = qs.exclude(pk=self.instance.pk)
+        if qs.exists():
+            raise forms.ValidationError(
+                f'رقم جهاز البصمة مستخدم بالفعل للمعلم "{qs.first().full_name}"')
+        return device_user_id
+
     @transaction.atomic
     def save(self):
         data = self.cleaned_data
@@ -231,6 +252,7 @@ class TeacherForm(forms.Form):
                 subject=data.get('subject') or None,
                 gender=data.get('gender') or None,
                 teacher_code=data.get('teacher_code') or None,
+                device_user_id=data.get('device_user_id'),
                 is_course=data.get('is_course', False),
                 is_active=data.get('is_active', True),
                 hall_name=data.get('hall_name', ''),
@@ -249,6 +271,7 @@ class TeacherForm(forms.Form):
             self.instance.subject = data.get('subject') or None
             self.instance.gender = data.get('gender') or None
             self.instance.teacher_code = data.get('teacher_code') or None
+            self.instance.device_user_id = data.get('device_user_id')
             self.instance.is_course = data.get('is_course', False)
             self.instance.is_active = data.get('is_active', True)
             self.instance.hall_name = data.get('hall_name', '')

@@ -13,6 +13,13 @@
   - Access QR codes, student codes, or national IDs
   - Dedicated full-screen interface
 
+### 🖐️ **Fingerprint Device** (Teachers, ZKTeco ADMS)
+- **URL**: `/iclock/` (called by the device, not by people)
+- **Features**:
+  - Teacher check-in/check-out by fingerprint, same rules as the scan station
+  - Shared rule: `attendance/services.py` → `record_teacher_scan()`
+  - Setup guide: [zkteco-device.md](zkteco-device.md)
+
 ### 👨‍🏫 **Teacher Dashboard Scan** (Teacher Only)
 - **URL**: `/portal/teacher/`
 - **Permission**: Teachers only, integrated in dashboard

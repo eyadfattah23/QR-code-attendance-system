@@ -176,6 +176,7 @@ For deep dives into the system architecture and deployment guidelines, refer to 
 - [Authentication System](docs/AUTHENTICATION.md)
 - [Attendance Logic & Schema](docs/ATTENDANCE.md)
 - [Production Deployment](docs/deployment.md)
+- [ZKTeco Fingerprint Device (teacher attendance)](docs/zkteco-device.md)
 
 ---
 

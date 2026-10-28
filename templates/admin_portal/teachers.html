@@ -154,7 +154,14 @@
                                 </td>
                                 <td class="text-muted small">{{ forloop.counter|add:page_obj.start_index|add:"-1" }}</td>
                             <td class="fw-semibold">{{ teacher.full_name }}</td>
-                            <td class="font-monospace small text-muted">{{ teacher.teacher_code|default:"—" }}</td>
+                            <td class="font-monospace small text-muted">
+                                {{ teacher.teacher_code|default:"—" }}
+                                {% if teacher.device_user_id %}
+                                <div><span class="badge bg-light text-dark border" title="رقم جهاز البصمة">
+                                    <i class="bi bi-fingerprint"></i> {{ teacher.device_user_id }}
+                                </span></div>
+                                {% endif %}
+                            </td>
                             <td class="font-monospace small text-muted" dir="ltr">{{ teacher.user.phone }}</td>
                             <td>
                                 {% if teacher.subject %}

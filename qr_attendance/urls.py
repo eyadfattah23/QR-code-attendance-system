@@ -29,6 +29,7 @@ urlpatterns = [
     path('admin/', admin.site.urls),
     path('', include('core.urls')),
     path('scan/', include('attendance.urls')),
+    path('iclock/', include('attendance.iclock_urls')),
     path('portal/admin/', include('admin_portal.urls')),
     path('portal/teacher/', include('teacher_portal.urls')),
     path('portal/supervisor/', include('supervisor_portal.urls')),
