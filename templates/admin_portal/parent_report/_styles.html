@@ -1,0 +1,210 @@
+{% load static %}
+<style>
+    @font-face { font-family: 'Report Arabic'; font-weight: 400; src: url('{% static "fonts/ibm-plex-sans-arabic/IBMPlexSansArabic-Regular.ttf" %}') format('truetype'); }
+    @font-face { font-family: 'Report Arabic'; font-weight: 500; src: url('{% static "fonts/ibm-plex-sans-arabic/IBMPlexSansArabic-Medium.ttf" %}') format('truetype'); }
+    @font-face { font-family: 'Report Arabic'; font-weight: 600; src: url('{% static "fonts/ibm-plex-sans-arabic/IBMPlexSansArabic-SemiBold.ttf" %}') format('truetype'); }
+    @font-face { font-family: 'Report Arabic'; font-weight: 700; src: url('{% static "fonts/ibm-plex-sans-arabic/IBMPlexSansArabic-Bold.ttf" %}') format('truetype'); }
+
+    @page {
+        size: A4;
+        margin: 12mm 12mm 15mm 12mm;
+        @bottom-right {
+            content: "واحة الرضوان التعليمية · تقرير متابعة: " string(student);
+            font-family: 'Report Arabic', sans-serif; font-size: 8pt; color: #636e7b;
+            direction: rtl; vertical-align: top; padding-top: 4mm;
+        }
+        @bottom-left {
+            content: "صفحة " counter(page) " من " counter(pages);
+            font-family: 'Report Arabic', sans-serif; font-size: 8pt; color: #636e7b;
+            direction: rtl; vertical-align: top; padding-top: 4mm;
+        }
+    }
+
+    .pr-doc {
+        --ink: #1c2530; --ink-2: #4a5563; --muted: #636e7b;
+        --line: #e2e7ec; --soft: #f5f7f9;
+        --brand: #0e6b62; --brand-dark: #0a4f48; --brand-soft: #e8f3f1;
+        --gold: #b98b2c; --gold-soft: #fbf4e4;
+        --low: #c62f2f; --low-ink: #a8231d; --low-soft: #fdeeec; --low-line: #ecaaa4;
+        --high: #3baa63; --high-ink: #1b6b37; --high-soft: #ebf6ef; --high-line: #acd9bb;
+        --mid: #98a2ae; --mid-ink: #4e5a68; --mid-soft: #f3f5f7; --mid-line: #dfe4e9;
+        font-family: 'Report Arabic', 'Noto Sans Arabic', 'Segoe UI', Tahoma, sans-serif;
+        font-size: 10pt; line-height: 1.55; color: var(--ink);
+        direction: rtl; text-align: right; background: #fff;
+    }
+    .pr-doc *, .pr-doc *::before, .pr-doc *::after { box-sizing: border-box; }
+    .pr-doc h1, .pr-doc h2, .pr-doc h3, .pr-doc p, .pr-doc figure, .pr-doc ul { margin: 0; padding: 0; }
+    .pr-doc ul { list-style: none; }
+    .pr-doc img { image-orientation: from-image; }
+    .pr-doc .bi::before { vertical-align: -0.12em; }
+    .pr-num { font-feature-settings: "tnum"; direction: ltr; display: inline-block; }
+
+    /* ---------- header ---------- */
+    .pr-header { display: flex; align-items: center; justify-content: space-between; gap: 6mm;
+        padding-bottom: 4mm; border-bottom: 2px solid var(--brand); position: relative; }
+    .pr-header::after { content: ""; position: absolute; bottom: -4px; right: 0; width: 38mm; height: 2px; background: var(--gold); }
+    .pr-brand { display: flex; align-items: center; gap: 3.5mm; }
+    .pr-emblem { width: 14mm; height: 14mm; flex: none; }
+    .pr-brand-name { font-size: 17pt; font-weight: 700; color: var(--brand-dark); line-height: 1.2; white-space: nowrap; }
+    .pr-brand-sub { font-size: 10pt; font-weight: 500; color: var(--ink-2); margin-top: 0.6mm; }
+    .pr-period { text-align: left; background: var(--brand-soft); border-radius: 3mm; padding: 2.4mm 4mm; }
+    .pr-period-label { font-size: 8pt; font-weight: 600; color: var(--brand); text-align: right; }
+    .pr-period-range { font-size: 10.5pt; font-weight: 700; color: var(--brand-dark); white-space: nowrap; text-align: right; }
+    .pr-period-range .bi { font-size: 9pt; color: var(--gold); margin: 0 1.2mm; }
+    .pr-period-meta { font-size: 8pt; color: var(--ink-2); text-align: right; }
+
+    /* ---------- sections ---------- */
+    .pr-section { margin-top: 6mm; }
+    .pr-h2 { display: flex; align-items: center; gap: 2.2mm; font-size: 12pt; font-weight: 700; color: var(--brand-dark);
+        padding-bottom: 1.6mm; margin-bottom: 3mm; border-bottom: 1px solid var(--line); break-after: avoid; }
+    .pr-h2-icon { display: inline-block; width: 6.4mm; height: 6.4mm; line-height: 6.4mm; text-align: center;
+        border-radius: 1.6mm; background: var(--brand); color: #fff; font-size: 9pt; flex: none; }
+    .pr-h2-count { font-size: 8.5pt; font-weight: 600; color: var(--muted); }
+    .pr-h2-aside { margin-right: auto; font-size: 8pt; font-weight: 500; color: var(--muted); }
+    .pr-empty { color: var(--muted); background: var(--soft); border-radius: 2mm; padding: 3mm 4mm; font-size: 9pt; }
+
+    /* ---------- student card ---------- */
+    .pr-student { display: flex; gap: 5mm; align-items: stretch; margin-top: 5mm;
+        border: 1px solid var(--line); border-radius: 3mm; padding: 4mm; break-inside: avoid; }
+    .pr-photo { width: 30mm; height: 34mm; flex: none; border-radius: 2.5mm; overflow: hidden; background: var(--soft);
+        border: 1px solid var(--line); text-align: center; }
+    .pr-photo img { width: 100%; height: 100%; object-fit: cover; display: block; }
+    .pr-photo-placeholder { font-size: 30pt; color: #c3cad2; line-height: 34mm; }
+    .pr-student-main { flex: 1; min-width: 0; }
+    .pr-student-name { font-size: 15pt; font-weight: 700; line-height: 1.3; string-set: student content(); }
+    .pr-student-nick { font-size: 9.5pt; font-weight: 500; color: var(--muted); margin-top: 0.4mm; }
+    .pr-facts { display: flex; flex-wrap: wrap; margin-top: 3mm; border-top: 1px dashed var(--line); padding-top: 2.5mm; }
+    .pr-fact { width: 33.33%; padding: 0.8mm 0 0.8mm 2mm; }
+    .pr-fact-label { font-size: 8pt; color: var(--muted); font-weight: 500; }
+    .pr-fact-value { font-size: 10pt; font-weight: 600; }
+
+    /* ---------- summary ---------- */
+    .pr-summary { margin-top: 4mm; background: var(--gold-soft); border-right: 3px solid var(--gold);
+        border-radius: 2mm; padding: 3mm 4mm; font-size: 10.5pt; line-height: 1.7; break-inside: avoid; }
+    .pr-summary p + p { margin-top: 0.8mm; }
+
+    /* ---------- KPI tiles ---------- */
+    .pr-kpis { display: flex; gap: 3mm; margin-top: 4mm; break-inside: avoid; }
+    .pr-kpi { flex: 1; border: 1px solid var(--line); border-radius: 2.5mm; padding: 2.8mm 3.2mm; border-top: 3px solid var(--brand); }
+    .pr-kpi.is-low { border-top-color: var(--low); background: var(--low-soft); }
+    .pr-kpi.is-high { border-top-color: var(--high); }
+    .pr-kpi-label { font-size: 8.5pt; font-weight: 600; color: var(--ink-2); }
+    .pr-kpi-value { font-size: 19pt; font-weight: 700; line-height: 1.25; margin-top: 0.6mm; }
+    .pr-kpi-value small { font-size: 9pt; font-weight: 500; color: var(--muted); }
+    .pr-kpi-sub { font-size: 8pt; color: var(--muted); margin-top: 0.4mm; }
+    .pr-delta { font-weight: 600; }
+    .pr-delta.up { color: var(--high-ink); }
+    .pr-delta.down { color: var(--low-ink); }
+    .pr-bar { height: 1.6mm; background: var(--soft); border-radius: 1mm; margin-top: 1.4mm; overflow: hidden; }
+    .pr-bar > span { display: block; height: 100%; background: var(--brand); border-radius: 1mm; }
+
+    /* ---------- tier badges ---------- */
+    .pr-badge { display: inline-block; border-radius: 10mm; padding: 0.2mm 2.2mm; font-size: 8pt; font-weight: 700;
+        border: 1px solid; white-space: nowrap; line-height: 1.5; }
+    .pr-badge.low { color: #fff; background: var(--low); border-color: var(--low); }
+    .pr-badge.high { color: var(--high-ink); background: var(--high-soft); border-color: var(--high-line); }
+    .pr-badge.mid { color: var(--mid-ink); background: var(--mid-soft); border-color: var(--mid-line); }
+    .pr-tag { display: inline-block; font-size: 8pt; font-weight: 600; color: var(--ink-2); background: var(--soft);
+        border: 1px solid var(--line); border-radius: 1.2mm; padding: 0 1.6mm; white-space: nowrap; }
+
+    /* ---------- chart ---------- */
+    .pr-chart { border: 1px solid var(--line); border-radius: 3mm; padding: 3mm 3mm 2mm; break-inside: avoid; }
+    .pr-chart svg { width: 100%; height: auto; display: block; }
+    .pr-legend { display: flex; flex-wrap: wrap; gap: 1.5mm 5mm; font-size: 8.5pt; color: var(--ink-2); margin-top: 2mm; padding: 0 1mm; }
+    .pr-legend-item { white-space: nowrap; }
+    .pr-dot { display: inline-block; width: 2.6mm; height: 2.6mm; border-radius: 50%; vertical-align: -0.2mm; margin-left: 1.2mm; }
+    .pr-dot.low { background: var(--low); } .pr-dot.mid { background: var(--mid); } .pr-dot.high { background: var(--high); }
+    .pr-swatch-line { display: inline-block; width: 6mm; border-top: 2px dashed var(--brand); vertical-align: 0.6mm; margin-left: 1.2mm; }
+    .pr-swatch-line.prev { border-top: 2px dotted var(--mid); }
+    .pr-chart-caption { font-size: 7.5pt; color: var(--muted); margin-right: auto; }
+
+    /* ---------- attendance per subject ---------- */
+    .pr-chip-legend { display: flex; gap: 4mm; font-size: 8pt; color: var(--ink-2); margin-bottom: 2.5mm; flex-wrap: wrap; break-after: avoid; }
+    .pr-subject { border: 1px solid var(--line); border-radius: 3mm; padding: 3mm 3.5mm; margin-bottom: 3mm; break-inside: avoid; }
+    .pr-subject-head { display: flex; align-items: center; gap: 3mm; }
+    .pr-subject-title { font-size: 11pt; font-weight: 700; }
+    .pr-subject-sub { font-size: 8.5pt; color: var(--muted); font-weight: 500; }
+    .pr-subject-stats { margin-right: auto; display: flex; gap: 1.6mm; align-items: center; }
+    .pr-stat { font-size: 8pt; font-weight: 600; color: var(--ink-2); background: var(--soft); border-radius: 1.5mm; padding: 0.5mm 2mm; white-space: nowrap; }
+    .pr-stat.absent { color: var(--low-ink); background: var(--low-soft); }
+    .pr-chips { margin-top: 2.5mm; line-height: 0; }
+    .pr-chip { display: inline-block; width: 12.6mm; margin: 0 0 1.4mm 1.4mm; border: 1px solid; border-radius: 1.6mm;
+        text-align: center; line-height: 1.25; padding: 0.8mm 0 0.9mm; vertical-align: top; }
+    .pr-chip-date { display: block; font-size: 7pt; font-weight: 500; }
+    .pr-chip-val { display: block; font-size: 10.5pt; font-weight: 700; }
+    .pr-chip.low { background: var(--low-soft); border-color: var(--low); color: var(--low-ink); border-width: 1.5px; }
+    .pr-chip.mid { background: var(--mid-soft); border-color: var(--mid-line); color: var(--mid-ink); }
+    .pr-chip.high { background: var(--high-soft); border-color: var(--high-line); color: var(--high-ink); }
+    .pr-chip.absent { background: #fff; border: 1px dashed #aab3bd; color: var(--muted); }
+    .pr-chip.absent .pr-chip-val { font-size: 7.5pt; font-weight: 600; padding: 0.6mm 0 0.5mm; }
+    .pr-chip-sample { display: inline-block; width: 4.5mm; height: 3.2mm; border-radius: 0.8mm; border: 1px solid; vertical-align: -0.4mm; margin-left: 1.2mm; }
+    .pr-chip-sample.low { background: var(--low-soft); border-color: var(--low); }
+    .pr-chip-sample.mid { background: var(--mid-soft); border-color: var(--mid-line); }
+    .pr-chip-sample.high { background: var(--high-soft); border-color: var(--high-line); }
+    .pr-chip-sample.absent { background: #fff; border: 1px dashed #aab3bd; }
+
+    /* ---------- notes ---------- */
+    .pr-group { margin-bottom: 4mm; }
+    .pr-group-title { display: flex; align-items: center; gap: 1.8mm; font-size: 10pt; font-weight: 700; margin-bottom: 2mm; break-after: avoid; }
+    .pr-group-title.low { color: var(--low-ink); }
+    .pr-group-title.high { color: var(--high-ink); }
+    .pr-group-title.mid { color: var(--ink-2); }
+    .pr-group-hint { font-size: 8pt; font-weight: 500; color: var(--muted); }
+    .pr-note { border-radius: 2mm; margin-bottom: 2mm; break-inside: avoid; }
+    .pr-note-head { display: flex; align-items: center; gap: 2mm; flex-wrap: wrap; }
+    .pr-note-date { font-weight: 700; }
+    .pr-note-day { color: var(--muted); font-size: 8pt; }
+    .pr-note-teacher { color: var(--muted); font-size: 8pt; }
+    .pr-note-head .pr-badge { margin-right: auto; }
+    .pr-note-text { white-space: pre-line; }
+    .pr-note-missing { color: var(--muted); font-style: italic; }
+    .pr-note.low { background: var(--low-soft); border: 1px solid var(--low-line); border-right: 4px solid var(--low); padding: 3mm 3.5mm; }
+    .pr-note.low .pr-note-text { font-size: 10.5pt; margin-top: 1.4mm; font-weight: 500; }
+    .pr-note.low.is-compact { padding: 1.8mm 3.5mm; }
+    .pr-note.low.is-compact .pr-note-missing { font-size: 8.5pt; }
+    .pr-note-row { display: flex; justify-content: space-between; break-inside: avoid; }
+    .pr-note-row > * { width: 49%; }
+    .pr-note.high { background: var(--high-soft); border-right: 3px solid var(--high); padding: 2mm 3mm; }
+    .pr-note.high .pr-note-text { font-size: 9.5pt; margin-top: 0.6mm; }
+    .pr-note.high .pr-note-day { font-size: 8pt; }
+    .pr-footnote { font-size: 8.5pt; color: var(--muted); margin-top: -0.5mm; }
+    .pr-table { width: 100%; border-collapse: collapse; font-size: 9pt; }
+    .pr-table th { text-align: right; font-weight: 600; color: var(--muted); font-size: 8pt; padding: 1mm 1.5mm; border-bottom: 1px solid var(--line); }
+    .pr-table td { padding: 1.4mm 1.5mm; border-bottom: 1px solid var(--line); vertical-align: top; }
+    .pr-table tr { break-inside: avoid; }
+    .pr-table td.pr-nowrap { white-space: nowrap; }
+
+    /* ---------- exam photos ---------- */
+    .pr-exam-row { display: flex; justify-content: space-between; margin-bottom: 3mm; break-inside: avoid; }
+    .pr-exam { border: 1px solid var(--line); border-radius: 3mm; overflow: hidden; background: #fff; }
+    .cols-2 > * { width: 48.8%; }
+    .cols-3 > * { width: 32.2%; }
+    .pr-exam.low { border: 1.5px solid var(--low); }
+    .pr-exam-img { background: var(--soft); text-align: center; }
+    .cols-2 .pr-exam-img { height: 62mm; }
+    .cols-3 .pr-exam-img { height: 48mm; }
+    .cols-3 .pr-exam-cap { padding: 1.6mm 2.2mm 2mm; }
+    .cols-3 .pr-exam-note { font-size: 8pt; }
+    .cols-3 .pr-exam-meta { flex-wrap: nowrap; gap: 1.4mm; }
+    .cols-3 .pr-exam-meta .pr-note-day { display: none; }
+    .cols-3 .pr-exam-meta .pr-note-date { font-size: 9pt; }
+    .pr-exam-img img { width: 100%; height: 100%; object-fit: contain; display: block; }
+    .pr-exam-flag { background: var(--low); color: #fff; font-size: 8pt; font-weight: 700; padding: 0.8mm 3mm; }
+    .pr-exam-cap { padding: 2.2mm 3mm 2.6mm; }
+    .pr-exam-meta { display: flex; align-items: center; gap: 2mm; flex-wrap: wrap; }
+    .pr-exam-meta .pr-badge { margin-right: auto; }
+    .pr-exam-note { font-size: 9pt; color: var(--ink-2); margin-top: 1mm; }
+
+    /* ---------- signatures ---------- */
+    .pr-sign { margin-top: 7mm; break-inside: avoid; }
+    .pr-sign-ack { font-size: 9pt; color: var(--ink-2); margin-bottom: 2.5mm; }
+    .pr-sign-row { display: flex; gap: 5mm; }
+    .pr-sign-box { flex: 1; border: 1px solid var(--line); border-radius: 3mm; padding: 3mm 4mm; }
+    .pr-sign-title { font-weight: 700; font-size: 9.5pt; color: var(--brand-dark); margin-bottom: 1.5mm; }
+    .pr-sign-line { display: flex; align-items: flex-end; gap: 2mm; font-size: 9pt; color: var(--ink-2); margin-top: 3.4mm; }
+    .pr-sign-line span { flex: 1; border-bottom: 1px dotted #9aa4b0; height: 4mm; }
+    .pr-sign-admin { display: flex; gap: 4mm; align-items: center; }
+    .pr-sign-admin > div:first-child { flex: 1; }
+    .pr-stamp { width: 20mm; height: 20mm; border: 1.5px dashed #b6bec7; border-radius: 50%; color: #aab3bd;
+        font-size: 8pt; text-align: center; line-height: 20mm; flex: none; }
+</style>

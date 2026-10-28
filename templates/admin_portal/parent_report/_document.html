@@ -1,0 +1,360 @@
+{% load l10n %}{% localize off %}
+<div class="pr-doc">
+
+    <!-- ===== Header ===== -->
+    <header class="pr-header">
+        <div class="pr-brand">
+            <svg class="pr-emblem" viewBox="0 0 48 48" aria-hidden="true">
+                <rect x="10" y="10" width="28" height="28" rx="2.5" fill="#0e6b62"/>
+                <rect x="10" y="10" width="28" height="28" rx="2.5" fill="#0e6b62" transform="rotate(45 24 24)"/>
+                <circle cx="24" cy="24" r="9" fill="#fff"/>
+                <circle cx="24" cy="24" r="6" fill="#b98b2c"/>
+            </svg>
+            <div>
+                <div class="pr-brand-name">واحة الرضوان التعليمية</div>
+                <div class="pr-brand-sub">تقرير متابعة الطالب لولي الأمر</div>
+            </div>
+        </div>
+        <div class="pr-period">
+            <div class="pr-period-label">فترة المتابعة</div>
+            <div class="pr-period-range">
+                من <span class="pr-num">{{ date_from|date:"Y/m/d" }}</span>
+                إلى <span class="pr-num">{{ date_to|date:"Y/m/d" }}</span>
+            </div>
+            <div class="pr-period-meta">{{ period_days }} {{ period_days_unit }} · تاريخ الإصدار <span class="pr-num">{{ generated_on|date:"Y/m/d" }}</span></div>
+        </div>
+    </header>
+
+    <!-- ===== Student identity ===== -->
+    <section class="pr-student">
+        <div class="pr-photo">
+            {% if student.image %}
+            <img src="{{ student.image.url }}" alt="صورة الطالب">
+            {% else %}
+            <i class="bi bi-person-fill pr-photo-placeholder"></i>
+            {% endif %}
+        </div>
+        <div class="pr-student-main">
+            <h1 class="pr-student-name">{{ student.full_name }}</h1>
+            {% if student.nickname %}<div class="pr-student-nick">{{ student.nickname }}</div>{% endif %}
+            <div class="pr-facts">
+                <div class="pr-fact">
+                    <div class="pr-fact-label">كود الطالب</div>
+                    <div class="pr-fact-value pr-num">{{ student.student_code|default:"—" }}</div>
+                </div>
+                <div class="pr-fact">
+                    <div class="pr-fact-label">الصف الدراسي</div>
+                    <div class="pr-fact-value">{{ student.grade|default:"—" }}</div>
+                </div>
+                <div class="pr-fact">
+                    <div class="pr-fact-label">نوع التعليم</div>
+                    <div class="pr-fact-value">{{ student.get_education_type_display|default:"—" }}</div>
+                </div>
+                <div class="pr-fact">
+                    <div class="pr-fact-label">القاعة / المجموعة</div>
+                    <div class="pr-fact-value">{{ student.hall_name|default:"—" }}</div>
+                </div>
+                <div class="pr-fact">
+                    <div class="pr-fact-label">ولي الأمر</div>
+                    <div class="pr-fact-value">{{ student.parent_full_name|default:"—" }}</div>
+                </div>
+                <div class="pr-fact">
+                    <div class="pr-fact-label">رقم ولي الأمر</div>
+                    <div class="pr-fact-value pr-num">{{ student.parent_phone|default:student.parent_calls_phone|default:"—" }}</div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- ===== Plain-language summary ===== -->
+    <div class="pr-summary">
+        {% for line in summary %}<p>{{ line }}</p>{% endfor %}
+    </div>
+
+    <!-- ===== Key numbers ===== -->
+    <div class="pr-kpis">
+        <div class="pr-kpi">
+            <div class="pr-kpi-label">متوسط التقييم</div>
+            {% if stats.avg %}
+            <div class="pr-kpi-value"><span class="pr-num">{{ stats.avg }}</span> <small>من 10</small></div>
+            <div class="pr-kpi-sub">
+                {% if stats.delta is None %}لا توجد بيانات للفترة السابقة
+                {% elif stats.delta_sign == 1 %}<span class="pr-delta up"><i class="bi bi-caret-up-fill"></i> <span class="pr-num">{{ stats.delta }}</span></span> أعلى من الفترة السابقة
+                {% elif stats.delta_sign == -1 %}<span class="pr-delta down"><i class="bi bi-caret-down-fill"></i> <span class="pr-num">{{ stats.delta }}</span></span> أقل من الفترة السابقة
+                {% else %}مثل الفترة السابقة{% endif %}
+            </div>
+            {% else %}
+            <div class="pr-kpi-value">—</div>
+            <div class="pr-kpi-sub">لا توجد تقييمات</div>
+            {% endif %}
+        </div>
+        <div class="pr-kpi">
+            <div class="pr-kpi-label">نسبة الحضور</div>
+            {% if stats.rate is not None %}
+            <div class="pr-kpi-value"><span class="pr-num">{{ stats.rate }}%</span></div>
+            <div class="pr-kpi-sub"><span class="pr-num">{{ stats.attended }}</span> من <span class="pr-num">{{ stats.held }}</span> {{ stats.held_unit }}{% if stats.absent %} · غياب <span class="pr-num">{{ stats.absent }}</span>{% endif %}</div>
+            <div class="pr-bar"><span style="width: {{ stats.rate }}%;"></span></div>
+            {% else %}
+            <div class="pr-kpi-value">—</div>
+            <div class="pr-kpi-sub">لا توجد حصص</div>
+            {% endif %}
+        </div>
+        <div class="pr-kpi{% if stats.low %} is-low{% endif %}">
+            <div class="pr-kpi-label">{% if stats.low %}<i class="bi bi-exclamation-triangle-fill" style="color: var(--low);"></i> {% endif %}أيام تحتاج متابعة</div>
+            <div class="pr-kpi-value"><span class="pr-num">{{ stats.low }}</span> <small>{{ stats.low_unit }}</small></div>
+            <div class="pr-kpi-sub">تقييم من 1 إلى {{ rating_low_max }}</div>
+        </div>
+        <div class="pr-kpi is-high">
+            <div class="pr-kpi-label"><i class="bi bi-star-fill" style="color: var(--high);"></i> أيام متميزة</div>
+            <div class="pr-kpi-value"><span class="pr-num">{{ stats.high }}</span> <small>{{ stats.high_unit }}</small></div>
+            <div class="pr-kpi-sub">تقييم من {{ rating_mid_max|add:1 }} إلى 10</div>
+        </div>
+    </div>
+
+    <!-- ===== Rating trend ===== -->
+    <section class="pr-section">
+        <h2 class="pr-h2">
+            <span class="pr-h2-icon"><i class="bi bi-graph-up"></i></span>
+            مستوى التقييم خلال الفترة
+            {% if stats.total %}<span class="pr-h2-aside">{{ stats.total_text }}</span>{% endif %}
+        </h2>
+        {% if chart %}
+        <div class="pr-chart">
+            <svg viewBox="0 0 {{ chart.width }} {{ chart.height }}" role="img"
+                 aria-label="تقييمات الطالب يوماً بيوم، متوسط الفترة {{ chart.avg.text }} من 10"
+                 font-family="Report Arabic, sans-serif">
+                <rect x="{{ chart.left|add:-8 }}" y="{{ chart.high_band.y }}" width="{{ chart.plot_width|add:16 }}" height="{{ chart.high_band.h }}" fill="#ebf6ef"/>
+                <rect x="{{ chart.left|add:-8 }}" y="{{ chart.low_band.y }}" width="{{ chart.plot_width|add:16 }}" height="{{ chart.low_band.h }}" fill="#fdeeec"/>
+                {% for g in chart.grid %}
+                <line x1="{{ chart.left|add:-8 }}" x2="{{ chart.right|add:8 }}" y1="{{ g.y }}" y2="{{ g.y }}" stroke="#e2e7ec" stroke-width="1"/>
+                <text x="{{ chart.right|add:24 }}" y="{{ g.y }}" dy="3.5" text-anchor="middle" font-size="10" fill="#636e7b">{{ g.value }}</text>
+                {% endfor %}
+                {% if chart.prev %}
+                <line x1="{{ chart.left|add:-8 }}" x2="{{ chart.right|add:8 }}" y1="{{ chart.prev.y }}" y2="{{ chart.prev.y }}" stroke="#98a2ae" stroke-width="1.6" stroke-dasharray="1.5 3.5" stroke-linecap="round"/>
+                <text x="{{ chart.left|add:-12 }}" y="{{ chart.prev.label_y }}" dy="3.5" text-anchor="end" font-size="10" font-weight="600" fill="#636e7b">{{ chart.prev.text }}</text>
+                {% endif %}
+                <line x1="{{ chart.left|add:-8 }}" x2="{{ chart.right|add:8 }}" y1="{{ chart.avg.y }}" y2="{{ chart.avg.y }}" stroke="#0e6b62" stroke-width="1.6" stroke-dasharray="6 4"/>
+                <text x="{{ chart.left|add:-12 }}" y="{{ chart.avg.label_y }}" dy="3.5" text-anchor="end" font-size="10.5" font-weight="700" fill="#0a4f48">{{ chart.avg.text }}</text>
+                <polyline points="{{ chart.line }}" fill="none" stroke="#c3cad2" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
+                {% for p in chart.points %}
+                {% if p.tier == 'low' %}
+                <circle cx="{{ p.x }}" cy="{{ p.y }}" r="5.5" fill="#c62f2f" stroke="#fff" stroke-width="2"/>
+                <text x="{{ p.x }}" y="{{ p.y }}" dy="-9" text-anchor="middle" font-size="10" font-weight="700" fill="#a8231d">{{ p.rating }}</text>
+                {% elif p.tier == 'high' %}
+                <circle cx="{{ p.x }}" cy="{{ p.y }}" r="4.5" fill="#3baa63" stroke="#fff" stroke-width="2"/>
+                {% else %}
+                <circle cx="{{ p.x }}" cy="{{ p.y }}" r="3.6" fill="#98a2ae" stroke="#fff" stroke-width="1.5"/>
+                {% endif %}
+                {% if p.date_label %}
+                <text x="{{ p.x }}" y="{{ chart.x_label_y }}" text-anchor="middle" font-size="9.5" fill="#636e7b">{{ p.date_label }}</text>
+                {% endif %}
+                {% endfor %}
+            </svg>
+            <div class="pr-legend">
+                <span class="pr-legend-item"><span class="pr-dot low"></span>يحتاج متابعة (1–{{ rating_low_max }}): <b class="pr-num">{{ stats.low }}</b></span>
+                <span class="pr-legend-item"><span class="pr-dot high"></span>متميز ({{ rating_mid_max|add:1 }}–10): <b class="pr-num">{{ stats.high }}</b></span>
+                <span class="pr-legend-item"><span class="pr-dot mid"></span>عادي ({{ rating_low_max|add:1 }}–{{ rating_mid_max }}): <b class="pr-num">{{ stats.mid }}</b></span>
+                <span class="pr-legend-item"><span class="pr-swatch-line"></span>متوسط الفترة <b class="pr-num">{{ chart.avg.text }}</b></span>
+                {% if chart.prev %}<span class="pr-legend-item"><span class="pr-swatch-line prev"></span>الفترة السابقة <b class="pr-num">{{ chart.prev.text }}</b></span>{% endif %}
+                <span class="pr-chart-caption">الأقدم يميناً ← الأحدث يساراً</span>
+            </div>
+        </div>
+        {% else %}
+        <p class="pr-empty">لا توجد تقييمات مسجلة في هذه الفترة.</p>
+        {% endif %}
+    </section>
+
+    <!-- ===== Attendance per subject ===== -->
+    <section class="pr-section">
+        <h2 class="pr-h2">
+            <span class="pr-h2-icon"><i class="bi bi-calendar2-check"></i></span>
+            تقرير الحضور
+            <span class="pr-h2-aside">الحصة تُحتسب في الأيام التي عُقدت فيها فعلاً</span>
+        </h2>
+        {% if subjects %}
+        <div class="pr-chip-legend">
+            <span><span class="pr-chip-sample low"></span>يحتاج متابعة</span>
+            <span><span class="pr-chip-sample high"></span>متميز</span>
+            <span><span class="pr-chip-sample mid"></span>عادي</span>
+            <span><span class="pr-chip-sample absent"></span>غائب</span>
+        </div>
+        {% for subject in subjects %}
+        <div class="pr-subject">
+            <div class="pr-subject-head">
+                <div>
+                    <div class="pr-subject-title">{{ subject.title }}</div>
+                    {% if subject.subtitle %}<div class="pr-subject-sub">{{ subject.subtitle }}</div>{% endif %}
+                </div>
+                <div class="pr-subject-stats">
+                    {% if subject.held %}
+                    <span class="pr-stat">حضر <span class="pr-num">{{ subject.attended }}/{{ subject.held }}</span> · <span class="pr-num">{{ subject.rate }}%</span></span>
+                    {% if subject.absent %}<span class="pr-stat absent">غياب <span class="pr-num">{{ subject.absent }}</span></span>{% endif %}
+                    {% if subject.avg %}<span class="pr-badge {{ subject.avg_tier }}">المتوسط <span class="pr-num">{{ subject.avg }}</span></span>{% endif %}
+                    {% endif %}
+                </div>
+            </div>
+            {% if subject.sessions %}
+            <div class="pr-chips">
+                {% for s in subject.sessions %}
+                {% if s.record %}
+                <span class="pr-chip {{ s.record.tier }}" title="{{ s.date|date:'Y/m/d' }}"><span class="pr-chip-date pr-num">{{ s.date|date:"j/n" }}</span><span class="pr-chip-val pr-num">{{ s.record.rating }}</span></span>
+                {% else %}
+                <span class="pr-chip absent" title="{{ s.date|date:'Y/m/d' }}"><span class="pr-chip-date pr-num">{{ s.date|date:"j/n" }}</span><span class="pr-chip-val">غائب</span></span>
+                {% endif %}
+                {% endfor %}
+            </div>
+            {% else %}
+            <p class="pr-empty" style="margin-top: 2mm;">لم تُعقد حصص لهذه المادة خلال الفترة.</p>
+            {% endif %}
+        </div>
+        {% endfor %}
+        {% else %}
+        <p class="pr-empty">الطالب غير مسجل في أي مادة.</p>
+        {% endif %}
+    </section>
+
+    <!-- ===== Notes log ===== -->
+    <section class="pr-section">
+        <h2 class="pr-h2">
+            <span class="pr-h2-icon"><i class="bi bi-journal-text"></i></span>
+            سجل الملاحظات
+        </h2>
+
+        {% if low_days %}
+        <div class="pr-group">
+            <div class="pr-group-title low">
+                <i class="bi bi-exclamation-triangle-fill"></i>
+                أيام تحتاج إلى متابعة
+                <span class="pr-group-hint">({{ low_days|length }} · تقييم من 1 إلى {{ rating_low_max }})</span>
+            </div>
+            {% for rec in low_days %}
+            <div class="pr-note low{% if not rec.note %} is-compact{% endif %}">
+                <div class="pr-note-head">
+                    <span class="pr-note-date pr-num">{{ rec.date|date:"Y/m/d" }}</span>
+                    <span class="pr-note-day">{{ rec.weekday }}</span>
+                    <span class="pr-tag">{{ rec.subject_title }}</span>
+                    {% if rec.teacher_name %}<span class="pr-note-teacher">{{ rec.teacher_name }}</span>{% endif %}
+                    {% if not rec.note %}<span class="pr-note-missing">لم يكتب المعلم ملاحظة</span>{% endif %}
+                    <span class="pr-badge low"><i class="bi bi-exclamation-triangle-fill"></i> <span class="pr-num">{{ rec.rating }}/10</span></span>
+                </div>
+                {% if rec.note %}<p class="pr-note-text">{{ rec.note }}</p>{% endif %}
+            </div>
+            {% endfor %}
+        </div>
+        {% endif %}
+
+        {% if high_note_rows %}
+        <div class="pr-group">
+            <div class="pr-group-title high">
+                <i class="bi bi-star-fill"></i>
+                أيام متميزة
+                <span class="pr-group-hint">(تقييم من {{ rating_mid_max|add:1 }} إلى 10)</span>
+            </div>
+            {% for row in high_note_rows %}
+            <div class="pr-note-row">
+                {% for rec in row %}
+                {% if not rec %}<div></div>{% else %}
+                <div class="pr-note high">
+                    <div class="pr-note-head">
+                        <span class="pr-note-date pr-num">{{ rec.date|date:"Y/m/d" }}</span>
+                        <span class="pr-note-day">{{ rec.weekday }}</span>
+                        <span class="pr-tag">{{ rec.subject_title }}</span>
+                        <span class="pr-badge high"><i class="bi bi-star-fill"></i> <span class="pr-num">{{ rec.rating }}/10</span></span>
+                    </div>
+                    <p class="pr-note-text">{{ rec.note }}</p>
+                </div>
+                {% endif %}
+                {% endfor %}
+            </div>
+            {% endfor %}
+            {% if high_without_note_text %}<p class="pr-footnote">{{ high_without_note_text }}</p>{% endif %}
+        </div>
+        {% endif %}
+
+        {% if mid_notes %}
+        <div class="pr-group">
+            <div class="pr-group-title mid">
+                <i class="bi bi-chat-left-text"></i>
+                ملاحظات أخرى
+                <span class="pr-group-hint">(تقييم {{ rating_low_max|add:1 }}–{{ rating_mid_max }})</span>
+            </div>
+            <table class="pr-table">
+                <thead>
+                    <tr><th style="width: 18%;">التاريخ</th><th style="width: 17%;">المادة</th><th style="width: 9%;">التقييم</th><th>الملاحظة</th></tr>
+                </thead>
+                <tbody>
+                    {% for rec in mid_notes %}
+                    <tr>
+                        <td class="pr-nowrap"><span class="pr-num">{{ rec.date|date:"Y/m/d" }}</span> <span class="pr-note-day">{{ rec.weekday }}</span></td>
+                        <td>{{ rec.subject_title }}</td>
+                        <td class="pr-nowrap"><span class="pr-num">{{ rec.rating }}/10</span></td>
+                        <td class="pr-note-text">{{ rec.note }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% endif %}
+
+        {% if not low_days and not high_note_rows and not mid_notes %}
+        <p class="pr-empty">لا توجد ملاحظات من المعلمين خلال هذه الفترة.</p>
+        {% endif %}
+    </section>
+
+    <!-- ===== Exam photos ===== -->
+    <section class="pr-section">
+        <h2 class="pr-h2">
+            <span class="pr-h2-icon"><i class="bi bi-file-earmark-text"></i></span>
+            صور الاختبارات
+            {% if exams %}<span class="pr-h2-count">({{ exams|length }})</span>{% endif %}
+        </h2>
+        {% for row in exam_rows %}
+        <div class="pr-exam-row cols-{{ row.cols }}">
+            {% for rec in row.items %}
+            {% if not rec %}<div></div>{% else %}
+            <figure class="pr-exam {{ rec.tier }}">
+                {% if rec.tier == 'low' %}<div class="pr-exam-flag"><i class="bi bi-exclamation-triangle-fill"></i> يوم يحتاج متابعة</div>{% endif %}
+                <div class="pr-exam-img"><img src="{{ rec.test_photo.url }}" alt="اختبار {{ rec.date|date:'Y/m/d' }}"></div>
+                <figcaption class="pr-exam-cap">
+                    <div class="pr-exam-meta">
+                        <span class="pr-note-date pr-num">{{ rec.date|date:"Y/m/d" }}</span>
+                        <span class="pr-note-day">{{ rec.weekday }}</span>
+                        <span class="pr-tag">{{ rec.subject_title }}</span>
+                        <span class="pr-badge {{ rec.tier }}">{% if rec.tier == 'low' %}<i class="bi bi-exclamation-triangle-fill"></i> {% elif rec.tier == 'high' %}<i class="bi bi-star-fill"></i> {% endif %}<span class="pr-num">{{ rec.rating }}/10</span></span>
+                    </div>
+                    {% if rec.note %}<p class="pr-exam-note">{{ rec.note|truncatechars:140 }}</p>{% endif %}
+                </figcaption>
+            </figure>
+            {% endif %}
+            {% endfor %}
+        </div>
+        {% empty %}
+        <p class="pr-empty">لا توجد صور اختبارات خلال هذه الفترة.</p>
+        {% endfor %}
+    </section>
+
+    <!-- ===== Signatures ===== -->
+    <section class="pr-sign">
+        <p class="pr-sign-ack">نأمل من ولي الأمر الاطلاع على التقرير والتوقيع عليه وإعادته، ونسعد بتواصلكم لأي استفسار.</p>
+        <div class="pr-sign-row">
+            <div class="pr-sign-box">
+                <div class="pr-sign-title"><i class="bi bi-pen"></i> توقيع ولي الأمر</div>
+                <div class="pr-sign-line">الاسم: <span></span></div>
+                <div class="pr-sign-line">التوقيع: <span></span></div>
+                <div class="pr-sign-line">التاريخ: <span></span></div>
+            </div>
+            <div class="pr-sign-box">
+                <div class="pr-sign-title"><i class="bi bi-building-check"></i> اعتماد الإدارة</div>
+                <div class="pr-sign-admin">
+                    <div>
+                        <div class="pr-sign-line">الاسم: <span></span></div>
+                        <div class="pr-sign-line">التوقيع: <span></span></div>
+                    </div>
+                    <div class="pr-stamp">الختم</div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+</div>
+{% endlocalize %}

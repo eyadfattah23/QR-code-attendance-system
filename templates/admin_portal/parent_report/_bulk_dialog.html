@@ -1,0 +1,164 @@
+{% comment %}
+Bulk parent-reports dialog. Students come either from server-rendered
+`bulk_student_ids` (with `bulk_count`), or — when the page defines
+window.parentReportSelectedIds() — from a client-side selection.
+Open it with data-bs-target="#bulkReportModal".
+{% endcomment %}
+<div class="modal fade" id="bulkReportModal" tabindex="-1" aria-labelledby="bulkReportModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <form method="post" action="{% url 'admin_portal:parent_reports_bulk' %}" class="modal-content" id="bulkReportForm"
+              data-count="{{ bulk_count|default:0 }}" data-max="{{ bulk_max }}">
+            {% csrf_token %}
+            <input type="hidden" name="next" value="{{ request.get_full_path }}">
+            {% for id in bulk_student_ids %}<input type="hidden" name="student_ids" value="{{ id }}">{% endfor %}
+            <div class="modal-header">
+                <h5 class="modal-title fs-6" id="bulkReportModalLabel">
+                    <i class="bi bi-files me-1 text-success"></i>تقارير أولياء الأمور لعدة طلاب
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="إغلاق"></button>
+            </div>
+            <div class="modal-body">
+                <div class="alert alert-success py-2 small mb-3" data-bulk-ok>
+                    <i class="bi bi-people me-1"></i>سيتم إنشاء تقرير منفصل لكل طالب — عدد الطلاب: <strong data-bulk-count></strong>
+                    {% if bulk_student_ids or bulk_count %}<span class="text-muted">(الطلاب الظاهرون في نتائج البحث الحالية)</span>{% endif %}
+                </div>
+                <div class="alert alert-warning py-2 small mb-3 d-none" data-bulk-over>
+                    <i class="bi bi-exclamation-triangle me-1"></i>
+                    عدد الطلاب <strong data-bulk-count></strong>، والحد الأقصى {{ bulk_max }} طالباً في المرة الواحدة.
+                    ضيّق الاختيار أو قسّمه على أكثر من دفعة.
+                </div>
+                <div class="alert alert-secondary py-2 small mb-3 d-none" data-bulk-empty>
+                    لم يتم اختيار أي طالب.
+                </div>
+                <div class="row g-2">
+                    <div class="col-6">
+                        <label class="form-label mb-1 small fw-semibold" for="bulkDateFrom">من تاريخ</label>
+                        <input type="date" id="bulkDateFrom" name="date_from" value="{{ report_date_from }}" class="form-control form-control-sm" required>
+                    </div>
+                    <div class="col-6">
+                        <label class="form-label mb-1 small fw-semibold" for="bulkDateTo">إلى تاريخ</label>
+                        <input type="date" id="bulkDateTo" name="date_to" value="{{ report_date_to }}" class="form-control form-control-sm" required>
+                    </div>
+                </div>
+                <div class="d-flex flex-wrap gap-1 mt-2">
+                    {% for p in report_presets %}
+                    <button type="button" class="btn btn-outline-secondary btn-sm py-0 bulk-preset" data-from="{{ p.from }}" data-to="{{ p.to }}">{{ p.label }}</button>
+                    {% endfor %}
+                </div>
+                <div class="mt-3">
+                    <div class="small fw-semibold mb-1">شكل الملف</div>
+                    <div class="form-check">
+                        <input class="form-check-input" type="radio" name="output" id="bulkOutZip" value="zip" checked>
+                        <label class="form-check-label small" for="bulkOutZip">
+                            ملف لكل طالب (ZIP) <span class="text-muted">— لإرسال كل تقرير لولي أمره</span>
+                        </label>
+                    </div>
+                    <div class="form-check">
+                        <input class="form-check-input" type="radio" name="output" id="bulkOutPdf" value="pdf">
+                        <label class="form-check-label small" for="bulkOutPdf">
+                            ملف PDF واحد <span class="text-muted">— للطباعة دفعة واحدة</span>
+                        </label>
+                    </div>
+                </div>
+                <div class="alert alert-danger py-2 small mt-3 mb-0 d-none" data-bulk-error></div>
+                <p class="small text-muted mt-3 mb-0" data-bulk-hint>
+                    <i class="bi bi-hourglass-split me-1"></i>قد يستغرق التجهيز حوالي ثانية لكل طالب، ثم يبدأ التحميل تلقائياً.
+                </p>
+            </div>
+            <div class="modal-footer p-2">
+                <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">إلغاء</button>
+                <button type="submit" class="btn btn-success btn-sm" data-bulk-submit>
+                    <span class="spinner-border spinner-border-sm me-1 d-none" aria-hidden="true"></span>
+                    <i class="bi bi-download me-1"></i><span data-bulk-label>تحميل التقارير</span>
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+<script{% if csp_nonce %} nonce="{{ csp_nonce }}"{% endif %}>
+(function () {
+    var form = document.getElementById('bulkReportForm');
+    if (!form) return;
+    var modalEl = document.getElementById('bulkReportModal');
+    var max = parseInt(form.dataset.max, 10);
+    var submit = form.querySelector('[data-bulk-submit]');
+    var label = form.querySelector('[data-bulk-label]');
+    var spinner = submit.querySelector('.spinner-border');
+    var errorBox = form.querySelector('[data-bulk-error]');
+
+    function selectedIds() {
+        if (typeof window.parentReportSelectedIds === 'function') return window.parentReportSelectedIds();
+        return null;
+    }
+    function count() {
+        var ids = selectedIds();
+        return ids ? ids.length : parseInt(form.dataset.count, 10) || 0;
+    }
+    function toggle(sel, on) { form.querySelectorAll(sel).forEach(function (el) { el.classList.toggle('d-none', !on); }); }
+
+    modalEl.addEventListener('show.bs.modal', function () {
+        var n = count();
+        form.querySelectorAll('[data-bulk-count]').forEach(function (el) { el.textContent = n; });
+        toggle('[data-bulk-ok]', n > 0 && n <= max);
+        toggle('[data-bulk-over]', n > max);
+        toggle('[data-bulk-empty]', n === 0);
+        toggle('[data-bulk-error]', false);
+        submit.disabled = n === 0 || n > max;
+    });
+
+    form.querySelectorAll('.bulk-preset').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+            form.querySelector('[name=date_from]').value = btn.dataset.from;
+            form.querySelector('[name=date_to]').value = btn.dataset.to;
+        });
+    });
+
+    function busy(on) {
+        submit.disabled = on;
+        spinner.classList.toggle('d-none', !on);
+        label.textContent = on ? 'جارٍ تجهيز التقارير…' : 'تحميل التقارير';
+    }
+
+    function filename(disposition) {
+        var m = /filename\*=utf-8''([^;]+)/i.exec(disposition || '');
+        if (m) return decodeURIComponent(m[1]);
+        m = /filename="([^"]+)"/i.exec(disposition || '');
+        return m ? m[1] : 'reports';
+    }
+
+    form.addEventListener('submit', function (e) {
+        e.preventDefault();
+        var ids = selectedIds();
+        if (ids) {
+            form.querySelectorAll('input[name=student_ids]').forEach(function (el) { el.remove(); });
+            ids.forEach(function (id) {
+                var input = document.createElement('input');
+                input.type = 'hidden'; input.name = 'student_ids'; input.value = id;
+                form.appendChild(input);
+            });
+        }
+        toggle('[data-bulk-error]', false);
+        busy(true);
+        fetch(form.action, {
+            method: 'POST', body: new FormData(form), credentials: 'same-origin',
+            headers: {'X-Requested-With': 'fetch'},
+        }).then(function (resp) {
+            if (!resp.ok) {
+                return resp.text().then(function (text) { throw new Error(text || 'تعذر تجهيز التقارير.'); });
+            }
+            var name = filename(resp.headers.get('Content-Disposition'));
+            return resp.blob().then(function (blob) {
+                var url = URL.createObjectURL(blob);
+                var a = document.createElement('a');
+                a.href = url; a.download = name;
+                document.body.appendChild(a); a.click(); a.remove();
+                setTimeout(function () { URL.revokeObjectURL(url); }, 60000);
+                bootstrap.Modal.getOrCreateInstance(modalEl).hide();
+            });
+        }).catch(function (err) {
+            errorBox.textContent = err.message.length < 300 ? err.message : 'تعذر تجهيز التقارير، حاول مرة أخرى.';
+            toggle('[data-bulk-error]', true);
+        }).finally(function () { busy(false); });
+    });
+})();
+</script>

@@ -136,6 +136,10 @@
             <!-- Bulk action toolbar (hidden until rows selected, persists across pages) -->
             <div id="bulk-toolbar" class="d-none align-items-center gap-2">
                 <span class="text-muted small" id="bulk-count-label"></span>
+                <button type="button" class="btn btn-success btn-sm" data-bs-toggle="modal"
+                    data-bs-target="#bulkReportModal">
+                    <i class="bi bi-files me-1"></i>تقارير أولياء الأمور
+                </button>
                 <button type="button" class="btn btn-outline-secondary btn-sm" id="bulk-export-btn">
                     <i class="bi bi-download me-1"></i>تصدير المحدد
                 </button>
@@ -431,6 +435,8 @@
 {% endblock %}
 
 {% block extra_js %}
+{% include 'admin_portal/parent_report/_bulk_dialog.html' %}
+
 <script src="{% static 'js/bulk_select.js' %}"></script>
 <script>
     // ── single-row delete modal ───────────────────────────────────────────────
@@ -446,6 +452,7 @@
         idFieldName: 'student_ids',
         itemLabel: 'طالب',
     });
+    window.parentReportSelectedIds = bulkSelect.getSelectedIds;
 
     // ── bulk delete confirm ───────────────────────────────────────────────────
     document.getElementById('bulkDeleteModal').addEventListener('show.bs.modal', function () {

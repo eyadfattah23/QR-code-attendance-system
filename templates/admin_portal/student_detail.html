@@ -36,6 +36,9 @@
             </div>
         </div>
         <div class="d-flex gap-2">
+            <button type="button" class="btn btn-success btn-sm" data-bs-toggle="modal" data-bs-target="#parentReportModal">
+                <i class="bi bi-file-earmark-person me-1"></i>تقرير ولي الأمر
+            </button>
             <a href="{% url 'admin_portal:student_history' student.id %}" class="btn btn-outline-info btn-sm">
                 <i class="bi bi-clock-history me-1"></i>سجل الحضور
             </a>
@@ -286,6 +289,8 @@
 
     </div>
 </div>
+
+{% include 'admin_portal/parent_report/_dialog.html' with report_student=student %}
 
 {% if student.image %}
 <!-- Image Modal -->

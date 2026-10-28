@@ -128,3 +128,7 @@ ALLOWED_IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/webp']
 QR_CODE_VERSION = 1
 QR_CODE_BOX_SIZE = 10
 QR_CODE_BORDER = 4
+
+# Parent reports: max students per bulk download (rendered inside one
+# request, roughly 0.6–1 s per student).
+PARENT_REPORT_BULK_MAX = config('PARENT_REPORT_BULK_MAX', default=20, cast=int)
